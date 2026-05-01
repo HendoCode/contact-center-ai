@@ -1,0 +1,260 @@
+workspace "Contact Center AI" "RAG pipeline and MCP server for credit union call center supervisors." {
+
+    model {
+
+        # ── People ──────────────────────────────────────────────────────────────
+
+        supervisor = person "Credit Union Supervisor" "Queries call transcripts and CSAT survey data using natural language via an MCP-compatible client such as Claude Desktop." {
+            tags "User"
+        }
+
+        # ── Software Systems ─────────────────────────────────────────────────────
+
+        contactCenterAI = softwareSystem "Contact Center AI" "Python RAG pipeline and MCP server. Exposes call center data as three tools to any MCP-compatible AI client." {
+            tags "Internal"
+
+            # ── Containers ───────────────────────────────────────────────────────
+
+            mcpServer = container "MCP Server" "Async stdio/HTTP server. Registers tool schemas and dispatches incoming tool calls. Entry point: mcp/server.py. Tool implementations: mcp/tools.py." "Python / MCP SDK" {
+                tags "Server"
+
+                # server.py handlers
+                listToolsHandler = component "list_tools handler" "Registers the three MCP tool definitions (name, description, inputSchema) with the MCP SDK." "Python async function"
+                callToolHandler  = component "call_tool handler"  "Routes incoming tool calls by name to the correct tool function. Wraps results in TextContent." "Python async function"
+                mainRunner       = component "main()"             "Initialises the stdio_server context manager and starts the MCP application." "Python async function"
+
+                # mcp/tools.py functions
+                searchTranscriptsTool = component "search_transcripts()" "Accepts a natural-language query and optional k. Delegates to rag_query(). Returns an AI-generated answer grounded in the top-k retrieved transcripts." "Python function"
+                getCallSummaryTool    = component "get_call_summary()"   "Accepts a call_id. Retrieves the matching transcript via retrieve() then calls rag_query() to produce a concise summary." "Python function"
+                queryCSATTool         = component "query_csat()"         "Accepts optional score range and category. Loads csat.json directly from disk. Filters in-memory. Does not touch pgvector or OpenAI." "Python function"
+            }
+
+            ragPipeline = container "RAG Pipeline" "Orchestrates data ingestion, semantic retrieval, and answer synthesis. rag/pipeline.py." "Python / LangChain" {
+                tags "Module"
+
+                loadSyntheticData  = component "load_synthetic_data()"      "Reads data/synthetic/transcripts.json from disk and returns a list of raw dicts." "Python function"
+                transcriptsToDocs  = component "transcripts_to_documents()" "Converts raw transcript dicts into LangChain Document objects, preserving call_id, date, category, outcome, and agent/member IDs as metadata." "Python function"
+                ingestFn           = component "ingest()"                   "Orchestrates the full ingestion path: load → convert → embed → store. Accepts source='synthetic' (live) or 's3' (NotImplementedError). No deduplication guard." "Python function"
+                retrieveFn         = component "retrieve()"                  "Calls vector_store.similarity_search(query, k). Returns the top-k most semantically similar Document objects." "Python function"
+                ragQueryFn         = component "rag_query()"                 "Calls retrieve(), formats document context, builds a system prompt, invokes gpt-4o-mini via ChatOpenAI, and returns response.content." "Python function"
+            }
+
+            embeddingsModule = container "Embeddings Module" "Wraps the embedding model and vector store. Swapping LLM providers requires editing only this file. rag/embeddings.py." "Python / LangChain" {
+                tags "Module"
+
+                getEmbeddings  = component "get_embeddings()"   "Returns OpenAIEmbeddings(model='text-embedding-3-small', dimensions=1536). This function is the sole provider-coupling point for embeddings." "Python function"
+                getVectorStore = component "get_vector_store()" "Returns a PGVector instance bound to the call_transcripts collection and the DATABASE_URL connection string. Calls get_embeddings() if none is supplied." "Python function"
+            }
+
+            postgresDB = container "PostgreSQL + pgvector" "Stores 1536-dimension call transcript embeddings in the call_transcripts collection. Local dev: Docker pgvector/pgvector:pg16. Production: Azure PostgreSQL Flexible Server 16 with pgvector extension." "PostgreSQL 16 + pgvector" {
+                tags "Database"
+            }
+
+            dataFiles = container "Data Files" "Synthetic JSON files on disk. transcripts.json holds 150 call records with full dialogue. csat.json holds ~112 CSAT survey records (75% response rate). Generated by data/synthetic/generate_data.py." "JSON on disk" {
+                tags "DataStore"
+            }
+        }
+
+        openAI = softwareSystem "OpenAI API" "Provides text-embedding-3-small for document and query vectorisation, and gpt-4o-mini for answer synthesis." {
+            tags "External"
+        }
+
+        azureAppService = softwareSystem "Azure App Service" "Production host for the MCP server. Linux B2 plan. Defined in infra/terraform/main.tf." {
+            tags "Azure"
+        }
+
+        azureEntra = softwareSystem "Microsoft Entra (Easy Auth)" "Intercepts every inbound HTTP request to App Service before it reaches Python code. Validates OAuth 2.0 Bearer tokens against the registered app audience. No auth logic exists in the Python application." {
+            tags "Azure"
+        }
+
+        awsS3 = softwareSystem "AWS S3" "Planned source for production call recordings and transcripts. pipeline.py raises NotImplementedError for the 's3' source path." {
+            tags "Planned"
+        }
+
+        # ── Relationships ────────────────────────────────────────────────────────
+
+        # Person → system
+        supervisor -> contactCenterAI "Queries call transcripts and CSAT data" "MCP (stdio / HTTPS)"
+
+        # System → external
+        contactCenterAI -> openAI        "Generates embeddings and LLM completions" "HTTPS"
+        contactCenterAI -> awsS3         "Planned: loads source transcript files" "HTTPS (stubbed — NotImplementedError)"
+        contactCenterAI -> azureAppService "Deployed to in production" "Terraform / App Service"
+        azureEntra      -> azureAppService "Intercepts requests and validates Bearer tokens" "HTTP middleware (Easy Auth)"
+
+        # Person → container
+        supervisor -> mcpServer "Sends tool call requests" "MCP stdio (local) / HTTPS (production)"
+
+        # Container → container
+        mcpServer       -> ragPipeline      "Calls rag_query() and retrieve()" "Python function call"
+        mcpServer       -> dataFiles        "Reads csat.json directly" "File I/O"
+        ragPipeline     -> embeddingsModule "Calls get_vector_store() and get_embeddings()" "Python function call"
+        ragPipeline     -> dataFiles        "Reads transcripts.json" "File I/O"
+        ragPipeline     -> postgresDB       "Stores and queries vector embeddings" "SQL / pgvector"
+        ragPipeline     -> openAI           "Synthesises answers via ChatOpenAI (gpt-4o-mini)" "HTTPS"
+        embeddingsModule -> openAI          "Vectorises text via OpenAI Embeddings API" "HTTPS"
+        embeddingsModule -> postgresDB      "Reads and writes embeddings via PGVector / psycopg2" "SQL"
+
+        # Component → component: MCP Server layer
+        callToolHandler       -> searchTranscriptsTool "routes search_transcripts calls"
+        callToolHandler       -> getCallSummaryTool    "routes get_call_summary calls"
+        callToolHandler       -> queryCSATTool         "routes query_csat calls"
+        searchTranscriptsTool -> ragQueryFn            "calls rag_query()"
+        getCallSummaryTool    -> retrieveFn            "calls retrieve() filtered by call_id"
+        getCallSummaryTool    -> ragQueryFn            "calls rag_query() to summarise match"
+        queryCSATTool         -> dataFiles             "reads csat.json — bypasses vector store entirely"
+
+        # Component → component: RAG Pipeline layer
+        ragQueryFn   -> retrieveFn     "calls retrieve()"
+        retrieveFn   -> getVectorStore "calls similarity_search()"
+        ingestFn     -> loadSyntheticData  "loads transcripts.json"
+        ingestFn     -> transcriptsToDocs  "converts raw dicts to LangChain Documents"
+        ingestFn     -> getVectorStore     "calls vector_store.add_documents()"
+        getVectorStore -> getEmbeddings    "calls get_embeddings() when no embeddings are supplied"
+        getEmbeddings  -> openAI           "calls OpenAI Embeddings API"
+        ragQueryFn     -> openAI           "calls ChatOpenAI (gpt-4o-mini)"
+        getVectorStore -> postgresDB       "reads and writes embeddings via psycopg2"
+    }
+
+    views {
+
+        # ── Level 1: System Context ──────────────────────────────────────────────
+
+        systemContext contactCenterAI "SystemContext" {
+            include *
+            autoLayout lr
+            title "System Context — Contact Center AI"
+            description "All actors and external systems. azureEntra sits outside the system boundary — the Python application contains no authentication code."
+        }
+
+        # ── Level 2: Container ───────────────────────────────────────────────────
+
+        container contactCenterAI "Containers" {
+            include *
+            autoLayout tb
+            title "Container View — Contact Center AI"
+            description "Six runtime and storage containers. The CSAT query path (mcpServer → dataFiles) bypasses pgvector and OpenAI entirely."
+        }
+
+        # ── Level 3: Component — MCP Server + Tools ──────────────────────────────
+
+        component mcpServer "Components_MCP" {
+            include *
+            autoLayout tb
+            title "Component View — MCP Server and Tools"
+            description "mcp/server.py handlers and mcp/tools.py functions run in a single Python process. query_csat() is the only tool that does not call into the RAG pipeline."
+        }
+
+        # ── Level 3: Component — RAG Pipeline ────────────────────────────────────
+
+        component ragPipeline "Components_RAG" {
+            include *
+            autoLayout tb
+            title "Component View — RAG Pipeline"
+            description "rag/pipeline.py functions. Ingestion has no deduplication guard — running ingest() twice creates duplicate rows. LangChain provides the provider-abstraction boundary."
+        }
+
+        # ── Level 3: Component — Embeddings Module ────────────────────────────────
+
+        component embeddingsModule "Components_Embeddings" {
+            include *
+            autoLayout tb
+            title "Component View — Embeddings Module"
+            description "rag/embeddings.py. get_embeddings() and get_vector_store() are the only two coupling points to OpenAI and pgvector. Swapping providers requires editing only this file."
+        }
+
+        # ── Dynamic: Data Ingestion Flow ─────────────────────────────────────────
+
+        dynamic contactCenterAI "Dynamic_Ingest" "Data Ingestion Flow" {
+            ragPipeline     -> dataFiles        "1. load_synthetic_data() reads transcripts.json (150 call records)"
+            ragPipeline     -> embeddingsModule "2. transcripts_to_documents() converts records to LangChain Documents, then calls get_vector_store()"
+            embeddingsModule -> openAI          "3. get_embeddings() vectorises each document — text-embedding-3-small, 1536 dimensions"
+            embeddingsModule -> postgresDB      "4. PGVector initialises schema and indexes on first run"
+            ragPipeline     -> postgresDB       "5. vector_store.add_documents() inserts embeddings and call metadata — no dedup guard"
+            autoLayout lr
+            title "Data Ingestion Flow"
+            description "Triggered by: python rag/pipeline.py --ingest. csat.json is not ingested — it is read directly at query time."
+        }
+
+        # ── Dynamic: RAG Query Flow ───────────────────────────────────────────────
+
+        dynamic contactCenterAI "Dynamic_RAGQuery" "RAG Query Flow" {
+            supervisor   -> mcpServer       "1. Call tool: search_transcripts(query='fraud disputes')"
+            mcpServer    -> ragPipeline     "2. search_transcripts() delegates to rag_query(query, k=5)"
+            ragPipeline  -> embeddingsModule "3. retrieve() calls get_vector_store().similarity_search()"
+            embeddingsModule -> openAI      "4. Embed query string → 1536-dim vector"
+            embeddingsModule -> postgresDB  "5. ANN similarity search on call_transcripts collection — returns top-k docs"
+            ragPipeline  -> openAI          "6. ChatOpenAI(gpt-4o-mini).invoke(system prompt + retrieved context)"
+            autoLayout lr
+            title "RAG Query Flow — search_transcripts / get_call_summary"
+            description "Happy path for a semantic natural-language query. get_call_summary follows the same path with a call_id filter applied before rag_query()."
+        }
+
+        # ── Dynamic: CSAT Query Flow ──────────────────────────────────────────────
+
+        dynamic contactCenterAI "Dynamic_CSATQuery" "CSAT Query Flow" {
+            supervisor -> mcpServer  "1. Call tool: query_csat(min_score=1, max_score=2, category='fraud_dispute')"
+            mcpServer  -> dataFiles  "2. query_csat() loads csat.json — in-memory filter by score range and category. No pgvector. No OpenAI."
+            autoLayout lr
+            title "CSAT Query Flow — query_csat"
+            description "CSAT data is not in pgvector. query_csat() bypasses the entire RAG pipeline — it reads the JSON file directly and filters in-memory. If query volume or dataset size grows, this path needs a SQL-backed approach."
+        }
+
+        # ── Styles ───────────────────────────────────────────────────────────────
+
+        styles {
+
+            element "User" {
+                shape Person
+                background #1168BD
+                color #ffffff
+                fontSize 14
+            }
+
+            element "Internal" {
+                background #1168BD
+                color #ffffff
+            }
+
+            element "External" {
+                background #999999
+                color #ffffff
+            }
+
+            element "Azure" {
+                background #0078D4
+                color #ffffff
+            }
+
+            element "Planned" {
+                background #cccccc
+                color #444444
+                border dashed
+            }
+
+            element "Server" {
+                shape RoundedBox
+                background #438DD5
+                color #ffffff
+            }
+
+            element "Module" {
+                shape Component
+                background #85BBF0
+                color #000000
+            }
+
+            element "Database" {
+                shape Cylinder
+                background #336791
+                color #ffffff
+            }
+
+            element "DataStore" {
+                shape Folder
+                background #E8A838
+                color #000000
+            }
+        }
+    }
+}
