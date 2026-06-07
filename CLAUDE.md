@@ -21,17 +21,18 @@ survey data using natural language. This repo uses synthetic data and is safe fo
 ```bash
 # Local dev setup (run once)
 docker compose up -d                          # Start pgvector (PostgreSQL)
-pip install -r requirements.txt
+uv venv --python 3.12                         # Create virtualenv (uv manages Python version)
+uv sync --extra dev                           # Install exact versions from uv.lock
 
 # Data pipeline
 python data/synthetic/generate_data.py        # Generate transcripts.json + csat.json
-python rag/pipeline.py --ingest               # Embed and store in pgvector
+python -m rag.pipeline --ingest               # Embed and store in pgvector
 
 # Test a RAG query end-to-end
-python rag/pipeline.py --query "fraud disputes from last week"
+python -m rag.pipeline --query "fraud disputes from last week"
 
 # Start MCP server (stdio, for client connections)
-python mcp/server.py
+python -m mcp.server
 
 # Tests (framework installed, no tests written yet)
 pytest
