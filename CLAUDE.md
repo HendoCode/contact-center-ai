@@ -20,9 +20,12 @@ survey data using natural language. This repo uses synthetic data and is safe fo
 
 ```bash
 # Local dev setup (run once)
-docker compose up -d                          # Start pgvector (PostgreSQL)
+docker compose up -d                          # Start pgvector + Ollama (if using it)
 uv venv --python 3.12                         # Create virtualenv (uv manages Python version)
 uv sync --extra dev                           # Install exact versions from uv.lock
+# Pull Ollama models (only needed when LLM_PROVIDER=ollama)
+docker compose exec ollama ollama pull llama3.2
+docker compose exec ollama ollama pull nomic-embed-text
 
 # Data pipeline
 python data/synthetic/generate_data.py        # Generate transcripts.json + csat.json
@@ -51,7 +54,7 @@ No linting or formatting is configured yet (no Makefile, ruff, black, or pre-com
 ```
 generate_data.py → transcripts.json + csat.json
                         ↓
-pipeline.py --ingest → embed (OpenAI) → pgvector (PostgreSQL)
+pipeline.py --ingest → embed (OpenAI default / Ollama local) → pgvector (PostgreSQL)
                         ↓
 mcp/server.py (stdio) → 3 tools exposed to MCP clients
 ```
@@ -70,13 +73,17 @@ mcp/server.py (stdio) → 3 tools exposed to MCP clients
 ## Key design constraints
 
 - **CSAT is not semantically searchable.** `csat.json` is loaded and filtered in-memory in `query_csat()`. It is not in pgvector. If query volume or dataset size grows, this needs a SQL-backed approach.
-- **Provider swaps are isolated to `rag/embeddings.py`.** LangChain abstractions (`ChatOpenAI`, `OpenAIEmbeddings`, `PGVector`) are used everywhere; swapping providers only requires changing `get_embeddings()` and the `ChatOpenAI` call in `pipeline.py`.
+- **Provider swaps are controlled by `LLM_PROVIDER` env var.** Set `LLM_PROVIDER=ollama` to use Ollama (via `langchain-ollama`) for both embeddings and completions — no code changes needed. Set `LLM_PROVIDER=openai` (or omit) for OpenAI. To add other providers (Anthropic, Vertex AI, etc.), only `rag/embeddings.py` and the LLM init in `rag/pipeline.py` need to change.
 - **MCP server is stdio-only** (not HTTP). Claude Desktop and other clients connect via process I/O. The production Azure deployment adds HTTP transport via App Service.
 
 ## Environment variables
 
 ```
-OPENAI_API_KEY=
+LLM_PROVIDER=openai          # "openai" (default) or "ollama"
+OPENAI_API_KEY=              # required when LLM_PROVIDER=openai
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=llama3.2
+OLLAMA_EMBEDDING_MODEL=nomic-embed-text
 DATABASE_URL=postgresql://postgres:postgres@localhost:5432/contactcenter
 S3_BUCKET_NAME=
 S3_PREFIX=call-data/
@@ -88,6 +95,6 @@ See `.env.example` for the full list including AWS credentials and MCP server ho
 
 ## What's built vs. what's next
 
-**Built:** synthetic data generator, full RAG ingest/retrieve/respond pipeline, pgvector + OpenAI integration, 3-tool MCP server, Terraform for Azure (App Service + PostgreSQL Flexible Server), Docker Compose for local dev.
+**Built:** synthetic data generator, full RAG ingest/retrieve/respond pipeline, pgvector + OpenAI integration, Ollama as local provider alternative (no API key), 3-tool MCP server, Terraform for Azure (App Service + PostgreSQL Flexible Server), Docker Compose for local dev.
 
 **Not yet implemented:** S3 ingestion, CSAT → vector store (currently JSON-only), test suite, linting/formatting, observability, CI/CD.
