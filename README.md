@@ -99,18 +99,34 @@ Once the MCP server is running locally, add it to your Claude Desktop config:
 
 ## Swapping LLM providers
 
-The pipeline is designed so you can replace OpenAI with any LangChain-supported provider:
+Set `LLM_PROVIDER` in your `.env` to switch providers — no code changes needed.
 
-```python
-# OpenAI (default)
-from langchain_openai import OpenAIEmbeddings, ChatOpenAI
+### Ollama (local, no API key required)
 
-# Anthropic
-from langchain_anthropic import ChatAnthropic
+```bash
+# Install Ollama: https://ollama.com
+ollama pull llama3
+ollama pull nomic-embed-text
 
-# Google
-from langchain_google_vertexai import ChatVertexAI
+# In .env:
+LLM_PROVIDER=ollama
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=llama3
+OLLAMA_EMBEDDING_MODEL=nomic-embed-text
+
+# Run the pipeline as normal
+python -m rag.pipeline --ingest
+python -m rag.pipeline --query "fraud disputes from last week"
 ```
+
+### OpenAI (default)
+
+```bash
+LLM_PROVIDER=openai   # or omit — openai is the default
+OPENAI_API_KEY=sk-...
+```
+
+The pipeline is also designed so you can add other LangChain-supported providers (Anthropic, Google Vertex AI, etc.) by extending `rag/embeddings.py` and `rag/pipeline.py`.
 
 ## Production deployment
 
