@@ -15,9 +15,9 @@ import os
 from pathlib import Path
 
 from langchain_core.documents import Document
-from langchain_openai import ChatOpenAI
 
 from rag.embeddings import get_vector_store, get_embeddings
+
 
 # ── Ingest ────────────────────────────────────────────────────────────────────
 
@@ -107,10 +107,19 @@ def rag_query(query: str, k: int = 5) -> str:
         for doc in docs
     )
 
-    llm = ChatOpenAI(
-        model="gpt-4o-mini",
-        api_key=os.getenv("OPENAI_API_KEY"),
-    )
+    provider = os.getenv("LLM_PROVIDER", "openai").lower()
+    if provider == "ollama":
+        from langchain_ollama import ChatOllama
+        llm = ChatOllama(
+            model=os.getenv("OLLAMA_MODEL", "llama3.2"),
+            base_url=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"),
+        )
+    else:
+        from langchain_openai import ChatOpenAI
+        llm = ChatOpenAI(
+            model="gpt-4o-mini",
+            api_key=os.getenv("OPENAI_API_KEY"),
+        )
 
     prompt = f"""You are an assistant helping contact center supervisors understand call patterns and member issues.
 

@@ -40,10 +40,11 @@ Call recordings / transcripts / CSAT surveys
 
 ## Stack
 
-- **Python 3.11+**
+- **Python 3.12** (managed by uv)
 - **LangChain** — orchestration and LLM abstraction
 - **pgvector** — vector similarity search inside PostgreSQL
-- **OpenAI** — embeddings and completions (swappable)
+- **OpenAI** — embeddings and completions (default; swappable)
+- **Ollama** — local embeddings and completions, no API key required (optional)
 - **Python MCP SDK** — MCP server implementation
 - **Terraform** — Azure infrastructure (App Service + PostgreSQL)
 - **Microsoft Entra** — authentication (production)
@@ -52,8 +53,8 @@ Call recordings / transcripts / CSAT surveys
 
 ### Prerequisites
 - Docker and Docker Compose
-- Python 3.11+
-- OpenAI API key
+- [uv](https://docs.astral.sh/uv/) (manages Python 3.12 automatically)
+- OpenAI API key — or use Ollama locally (see [Swapping LLM providers](#swapping-llm-providers))
 
 ### Run locally
 
@@ -64,22 +65,23 @@ cd contact-center-ai
 
 # Copy and configure environment
 cp .env.example .env
-# Edit .env and add your OPENAI_API_KEY
+# Edit .env — set OPENAI_API_KEY, or set LLM_PROVIDER=ollama
 
-# Start PostgreSQL with pgvector
+# Start PostgreSQL with pgvector (and Ollama, if using it)
 docker compose up -d
 
-# Install Python dependencies
-pip install -r requirements.txt
+# Create virtualenv and install dependencies
+uv venv --python 3.12
+uv sync --extra dev
 
 # Generate synthetic call data
 python data/synthetic/generate_data.py
 
 # Ingest data into vector store
-python rag/pipeline.py --ingest
+python -m rag.pipeline --ingest
 
 # Start the MCP server
-python mcp/server.py
+python -m mcp.server
 ```
 
 ## Connecting a client
@@ -90,8 +92,8 @@ Once the MCP server is running locally, add it to your Claude Desktop config:
 {
   "mcpServers": {
     "contact-center": {
-      "command": "python",
-      "args": ["/path/to/contact-center-ai/mcp/server.py"]
+      "command": "uv",
+      "args": ["run", "--directory", "/path/to/contact-center-ai", "python", "-m", "mcp.server"]
     }
   }
 }
@@ -99,18 +101,36 @@ Once the MCP server is running locally, add it to your Claude Desktop config:
 
 ## Swapping LLM providers
 
-The pipeline is designed so you can replace OpenAI with any LangChain-supported provider:
+Set `LLM_PROVIDER` in your `.env` to switch providers — no code changes needed.
 
-```python
-# OpenAI (default)
-from langchain_openai import OpenAIEmbeddings, ChatOpenAI
+### Ollama (local, no API key required)
 
-# Anthropic
-from langchain_anthropic import ChatAnthropic
+Ollama runs as a Docker Compose service — `docker compose up -d` starts it automatically.
 
-# Google
-from langchain_google_vertexai import ChatVertexAI
+```bash
+# Pull models into the running Ollama container
+docker compose exec ollama ollama pull llama3.2
+docker compose exec ollama ollama pull nomic-embed-text
+
+# In .env:
+LLM_PROVIDER=ollama
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=llama3.2
+OLLAMA_EMBEDDING_MODEL=nomic-embed-text
+
+# Run the pipeline as normal
+python -m rag.pipeline --ingest
+python -m rag.pipeline --query "fraud disputes from last week"
 ```
+
+### OpenAI (default)
+
+```bash
+LLM_PROVIDER=openai   # or omit — openai is the default
+OPENAI_API_KEY=sk-...
+```
+
+The pipeline is also designed so you can add other LangChain-supported providers (Anthropic, Google Vertex AI, etc.) by extending `rag/embeddings.py` and `rag/pipeline.py`.
 
 ## Production deployment
 
