@@ -54,7 +54,7 @@ The outermost view shows the actors and systems this solution touches.
 ```mermaid
 flowchart LR
     supervisor(["Call Center Supervisor"])
-    teams(["Other Teams (future)"])
+    teams(["Other Teams"])
 
     subgraph ccai ["Contact Center AI"]
         mcp["MCP Server"]
@@ -63,10 +63,10 @@ flowchart LR
     end
 
     openai["OpenAI API"]
-    ollama["Ollama - local"]
+    ollama["Ollama local"]
     azure["Azure App Service"]
-    entra["Microsoft Entra\nEasy Auth"]
-    s3["AWS S3\n(planned)"]
+    entra["Microsoft Entra Easy Auth"]
+    s3["AWS S3 planned"]
 
     supervisor -->|"MCP queries"| mcp
     teams -->|"MCP queries"| mcp
@@ -92,14 +92,14 @@ flowchart TB
     supervisor(["Supervisor"])
 
     subgraph ccai ["Contact Center AI"]
-        mcpServer["MCP Server\nPython / MCP SDK 1.0\nmcp/server.py + tools.py"]
-        ragPipeline["RAG Pipeline\nPython / LangChain 0.3\nrag/pipeline.py"]
-        embedModule["Embeddings Module\nPython / LangChain\nrag/embeddings.py"]
-        pgvector[("PostgreSQL + pgvector\n1536-dim embeddings")]
-        dataFiles[/"Data Files\ntranscripts.json + csat.json"/]
+        mcpServer["MCP Server"]
+        ragPipeline["RAG Pipeline"]
+        embedModule["Embeddings Module"]
+        pgvector[("PostgreSQL + pgvector")]
+        dataFiles[/"transcripts.json + csat.json"/]
     end
 
-    llmProvider["LLM Provider\nOpenAI API or Ollama\nswap via LLM_PROVIDER env var"]
+    llmProvider["LLM Provider — OpenAI or Ollama"]
 
     supervisor -->|"MCP stdio / HTTPS"| mcpServer
     mcpServer -->|"rag_query()"| ragPipeline
@@ -123,24 +123,24 @@ The MCP server is a single Python process. `server.py` is the async entry point;
 ```mermaid
 flowchart LR
     subgraph server ["mcp/server.py"]
-        listTools["list_tools handler\nregisters 3 tool schemas"]
-        callTool["call_tool handler\nroutes by tool name"]
+        listTools["list_tools handler"]
+        callTool["call_tool handler"]
     end
 
     subgraph tools ["mcp/tools.py"]
-        searchTool["search_transcripts\nquery + k via rag_query()"]
-        summaryTool["get_call_summary\ncall_id via retrieve + rag_query()"]
-        csatTool["query_csat\nload csat.json, filter in-memory"]
+        searchTool["search_transcripts"]
+        summaryTool["get_call_summary"]
+        csatTool["query_csat"]
     end
 
-    ragPipeline["RAG Pipeline\nrag_query() + retrieve()"]
+    ragPipeline["RAG Pipeline"]
     dataFiles[/"csat.json"/]
 
-    callTool -->|"search_transcripts call"| searchTool
-    callTool -->|"get_call_summary call"| summaryTool
-    callTool -->|"query_csat call"| csatTool
+    callTool -->|"search_transcripts"| searchTool
+    callTool -->|"get_call_summary"| summaryTool
+    callTool -->|"query_csat"| csatTool
     searchTool -->|"rag_query(query, k)"| ragPipeline
-    summaryTool -->|"retrieve() then rag_query()"| ragPipeline
+    summaryTool -->|"retrieve then rag_query"| ragPipeline
     csatTool -->|"bypasses RAG entirely"| dataFiles
 ```
 
