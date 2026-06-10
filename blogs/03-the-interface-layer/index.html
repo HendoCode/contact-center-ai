@@ -1,626 +1,706 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>The Interface Layer | Anchoring AI — HendoCode</title>
-  <meta name="description" content="Post 3 of Anchoring AI: inside the
-MCP server — tool schemas, the stdio transport, call routing, and why
-the Model Context Protocol is the right abstraction for a multi-team AI
-platform.">
-  <meta property="og:title" content="The Interface Layer">
-  <meta property="og:description" content="Post 3 of Anchoring AI:
-inside the MCP server — tool schemas, the stdio transport, call routing,
-and why the Model Context Protocol is the right abstraction for a
-multi-team AI platform.">
-  <meta property="og:type" content="article">
-  <meta name="twitter:card" content="summary">
-  <meta name="twitter:title" content="The Interface Layer">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Josefin+Sans:wght@300;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <style>
-    /* ── HendoCode brand palette (from logo explorations tile 12) ── */
-    :root {
-      --slate:       #2E4A5F;
-      --slate-d:     #1e3245;
-      --slate-l:     #3d5f78;
-      --slate-ll:    #4a7090;
-      --cream:       #F0EDCF;
-      --amber:       #E8A44A;
-      --amber-d:     #c4852a;
-      --amber-l:     #f0bb72;
-      --muted:       #7FA8C0;
-      --bg-warm:     #f5f2ea;
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-7GZJFLG07M"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
 
-      /* semantic roles */
-      --nav:         var(--slate);
-      --accent:      var(--amber);
-      --accent-dark: var(--amber-d);
-      --text:        var(--slate-d);
-      --text-muted:  var(--slate-ll);
-      --bg:          #ffffff;
-      --code-bg:     var(--slate-d);
-      --code-text:   var(--cream);
-      --border:      #ddd9cc;
-      --surface:     #f8f6f0;
-      --tag-bg:      #fef7e8;
-      --tag-text:    var(--amber-d);
+        function gtag() {
+            dataLayer.push(arguments);
+        }
 
-      --font-brand:  'Josefin Sans', sans-serif;
-      --font-ui:     'Josefin Sans', sans-serif;
-      --font-body:   Georgia, 'Times New Roman', Times, serif;
-      --font-mono:   'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Courier New', monospace;
-      --width:       720px;
-    }
+        gtag('js', new Date());
 
-    /* ── Reset ── */
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    html { scroll-behavior: smooth; }
-
-    body {
-      font-family: var(--font-body);
-      font-size: 1.125rem;
-      line-height: 1.8;
-      color: var(--text);
-      background: var(--bg);
-    }
-
-    /* ── Top navigation bar ── */
-    nav.top-nav {
-      background: var(--nav);
-      padding: 0 2rem;
-      position: sticky;
-      top: 0;
-      z-index: 100;
-      border-bottom: 1px solid rgba(255,255,255,0.06);
-    }
-
-    .nav-inner {
-      max-width: var(--width);
-      margin: 0 auto;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      height: 56px;
-    }
-
-    .nav-brand {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      text-decoration: none;
-    }
-
-    /* Tile-12 hairline/bold treatment at nav scale */
-    .brand-hendo {
-      font-family: var(--font-brand);
-      font-weight: 300;
-      font-size: 1.1rem;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      color: var(--cream);
-      line-height: 1;
-    }
-
-    .brand-code {
-      font-family: var(--font-brand);
-      font-weight: 700;
-      font-size: 1.1rem;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-      color: var(--accent);
-      line-height: 1;
-    }
-
-    .nav-divider {
-      color: rgba(255,255,255,0.2);
-      font-family: var(--font-brand);
-      font-weight: 300;
-      font-size: 0.9rem;
-    }
-
-    .nav-series {
-      font-family: var(--font-brand);
-      font-weight: 300;
-      font-size: 0.75rem;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      color: var(--muted);
-    }
-
-    .post-label {
-      font-family: var(--font-brand);
-      font-weight: 300;
-      font-size: 0.75rem;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      color: rgba(255,255,255,0.3);
-    }
-
-    .nav-gh {
-      color: rgba(255,255,255,0.35);
-      text-decoration: none;
-      font-family: var(--font-brand);
-      font-weight: 300;
-      font-size: 0.75rem;
-      letter-spacing: 0.06em;
-      transition: color 0.15s;
-    }
-    .nav-gh:hover { color: var(--accent); }
-
-    /* ── Article container ── */
-    article {
-      max-width: var(--width);
-      margin: 0 auto;
-      padding: 3.5rem 2rem 4rem;
-    }
-
-    /* ── Post header ── */
-    .post-header {
-      margin-bottom: 3rem;
-      padding-bottom: 2.5rem;
-      border-bottom: 1px solid var(--border);
-    }
-
-    .series-eyebrow {
-      font-family: var(--font-brand);
-      font-weight: 300;
-      font-size: 0.6875rem;
-      letter-spacing: 0.18em;
-      text-transform: uppercase;
-      color: var(--accent);
-      margin-bottom: 1rem;
-    }
-
-    .post-header h1 {
-      font-family: var(--font-brand);
-      font-weight: 700;
-      font-size: 2.75rem;
-      line-height: 1.05;
-      letter-spacing: 0.01em;
-      text-transform: uppercase;
-      color: var(--slate);
-      margin-bottom: 0.75rem;
-    }
-
-    .post-subtitle {
-      font-family: var(--font-body);
-      font-size: 1.2rem;
-      color: var(--text-muted);
-      font-style: italic;
-      margin-bottom: 1.25rem;
-    }
-
-    .byline {
-      font-family: var(--font-brand);
-      font-weight: 300;
-      font-size: 0.8rem;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--text-muted);
-    }
-
-    /* ── Amber rule under eyebrow ── */
-    .post-header::after {
-      content: '';
-      display: block;
-      width: 48px;
-      height: 2px;
-      background: var(--accent);
-      border-radius: 1px;
-      margin-top: 2.5rem;
-    }
-
-    /* ── Body content ── */
-    .post-body h2 {
-      font-family: var(--font-brand);
-      font-weight: 700;
-      font-size: 1.125rem;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      color: var(--slate);
-      margin: 3rem 0 1rem;
-      padding-top: 0.25rem;
-    }
-
-    .post-body h3 {
-      font-family: var(--font-brand);
-      font-weight: 700;
-      font-size: 0.875rem;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      color: var(--slate-l);
-      margin: 2rem 0 0.75rem;
-    }
-
-    .post-body h4 {
-      font-family: var(--font-brand);
-      font-weight: 700;
-      font-size: 0.8rem;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--text-muted);
-      margin: 1.5rem 0 0.5rem;
-    }
-
-    .post-body p { margin-bottom: 1.5rem; }
-
-    .post-body a {
-      color: var(--amber-d);
-      text-decoration: underline;
-      text-underline-offset: 3px;
-      transition: color 0.15s;
-    }
-    .post-body a:hover { color: var(--slate); }
-
-    /* ── Inline code ── */
-    .post-body :not(pre) > code {
-      font-family: var(--font-mono);
-      font-size: 0.85em;
-      background: var(--tag-bg);
-      color: var(--tag-text);
-      padding: 0.1em 0.35em;
-      border-radius: 3px;
-      border: 1px solid rgba(196,133,42,0.15);
-    }
-
-    /* ── Code blocks ── */
-    .post-body pre {
-      background: var(--code-bg);
-      border-radius: 8px;
-      padding: 1.25rem 1.5rem;
-      overflow-x: auto;
-      margin: 1.75rem 0;
-      border: 1px solid rgba(255,255,255,0.04);
-    }
-
-    .post-body pre code {
-      font-family: var(--font-mono);
-      font-size: 0.875rem;
-      background: none;
-      color: var(--cream);
-      padding: 0;
-      border: none;
-    }
-
-    .post-body div.sourceCode {
-      background: var(--code-bg);
-      border-radius: 8px;
-      margin: 1.75rem 0;
-      overflow: hidden;
-      border: 1px solid rgba(255,255,255,0.04);
-    }
-
-    .post-body div.sourceCode pre {
-      background: transparent;
-      margin: 0;
-      border: none;
-      border-radius: 0;
-      padding: 1.25rem 1.5rem;
-    }
-
-    /* ── Mermaid diagrams ── */
-    .mermaid {
-      margin: 2.25rem 0;
-      background: var(--surface);
-      border-radius: 8px;
-      padding: 2rem 1.5rem;
-      border: 1px solid var(--border);
-      overflow-x: auto;
-      text-align: center;
-    }
-
-    .mermaid svg { max-width: 100%; }
-
-    /* ── Tables ── */
-    .post-body table {
-      width: 100%;
-      border-collapse: collapse;
-      margin: 1.75rem 0;
-      font-family: var(--font-brand);
-      font-weight: 300;
-      font-size: 0.875rem;
-      border-radius: 8px;
-      overflow: hidden;
-      border: 1px solid var(--border);
-    }
-
-    .post-body th {
-      background: var(--slate);
-      color: var(--cream);
-      padding: 0.75rem 1rem;
-      text-align: left;
-      font-weight: 700;
-      font-size: 0.75rem;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-    }
-
-    .post-body td {
-      padding: 0.75rem 1rem;
-      border-bottom: 1px solid var(--border);
-      vertical-align: top;
-      font-family: var(--font-body);
-      font-size: 0.95rem;
-    }
-
-    .post-body tr:last-child td { border-bottom: none; }
-    .post-body tr:nth-child(even) td { background: var(--surface); }
-
-    /* ── Blockquotes ── */
-    .post-body blockquote {
-      border-left: 3px solid var(--accent);
-      padding: 0.5rem 0 0.5rem 1.5rem;
-      margin: 2rem 0;
-      color: var(--text-muted);
-      font-style: italic;
-    }
-    .post-body blockquote p { margin-bottom: 0; }
-
-    /* ── Lists ── */
-    .post-body ul, .post-body ol {
-      margin: 0.75rem 0 1.5rem 1.75rem;
-    }
-    .post-body li { margin-bottom: 0.4rem; }
-    .post-body li > ul, .post-body li > ol {
-      margin-top: 0.4rem;
-      margin-bottom: 0.4rem;
-    }
-
-    /* ── HR ── */
-    .post-body hr {
-      border: none;
-      border-top: 1px solid var(--border);
-      margin: 3.5rem 0;
-    }
-
-    /* ── Strong ── */
-    .post-body strong { color: var(--slate); font-weight: 700; }
-
-    /* ── Post navigation ── */
-    nav.post-nav {
-      max-width: var(--width);
-      margin: 0 auto;
-      padding: 2rem;
-      display: grid;
-      grid-template-columns: 1fr auto 1fr;
-      gap: 1rem;
-      align-items: center;
-      border-top: 1px solid var(--border);
-    }
-
-    .nav-prev {
-      color: var(--text-muted);
-      text-decoration: none;
-      font-family: var(--font-brand);
-      font-weight: 300;
-      font-size: 0.8rem;
-      letter-spacing: 0.05em;
-      text-transform: uppercase;
-      transition: color 0.15s;
-    }
-    .nav-prev:hover { color: var(--accent-dark); }
-
-    .nav-index {
-      color: var(--slate);
-      text-decoration: none;
-      font-family: var(--font-brand);
-      font-weight: 700;
-      font-size: 0.7rem;
-      text-transform: uppercase;
-      letter-spacing: 0.12em;
-      text-align: center;
-      padding: 0.4rem 0.9rem;
-      border: 1px solid var(--slate);
-      border-radius: 3px;
-      transition: all 0.15s;
-      white-space: nowrap;
-    }
-    .nav-index:hover {
-      background: var(--slate);
-      color: var(--cream);
-    }
-
-    .nav-next {
-      color: var(--text-muted);
-      text-decoration: none;
-      font-family: var(--font-brand);
-      font-weight: 300;
-      font-size: 0.8rem;
-      letter-spacing: 0.05em;
-      text-transform: uppercase;
-      text-align: right;
-      display: block;
-      transition: color 0.15s;
-    }
-    .nav-next:hover { color: var(--accent-dark); }
-
-    /* ── Footer ── */
-    footer.site-footer {
-      background: var(--slate);
-      color: rgba(255,255,255,0.4);
-      padding: 2.5rem 2rem;
-      text-align: center;
-      font-family: var(--font-brand);
-      font-weight: 300;
-      font-size: 0.8rem;
-      letter-spacing: 0.06em;
-      margin-top: 1rem;
-    }
-
-    footer.site-footer p { margin-bottom: 0.5rem; }
-
-    footer.site-footer .footer-brand { margin-bottom: 1rem; }
-    footer.site-footer .footer-brand .brand-hendo {
-      font-size: 1.4rem;
-      letter-spacing: 0.12em;
-    }
-    footer.site-footer .footer-brand .brand-code {
-      font-size: 1.4rem;
-      letter-spacing: 0.06em;
-    }
-
-    footer.site-footer a {
-      color: rgba(255,255,255,0.4);
-      text-decoration: underline;
-      transition: color 0.15s;
-    }
-    footer.site-footer a:hover { color: var(--accent); }
-
-    /* ── Responsive ── */
-    @media (max-width: 640px) {
-      article { padding: 2rem 1.25rem 3rem; }
-      .post-header h1 { font-size: 2rem; }
-      nav.post-nav {
-        grid-template-columns: 1fr;
-        text-align: center;
-      }
-      .nav-next { text-align: center; }
-      .nav-prev { text-align: center; }
-      .post-label { display: none; }
-    }
-  </style>
+        gtag('config', 'G-7GZJFLG07M');
+    </script>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>The Interface Layer | Anchoring AI — HendoCode</title>
+    <meta name="description"
+          content="Post 3 of Anchoring AI: inside the MCP server — tool
+schemas, the stdio transport, call routing, and why the Model Context
+Protocol is the right abstraction for a multi-team AI platform.">
+    <meta property="og:title" content="The Interface Layer">
+    <meta property="og:description"
+          content="Post 3 of Anchoring AI: inside the MCP server — tool
+schemas, the stdio transport, call routing, and why the Model Context
+Protocol is the right abstraction for a multi-team AI platform.">
+    <meta property="og:type" content="article">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="The Interface Layer">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Josefin+Sans:wght@300;700&family=JetBrains+Mono:wght@400;500&display=swap"
+          rel="stylesheet">
     <style>
-    html { -webkit-text-size-adjust: 100%; }
-    pre > code.sourceCode { white-space: pre; position: relative; }
-    pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
-    pre > code.sourceCode > span:empty { height: 1.2em; }
-    .sourceCode { overflow: visible; }
-    code.sourceCode > span { color: inherit; text-decoration: inherit; }
-    div.sourceCode { margin: 1em 0; }
-    pre.sourceCode { margin: 0; }
-    @media screen {
-    div.sourceCode { overflow: auto; }
-    }
-    @media print {
-    pre > code.sourceCode { white-space: pre-wrap; }
-    pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
-    }
-    pre.numberSource code
-      { counter-reset: source-line 0; }
-    pre.numberSource code > span
-      { position: relative; left: -4em; counter-increment: source-line; }
-    pre.numberSource code > span > a:first-child::before
-      { content: counter(source-line);
-        position: relative; left: -1em; text-align: right; vertical-align: baseline;
-        border: none; display: inline-block;
-        -webkit-touch-callout: none; -webkit-user-select: none;
-        -khtml-user-select: none; -moz-user-select: none;
-        -ms-user-select: none; user-select: none;
-        padding: 0 4px; width: 4em;
-        background-color: #232629;
-        color: #7a7c7d;
-      }
-    pre.numberSource { margin-left: 3em; border-left: 1px solid #7a7c7d;  padding-left: 4px; }
-    div.sourceCode
-      { color: #cfcfc2; background-color: #232629; }
-    @media screen {
-    pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
-    }
-    code span { color: #cfcfc2; } /* Normal */
-    code span.al { color: #95da4c; background-color: #4d1f24; font-weight: bold; } /* Alert */
-    code span.an { color: #3f8058; } /* Annotation */
-    code span.at { color: #2980b9; } /* Attribute */
-    code span.bn { color: #f67400; } /* BaseN */
-    code span.bu { color: #7f8c8d; } /* BuiltIn */
-    code span.cf { color: #fdbc4b; font-weight: bold; } /* ControlFlow */
-    code span.ch { color: #3daee9; } /* Char */
-    code span.cn { color: #27aeae; font-weight: bold; } /* Constant */
-    code span.co { color: #7a7c7d; } /* Comment */
-    code span.cv { color: #7f8c8d; } /* CommentVar */
-    code span.do { color: #a43340; } /* Documentation */
-    code span.dt { color: #2980b9; } /* DataType */
-    code span.dv { color: #f67400; } /* DecVal */
-    code span.er { color: #da4453; text-decoration: underline; } /* Error */
-    code span.ex { color: #0099ff; font-weight: bold; } /* Extension */
-    code span.fl { color: #f67400; } /* Float */
-    code span.fu { color: #8e44ad; } /* Function */
-    code span.im { color: #27ae60; } /* Import */
-    code span.in { color: #c45b00; } /* Information */
-    code span.kw { color: #cfcfc2; font-weight: bold; } /* Keyword */
-    code span.op { color: #cfcfc2; } /* Operator */
-    code span.ot { color: #27ae60; } /* Other */
-    code span.pp { color: #27ae60; } /* Preprocessor */
-    code span.re { color: #2980b9; background-color: #153042; } /* RegionMarker */
-    code span.sc { color: #3daee9; } /* SpecialChar */
-    code span.ss { color: #da4453; } /* SpecialString */
-    code span.st { color: #f44f4f; } /* String */
-    code span.va { color: #27aeae; } /* Variable */
-    code span.vs { color: #da4453; } /* VerbatimString */
-    code span.wa { color: #da4453; } /* Warning */
-  </style>
-  </head>
+        /* ── HendoCode brand palette (from logo explorations tile 12) ── */
+        :root {
+            --slate: #2E4A5F;
+            --slate-d: #1e3245;
+            --slate-l: #3d5f78;
+            --slate-ll: #4a7090;
+            --cream: #F0EDCF;
+            --amber: #E8A44A;
+            --amber-d: #c4852a;
+            --amber-l: #f0bb72;
+            --muted: #7FA8C0;
+            --bg-warm: #f5f2ea;
+
+            /* semantic roles */
+            --nav: var(--slate);
+            --accent: var(--amber);
+            --accent-dark: var(--amber-d);
+            --text: var(--slate-d);
+            --text-muted: var(--slate-ll);
+            --bg: #ffffff;
+            --code-bg: var(--slate-d);
+            --code-text: var(--cream);
+            --border: #ddd9cc;
+            --surface: #f8f6f0;
+            --tag-bg: #fef7e8;
+            --tag-text: var(--amber-d);
+
+            --font-brand: 'Josefin Sans', sans-serif;
+            --font-ui: 'Josefin Sans', sans-serif;
+            --font-body: Georgia, 'Times New Roman', Times, serif;
+            --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Courier New', monospace;
+            --width: 720px;
+        }
+
+        /* ── Reset ── */
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: var(--font-body);
+            font-size: 1.125rem;
+            line-height: 1.8;
+            color: var(--text);
+            background: var(--bg);
+        }
+
+        /* ── Top navigation bar ── */
+        nav.top-nav {
+            background: var(--nav);
+            padding: 0 2rem;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .nav-inner {
+            max-width: var(--width);
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 56px;
+        }
+
+        .nav-brand {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            text-decoration: none;
+        }
+
+        /* Tile-12 hairline/bold treatment at nav scale */
+        .brand-hendo {
+            font-family: var(--font-brand);
+            font-weight: 300;
+            font-size: 1.1rem;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--cream);
+            line-height: 1;
+        }
+
+        .brand-code {
+            font-family: var(--font-brand);
+            font-weight: 700;
+            font-size: 1.1rem;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: var(--accent);
+            line-height: 1;
+        }
+
+        .nav-divider {
+            color: rgba(255, 255, 255, 0.2);
+            font-family: var(--font-brand);
+            font-weight: 300;
+            font-size: 0.9rem;
+        }
+
+        .nav-series {
+            font-family: var(--font-brand);
+            font-weight: 300;
+            font-size: 0.75rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--muted);
+        }
+
+        .post-label {
+            font-family: var(--font-brand);
+            font-weight: 300;
+            font-size: 0.75rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: rgba(255, 255, 255, 0.3);
+        }
+
+        .nav-gh {
+            color: rgba(255, 255, 255, 0.35);
+            text-decoration: none;
+            font-family: var(--font-brand);
+            font-weight: 300;
+            font-size: 0.75rem;
+            letter-spacing: 0.06em;
+            transition: color 0.15s;
+        }
+
+        .nav-gh:hover {
+            color: var(--accent);
+        }
+
+        /* ── Article container ── */
+        article {
+            max-width: var(--width);
+            margin: 0 auto;
+            padding: 3.5rem 2rem 4rem;
+        }
+
+        /* ── Post header ── */
+        .post-header {
+            margin-bottom: 3rem;
+            padding-bottom: 2.5rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .series-eyebrow {
+            font-family: var(--font-brand);
+            font-weight: 300;
+            font-size: 0.6875rem;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            color: var(--accent);
+            margin-bottom: 1rem;
+        }
+
+        .post-header h1 {
+            font-family: var(--font-brand);
+            font-weight: 700;
+            font-size: 2.75rem;
+            line-height: 1.05;
+            letter-spacing: 0.01em;
+            text-transform: uppercase;
+            color: var(--slate);
+            margin-bottom: 0.75rem;
+        }
+
+        .post-subtitle {
+            font-family: var(--font-body);
+            font-size: 1.2rem;
+            color: var(--text-muted);
+            font-style: italic;
+            margin-bottom: 1.25rem;
+        }
+
+        .byline {
+            font-family: var(--font-brand);
+            font-weight: 300;
+            font-size: 0.8rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--text-muted);
+        }
+
+        /* ── Amber rule under eyebrow ── */
+        .post-header::after {
+            content: '';
+            display: block;
+            width: 48px;
+            height: 2px;
+            background: var(--accent);
+            border-radius: 1px;
+            margin-top: 2.5rem;
+        }
+
+        /* ── Body content ── */
+        .post-body h2 {
+            font-family: var(--font-brand);
+            font-weight: 700;
+            font-size: 1.125rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--slate);
+            margin: 3rem 0 1rem;
+            padding-top: 0.25rem;
+        }
+
+        .post-body h3 {
+            font-family: var(--font-brand);
+            font-weight: 700;
+            font-size: 0.875rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--slate-l);
+            margin: 2rem 0 0.75rem;
+        }
+
+        .post-body h4 {
+            font-family: var(--font-brand);
+            font-weight: 700;
+            font-size: 0.8rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            margin: 1.5rem 0 0.5rem;
+        }
+
+        .post-body p {
+            margin-bottom: 1.5rem;
+        }
+
+        .post-body a {
+            color: var(--amber-d);
+            text-decoration: underline;
+            text-underline-offset: 3px;
+            transition: color 0.15s;
+        }
+
+        .post-body a:hover {
+            color: var(--slate);
+        }
+
+        /* ── Inline code ── */
+        .post-body :not(pre) > code {
+            font-family: var(--font-mono);
+            font-size: 0.85em;
+            background: var(--tag-bg);
+            color: var(--tag-text);
+            padding: 0.1em 0.35em;
+            border-radius: 3px;
+            border: 1px solid rgba(196, 133, 42, 0.15);
+        }
+
+        /* ── Code blocks ── */
+        .post-body pre {
+            background: var(--code-bg);
+            border-radius: 8px;
+            padding: 1.25rem 1.5rem;
+            overflow-x: auto;
+            margin: 1.75rem 0;
+            border: 1px solid rgba(255, 255, 255, 0.04);
+        }
+
+        .post-body pre code {
+            font-family: var(--font-mono);
+            font-size: 0.875rem;
+            background: none;
+            color: var(--cream);
+            padding: 0;
+            border: none;
+        }
+
+        .post-body div.sourceCode {
+            background: var(--code-bg);
+            border-radius: 8px;
+            margin: 1.75rem 0;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.04);
+        }
+
+        .post-body div.sourceCode pre {
+            background: transparent;
+            margin: 0;
+            border: none;
+            border-radius: 0;
+            padding: 1.25rem 1.5rem;
+        }
+
+        /* ── Mermaid diagrams ── */
+        .mermaid {
+            margin: 2.25rem 0;
+            background: var(--surface);
+            border-radius: 8px;
+            padding: 2rem 1.5rem;
+            border: 1px solid var(--border);
+            overflow-x: auto;
+            text-align: center;
+        }
+
+        .mermaid svg {
+            max-width: 100%;
+        }
+
+        /* ── Tables ── */
+        .post-body table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1.75rem 0;
+            font-family: var(--font-brand);
+            font-weight: 300;
+            font-size: 0.875rem;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+        }
+
+        .post-body th {
+            background: var(--slate);
+            color: var(--cream);
+            padding: 0.75rem 1rem;
+            text-align: left;
+            font-weight: 700;
+            font-size: 0.75rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .post-body td {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--border);
+            vertical-align: top;
+            font-family: var(--font-body);
+            font-size: 0.95rem;
+        }
+
+        .post-body tr:last-child td {
+            border-bottom: none;
+        }
+
+        .post-body tr:nth-child(even) td {
+            background: var(--surface);
+        }
+
+        /* ── Blockquotes ── */
+        .post-body blockquote {
+            border-left: 3px solid var(--accent);
+            padding: 0.5rem 0 0.5rem 1.5rem;
+            margin: 2rem 0;
+            color: var(--text-muted);
+            font-style: italic;
+        }
+
+        .post-body blockquote p {
+            margin-bottom: 0;
+        }
+
+        /* ── Lists ── */
+        .post-body ul, .post-body ol {
+            margin: 0.75rem 0 1.5rem 1.75rem;
+        }
+
+        .post-body li {
+            margin-bottom: 0.4rem;
+        }
+
+        .post-body li > ul, .post-body li > ol {
+            margin-top: 0.4rem;
+            margin-bottom: 0.4rem;
+        }
+
+        /* ── HR ── */
+        .post-body hr {
+            border: none;
+            border-top: 1px solid var(--border);
+            margin: 3.5rem 0;
+        }
+
+        /* ── Strong ── */
+        .post-body strong {
+            color: var(--slate);
+            font-weight: 700;
+        }
+
+        /* ── Post navigation ── */
+        nav.post-nav {
+            max-width: var(--width);
+            margin: 0 auto;
+            padding: 2rem;
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            gap: 1rem;
+            align-items: center;
+            border-top: 1px solid var(--border);
+        }
+
+        .nav-prev {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-family: var(--font-brand);
+            font-weight: 300;
+            font-size: 0.8rem;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            transition: color 0.15s;
+        }
+
+        .nav-prev:hover {
+            color: var(--accent-dark);
+        }
+
+        .nav-index {
+            color: var(--slate);
+            text-decoration: none;
+            font-family: var(--font-brand);
+            font-weight: 700;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            text-align: center;
+            padding: 0.4rem 0.9rem;
+            border: 1px solid var(--slate);
+            border-radius: 3px;
+            transition: all 0.15s;
+            white-space: nowrap;
+        }
+
+        .nav-index:hover {
+            background: var(--slate);
+            color: var(--cream);
+        }
+
+        .nav-next {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-family: var(--font-brand);
+            font-weight: 300;
+            font-size: 0.8rem;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            text-align: right;
+            display: block;
+            transition: color 0.15s;
+        }
+
+        .nav-next:hover {
+            color: var(--accent-dark);
+        }
+
+        /* ── Footer ── */
+        footer.site-footer {
+            background: var(--slate);
+            color: rgba(255, 255, 255, 0.4);
+            padding: 2.5rem 2rem;
+            text-align: center;
+            font-family: var(--font-brand);
+            font-weight: 300;
+            font-size: 0.8rem;
+            letter-spacing: 0.06em;
+            margin-top: 1rem;
+        }
+
+        footer.site-footer p {
+            margin-bottom: 0.5rem;
+        }
+
+        footer.site-footer .footer-brand {
+            margin-bottom: 1rem;
+        }
+
+        footer.site-footer .footer-brand .brand-hendo {
+            font-size: 1.4rem;
+            letter-spacing: 0.12em;
+        }
+
+        footer.site-footer .footer-brand .brand-code {
+            font-size: 1.4rem;
+            letter-spacing: 0.06em;
+        }
+
+        footer.site-footer a {
+            color: rgba(255, 255, 255, 0.4);
+            text-decoration: underline;
+            transition: color 0.15s;
+        }
+
+        footer.site-footer a:hover {
+            color: var(--accent);
+        }
+
+        /* ── Responsive ── */
+        @media (max-width: 640px) {
+            article {
+                padding: 2rem 1.25rem 3rem;
+            }
+
+            .post-header h1 {
+                font-size: 2rem;
+            }
+
+            nav.post-nav {
+                grid-template-columns: 1fr;
+                text-align: center;
+            }
+
+            .nav-next {
+                text-align: center;
+            }
+
+            .nav-prev {
+                text-align: center;
+            }
+
+            .post-label {
+                display: none;
+            }
+        }
+    </style>
+        <style>
+        html { -webkit-text-size-adjust: 100%; }
+        pre > code.sourceCode { white-space: pre; position: relative; }
+        pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+        pre > code.sourceCode > span:empty { height: 1.2em; }
+        .sourceCode { overflow: visible; }
+        code.sourceCode > span { color: inherit; text-decoration: inherit; }
+        div.sourceCode { margin: 1em 0; }
+        pre.sourceCode { margin: 0; }
+        @media screen {
+        div.sourceCode { overflow: auto; }
+        }
+        @media print {
+        pre > code.sourceCode { white-space: pre-wrap; }
+        pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+        }
+        pre.numberSource code
+          { counter-reset: source-line 0; }
+        pre.numberSource code > span
+          { position: relative; left: -4em; counter-increment: source-line; }
+        pre.numberSource code > span > a:first-child::before
+          { content: counter(source-line);
+            position: relative; left: -1em; text-align: right; vertical-align: baseline;
+            border: none; display: inline-block;
+            -webkit-touch-callout: none; -webkit-user-select: none;
+            -khtml-user-select: none; -moz-user-select: none;
+            -ms-user-select: none; user-select: none;
+            padding: 0 4px; width: 4em;
+            background-color: #232629;
+            color: #7a7c7d;
+          }
+        pre.numberSource { margin-left: 3em; border-left: 1px solid #7a7c7d;  padding-left: 4px; }
+        div.sourceCode
+          { color: #cfcfc2; background-color: #232629; }
+        @media screen {
+        pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+        }
+        code span { color: #cfcfc2; } /* Normal */
+        code span.al { color: #95da4c; background-color: #4d1f24; font-weight: bold; } /* Alert */
+        code span.an { color: #3f8058; } /* Annotation */
+        code span.at { color: #2980b9; } /* Attribute */
+        code span.bn { color: #f67400; } /* BaseN */
+        code span.bu { color: #7f8c8d; } /* BuiltIn */
+        code span.cf { color: #fdbc4b; font-weight: bold; } /* ControlFlow */
+        code span.ch { color: #3daee9; } /* Char */
+        code span.cn { color: #27aeae; font-weight: bold; } /* Constant */
+        code span.co { color: #7a7c7d; } /* Comment */
+        code span.cv { color: #7f8c8d; } /* CommentVar */
+        code span.do { color: #a43340; } /* Documentation */
+        code span.dt { color: #2980b9; } /* DataType */
+        code span.dv { color: #f67400; } /* DecVal */
+        code span.er { color: #da4453; text-decoration: underline; } /* Error */
+        code span.ex { color: #0099ff; font-weight: bold; } /* Extension */
+        code span.fl { color: #f67400; } /* Float */
+        code span.fu { color: #8e44ad; } /* Function */
+        code span.im { color: #27ae60; } /* Import */
+        code span.in { color: #c45b00; } /* Information */
+        code span.kw { color: #cfcfc2; font-weight: bold; } /* Keyword */
+        code span.op { color: #cfcfc2; } /* Operator */
+        code span.ot { color: #27ae60; } /* Other */
+        code span.pp { color: #27ae60; } /* Preprocessor */
+        code span.re { color: #2980b9; background-color: #153042; } /* RegionMarker */
+        code span.sc { color: #3daee9; } /* SpecialChar */
+        code span.ss { color: #da4453; } /* SpecialString */
+        code span.st { color: #f44f4f; } /* String */
+        code span.va { color: #27aeae; } /* Variable */
+        code span.vs { color: #da4453; } /* VerbatimString */
+        code span.wa { color: #da4453; } /* Warning */
+    </style>
+    </head>
 <body>
 
 <nav class="top-nav">
-  <div class="nav-inner">
-    <div style="display:flex;align-items:center;gap:0.65rem;">
-      <a class="nav-brand" href="../">
-        <span class="brand-hendo">Hendo</span><span class="brand-code">Code</span>
-      </a>
-      <span class="nav-divider">/</span>
-      <span class="nav-series">Anchoring AI</span>
+    <div class="nav-inner">
+        <div style="display:flex;align-items:center;gap:0.65rem;">
+            <a class="nav-brand" href="../">
+                <span class="brand-hendo">Hendo</span><span class="brand-code">Code</span>
+            </a>
             <span class="nav-divider">/</span>
-      <span class="post-label">Post 03</span>
-          </div>
-    <a class="nav-gh" href="https://github.com/HendoCode/contact-center-ai" target="_blank" rel="noopener">GitHub ↗</a>
-  </div>
+            <span class="nav-series">Anchoring AI</span>
+                        <span class="nav-divider">/</span>
+            <span class="post-label">Post 03</span>
+                    </div>
+        <a class="nav-gh" href="https://github.com/HendoCode/contact-center-ai" target="_blank" rel="noopener">GitHub
+            ↗</a>
+    </div>
 </nav>
 
 <article>
-  <header class="post-header">
-        <div class="series-eyebrow">Anchoring AI &mdash; Post 03</div>
-        <h1>The Interface Layer</h1>
-    <p class="post-subtitle">MCP as enterprise glue: how three tools
+    <header class="post-header">
+                <div class="series-eyebrow">Anchoring AI &mdash; Post 03</div>
+                <h1>The Interface Layer</h1>
+        <p class="post-subtitle">MCP as enterprise glue: how three tools
 become a shared AI platform</p>
-        <div class="byline">
-      Stephen Henderson &middot; June 2026
-    </div>
-      </header>
+                <div class="byline">
+            Stephen Henderson &middot; June 2026
+        </div>
+            </header>
 
-  <div class="post-body">
-    <p>The RAG pipeline from Post 2 is powerful, but it’s a library. It
-    has no interface. You can call it from a script, embed it in a web
-    app, or wire it to an API — but each of those choices means building
-    something new, and each team that wants to use it would build their
-    own version.</p>
-    <p>The Model Context Protocol changes that. Instead of building a
-    team-specific application on top of the RAG pipeline, we expose it
-    once as MCP tools, and any MCP-compatible client — Claude Desktop, a
-    future internal app, another team’s AI workflow — can call those
-    tools without knowing anything about the underlying
-    implementation.</p>
-    <p>This post is about how that exposure works.</p>
-    <hr />
-    <h2 id="what-mcp-actually-is">What MCP Actually Is</h2>
-    <p>MCP is a protocol — a standardized way for AI clients and tool
-    servers to talk to each other. If you’ve worked with language model
-    function calling (OpenAI’s <code>tools</code> parameter, Anthropic’s
-    <code>tools</code> block), the concept is similar: a model can
-    decide to invoke a named function, receives a result, and
-    incorporates it into its response.</p>
-    <p>What MCP adds is the standardization layer. Instead of each LLM
-    vendor defining their own tool-calling format, MCP defines one
-    protocol that any client and any server can speak. A tool server
-    written today works with Claude Desktop, and — in principle — with
-    any other MCP-compatible client that exists or will exist.</p>
-    <p>The other key difference from function calling: <strong>the tool
-    server is a separate process.</strong> It runs independently,
-    potentially on a different machine or in a cloud service. The client
-    connects to it over stdio (for local development) or HTTPS (for
-    production). The server registers its tools and handles calls; it
-    doesn’t need to know anything about the client.</p>
-    <p>For our use case — multiple teams at a credit union all wanting
-    access to the same call center data — this matters a lot. The MCP
-    server is infrastructure, not a feature. You deploy it once and
-    every team’s AI client can use it.</p>
-    <hr />
-    <h2 id="the-server-in-30-lines">The Server in 30 Lines</h2>
-    <p>The entire entry point is <code>mcp/server.py</code>. Here’s the
-    core of it:</p>
-    <div class="sourceCode" id="cb1"><pre
-    class="sourceCode python"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> mcp.server <span class="im">import</span> Server</span>
+    <div class="post-body">
+        <p>The RAG pipeline from Post 2 is powerful, but it’s a library.
+        It has no interface. You can call it from a script, embed it in
+        a web app, or wire it to an API — but each of those choices
+        means building something new, and each team that wants to use it
+        would build their own version.</p>
+        <p>The Model Context Protocol changes that. Instead of building
+        a team-specific application on top of the RAG pipeline, we
+        expose it once as MCP tools, and any MCP-compatible client —
+        Claude Desktop, a future internal app, another team’s AI
+        workflow — can call those tools without knowing anything about
+        the underlying implementation.</p>
+        <p>This post is about how that exposure works.</p>
+        <hr />
+        <h2 id="what-mcp-actually-is">What MCP Actually Is</h2>
+        <p>MCP is a protocol — a standardized way for AI clients and
+        tool servers to talk to each other. If you’ve worked with
+        language model function calling (OpenAI’s <code>tools</code>
+        parameter, Anthropic’s <code>tools</code> block), the concept is
+        similar: a model can decide to invoke a named function, receives
+        a result, and incorporates it into its response.</p>
+        <p>What MCP adds is the standardization layer. Instead of each
+        LLM vendor defining their own tool-calling format, MCP defines
+        one protocol that any client and any server can speak. A tool
+        server written today works with Claude Desktop, and — in
+        principle — with any other MCP-compatible client that exists or
+        will exist.</p>
+        <p>The other key difference from function calling: <strong>the
+        tool server is a separate process.</strong> It runs
+        independently, potentially on a different machine or in a cloud
+        service. The client connects to it over stdio (for local
+        development) or HTTPS (for production). The server registers its
+        tools and handles calls; it doesn’t need to know anything about
+        the client.</p>
+        <p>For our use case — multiple teams at a credit union all
+        wanting access to the same call center data — this matters a
+        lot. The MCP server is infrastructure, not a feature. You deploy
+        it once and every team’s AI client can use it.</p>
+        <hr />
+        <h2 id="the-server-in-30-lines">The Server in 30 Lines</h2>
+        <p>The entire entry point is <code>mcp/server.py</code>. Here’s
+        the core of it:</p>
+        <div class="sourceCode" id="cb1"><pre
+        class="sourceCode python"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> mcp.server <span class="im">import</span> Server</span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> mcp.types <span class="im">import</span> Tool, TextContent</span>
 <span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> mcp.tools <span class="im">import</span> search_transcripts, get_call_summary, query_csat</span>
 <span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a></span>
@@ -649,23 +729,24 @@ become a shared AI platform</p>
 <span id="cb1-27"><a href="#cb1-27" aria-hidden="true" tabindex="-1"></a><span class="cf">async</span> <span class="kw">def</span> main():</span>
 <span id="cb1-28"><a href="#cb1-28" aria-hidden="true" tabindex="-1"></a>    <span class="cf">async</span> <span class="cf">with</span> mcp.server.stdio.stdio_server() <span class="im">as</span> (read_stream, write_stream):</span>
 <span id="cb1-29"><a href="#cb1-29" aria-hidden="true" tabindex="-1"></a>        <span class="cf">await</span> app.run(read_stream, write_stream, InitializationOptions(...))</span></code></pre></div>
-    <p>Three components. <code>list_tools()</code> registers what the
-    server can do. <code>call_tool()</code> handles incoming calls.
-    <code>main()</code> runs the server loop over stdio. That’s it.</p>
-    <p>The simplicity is intentional. The MCP SDK handles the protocol
-    mechanics — handshakes, message framing, error responses. The
-    application code stays focused on what it knows: which tools exist
-    and how to execute them.</p>
-    <hr />
-    <h2 id="tool-schemas-how-the-client-knows-what-to-ask">Tool Schemas:
-    How the Client Knows What to Ask</h2>
-    <p>The <code>inputSchema</code> on each tool is a JSON Schema
-    object. It’s how the MCP client — and ultimately the LLM — learns
-    what parameters a tool accepts, which ones are required, and what
-    values are valid.</p>
-    <p>Here’s the schema for <code>search_transcripts</code>:</p>
-    <div class="sourceCode" id="cb2"><pre
-    class="sourceCode python"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>Tool(</span>
+        <p>Three components. <code>list_tools()</code> registers what
+        the server can do. <code>call_tool()</code> handles incoming
+        calls. <code>main()</code> runs the server loop over stdio.
+        That’s it.</p>
+        <p>The simplicity is intentional. The MCP SDK handles the
+        protocol mechanics — handshakes, message framing, error
+        responses. The application code stays focused on what it knows:
+        which tools exist and how to execute them.</p>
+        <hr />
+        <h2 id="tool-schemas-how-the-client-knows-what-to-ask">Tool
+        Schemas: How the Client Knows What to Ask</h2>
+        <p>The <code>inputSchema</code> on each tool is a JSON Schema
+        object. It’s how the MCP client — and ultimately the LLM —
+        learns what parameters a tool accepts, which ones are required,
+        and what values are valid.</p>
+        <p>Here’s the schema for <code>search_transcripts</code>:</p>
+        <div class="sourceCode" id="cb2"><pre
+        class="sourceCode python"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>Tool(</span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>    name<span class="op">=</span><span class="st">&quot;search_transcripts&quot;</span>,</span>
 <span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>    description<span class="op">=</span>(</span>
 <span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>        <span class="st">&quot;Search call transcripts using natural language. &quot;</span></span>
@@ -689,29 +770,29 @@ become a shared AI platform</p>
 <span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a>        <span class="st">&quot;required&quot;</span>: [<span class="st">&quot;query&quot;</span>]</span>
 <span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a>    }</span>
 <span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div>
-    <p>Two things shape how a tool gets used in practice:</p>
-    <p><strong>The description is for the model, not the user.</strong>
-    When Claude Desktop connects and the supervisor types a question,
-    Claude reads the tool description to decide whether to invoke the
-    tool and how to fill in the parameters. A vague description like
-    “search calls” produces worse tool use than one with concrete
-    examples. The examples in the description
-    (<code>'fraud disputes from last week'</code>,
-    <code>'calls that were escalated'</code>) aren’t documentation —
-    they’re few-shot prompts that guide the model toward useful
-    queries.</p>
-    <p><strong><code>required</code> controls what the model must
-    provide.</strong> <code>query</code> is required; <code>k</code> is
-    optional with a default. The model will always fill in the query,
-    and will only specify <code>k</code> if the user gives a reason to
-    retrieve more or fewer results. This keeps the common case simple
-    and the power-user case available.</p>
-    <hr />
-    <h2 id="the-dispatch-router">The Dispatch Router</h2>
-    <p><code>call_tool()</code> is the simplest possible router: a chain
-    of <code>if/elif</code> statements.</p>
-    <div class="sourceCode" id="cb3"><pre
-    class="sourceCode python"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="at">@app.call_tool</span>()</span>
+        <p>Two things shape how a tool gets used in practice:</p>
+        <p><strong>The description is for the model, not the
+        user.</strong> When Claude Desktop connects and the supervisor
+        types a question, Claude reads the tool description to decide
+        whether to invoke the tool and how to fill in the parameters. A
+        vague description like “search calls” produces worse tool use
+        than one with concrete examples. The examples in the description
+        (<code>'fraud disputes from last week'</code>,
+        <code>'calls that were escalated'</code>) aren’t documentation —
+        they’re few-shot prompts that guide the model toward useful
+        queries.</p>
+        <p><strong><code>required</code> controls what the model must
+        provide.</strong> <code>query</code> is required; <code>k</code>
+        is optional with a default. The model will always fill in the
+        query, and will only specify <code>k</code> if the user gives a
+        reason to retrieve more or fewer results. This keeps the common
+        case simple and the power-user case available.</p>
+        <hr />
+        <h2 id="the-dispatch-router">The Dispatch Router</h2>
+        <p><code>call_tool()</code> is the simplest possible router: a
+        chain of <code>if/elif</code> statements.</p>
+        <div class="sourceCode" id="cb3"><pre
+        class="sourceCode python"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="at">@app.call_tool</span>()</span>
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="cf">async</span> <span class="kw">def</span> call_tool(name: <span class="bu">str</span>, arguments: <span class="bu">dict</span>) <span class="op">-&gt;</span> <span class="bu">list</span>[TextContent]:</span>
 <span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> name <span class="op">==</span> <span class="st">&quot;search_transcripts&quot;</span>:</span>
 <span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>        result <span class="op">=</span> search_transcripts(</span>
@@ -730,39 +811,40 @@ become a shared AI platform</p>
 <span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a>        result <span class="op">=</span> <span class="ss">f&quot;Unknown tool: </span><span class="sc">{</span>name<span class="sc">}</span><span class="ss">&quot;</span></span>
 <span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb3-19"><a href="#cb3-19" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> [TextContent(<span class="bu">type</span><span class="op">=</span><span class="st">&quot;text&quot;</span>, text<span class="op">=</span>result)]</span></code></pre></div>
-    <p>Everything returns <code>list[TextContent]</code> — a list
-    containing one text object. The MCP protocol supports richer content
-    types (images, structured data), but text is the right choice here:
-    the LLM that called the tool is going to read the result and
-    incorporate it into a natural-language response. Plain text is what
-    it needs.</p>
-    <p>The <code>.get()</code> calls with defaults are intentional: they
-    make the router tolerant of optional parameters that the model might
-    not pass. If the model doesn’t specify <code>k</code>,
-    <code>arguments.get("k", 5)</code> returns 5. If it doesn’t specify
-    <code>min_score</code>, <code>arguments.get("min_score")</code>
-    returns <code>None</code>, and the tool function handles
-    <code>None</code> gracefully.</p>
-    <hr />
-    <h2 id="the-three-tool-implementations">The Three Tool
-    Implementations</h2>
-    <p>The actual work happens in <code>mcp/tools.py</code>. Let’s look
-    at each one honestly.</p>
-    <h3
-    id="search_transcripts-the-clean-one"><code>search_transcripts</code>
-    — the clean one</h3>
-    <div class="sourceCode" id="cb4"><pre
-    class="sourceCode python"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> search_transcripts(query: <span class="bu">str</span>, k: <span class="bu">int</span> <span class="op">=</span> <span class="dv">5</span>) <span class="op">-&gt;</span> <span class="bu">str</span>:</span>
+        <p>Everything returns <code>list[TextContent]</code> — a list
+        containing one text object. The MCP protocol supports richer
+        content types (images, structured data), but text is the right
+        choice here: the LLM that called the tool is going to read the
+        result and incorporate it into a natural-language response.
+        Plain text is what it needs.</p>
+        <p>The <code>.get()</code> calls with defaults are intentional:
+        they make the router tolerant of optional parameters that the
+        model might not pass. If the model doesn’t specify
+        <code>k</code>, <code>arguments.get("k", 5)</code> returns 5. If
+        it doesn’t specify <code>min_score</code>,
+        <code>arguments.get("min_score")</code> returns
+        <code>None</code>, and the tool function handles
+        <code>None</code> gracefully.</p>
+        <hr />
+        <h2 id="the-three-tool-implementations">The Three Tool
+        Implementations</h2>
+        <p>The actual work happens in <code>mcp/tools.py</code>. Let’s
+        look at each one honestly.</p>
+        <h3
+        id="search_transcripts-the-clean-one"><code>search_transcripts</code>
+        — the clean one</h3>
+        <div class="sourceCode" id="cb4"><pre
+        class="sourceCode python"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> search_transcripts(query: <span class="bu">str</span>, k: <span class="bu">int</span> <span class="op">=</span> <span class="dv">5</span>) <span class="op">-&gt;</span> <span class="bu">str</span>:</span>
 <span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> rag_query(query, k<span class="op">=</span>k)</span></code></pre></div>
-    <p>One line. It delegates entirely to <code>rag_query()</code> from
-    Post 2. This is the cleanest tool: its schema matches its
-    implementation exactly, and the implementation is just the RAG
-    pipeline.</p>
-    <h3
-    id="get_call_summary-the-quirky-one"><code>get_call_summary</code> —
-    the quirky one</h3>
-    <div class="sourceCode" id="cb5"><pre
-    class="sourceCode python"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> get_call_summary(call_id: <span class="bu">str</span>) <span class="op">-&gt;</span> <span class="bu">str</span>:</span>
+        <p>One line. It delegates entirely to <code>rag_query()</code>
+        from Post 2. This is the cleanest tool: its schema matches its
+        implementation exactly, and the implementation is just the RAG
+        pipeline.</p>
+        <h3
+        id="get_call_summary-the-quirky-one"><code>get_call_summary</code>
+        — the quirky one</h3>
+        <div class="sourceCode" id="cb5"><pre
+        class="sourceCode python"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> get_call_summary(call_id: <span class="bu">str</span>) <span class="op">-&gt;</span> <span class="bu">str</span>:</span>
 <span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>    results <span class="op">=</span> retrieve(<span class="ss">f&quot;call_id:</span><span class="sc">{</span>call_id<span class="sc">}</span><span class="ss">&quot;</span>, k<span class="op">=</span><span class="dv">10</span>)</span>
 <span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>    matches <span class="op">=</span> [doc <span class="cf">for</span> doc <span class="kw">in</span> results <span class="cf">if</span> doc.metadata.get(<span class="st">&quot;call_id&quot;</span>) <span class="op">==</span> call_id]</span>
 <span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a></span>
@@ -775,36 +857,37 @@ become a shared AI platform</p>
 <span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>        <span class="st">&quot;how did the agent handle it, and what was the outcome?&quot;</span>,</span>
 <span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a>        k<span class="op">=</span><span class="dv">1</span>,</span>
 <span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a>    )</span></code></pre></div>
-    <p>This one is worth studying, because it has an interesting
-    inefficiency. The function:</p>
-    <ol type="1">
-    <li>Retrieves documents by embedding the string
-    <code>"call_id:CALL-00042"</code> and doing a semantic search —
-    using the vector store as a lookup when a direct metadata filter
-    would be cleaner</li>
-    <li>Filters the results to find the exact <code>call_id</code>
-    match</li>
-    <li>Finds the right document… and then ignores it</li>
-    <li>Calls <code>rag_query()</code> with a fixed summary prompt and
-    <code>k=1</code>, which does a <em>fresh</em> retrieval pass on its
-    own</li>
-    </ol>
-    <p>The <code>doc</code> variable on line 4 is never used in the
-    final response. The summary is generated from whatever
-    <code>rag_query()</code> retrieves with <code>k=1</code> — which may
-    or may not be the specific call being asked about.</p>
-    <p>For a portfolio project with a small, consistent dataset, this
-    usually works fine in practice: the <code>k=1</code> retrieval
-    typically surfaces the right call. In production, with a growing
-    corpus, it would be wrong often enough to matter. The fix is to pass
-    the retrieved document directly to the LLM rather than triggering
-    another retrieval pass.</p>
-    <p>This is the kind of thing that’s worth being honest about. The
-    architecture is sound; the implementation has rough edges.</p>
-    <h3 id="query_csat-the-bypass"><code>query_csat</code> — the
-    bypass</h3>
-    <div class="sourceCode" id="cb6"><pre
-    class="sourceCode python"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> query_csat(min_score<span class="op">=</span><span class="va">None</span>, max_score<span class="op">=</span><span class="va">None</span>, category<span class="op">=</span><span class="va">None</span>) <span class="op">-&gt;</span> <span class="bu">str</span>:</span>
+        <p>This one is worth studying, because it has an interesting
+        inefficiency. The function:</p>
+        <ol type="1">
+        <li>Retrieves documents by embedding the string
+        <code>"call_id:CALL-00042"</code> and doing a semantic search —
+        using the vector store as a lookup when a direct metadata filter
+        would be cleaner</li>
+        <li>Filters the results to find the exact <code>call_id</code>
+        match</li>
+        <li>Finds the right document… and then ignores it</li>
+        <li>Calls <code>rag_query()</code> with a fixed summary prompt
+        and <code>k=1</code>, which does a <em>fresh</em> retrieval pass
+        on its own</li>
+        </ol>
+        <p>The <code>doc</code> variable on line 4 is never used in the
+        final response. The summary is generated from whatever
+        <code>rag_query()</code> retrieves with <code>k=1</code> — which
+        may or may not be the specific call being asked about.</p>
+        <p>For a portfolio project with a small, consistent dataset,
+        this usually works fine in practice: the <code>k=1</code>
+        retrieval typically surfaces the right call. In production, with
+        a growing corpus, it would be wrong often enough to matter. The
+        fix is to pass the retrieved document directly to the LLM rather
+        than triggering another retrieval pass.</p>
+        <p>This is the kind of thing that’s worth being honest about.
+        The architecture is sound; the implementation has rough
+        edges.</p>
+        <h3 id="query_csat-the-bypass"><code>query_csat</code> — the
+        bypass</h3>
+        <div class="sourceCode" id="cb6"><pre
+        class="sourceCode python"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> query_csat(min_score<span class="op">=</span><span class="va">None</span>, max_score<span class="op">=</span><span class="va">None</span>, category<span class="op">=</span><span class="va">None</span>) <span class="op">-&gt;</span> <span class="bu">str</span>:</span>
 <span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>    csat_path <span class="op">=</span> Path(<span class="va">__file__</span>).parent.parent <span class="op">/</span> <span class="st">&quot;data&quot;</span> <span class="op">/</span> <span class="st">&quot;synthetic&quot;</span> <span class="op">/</span> <span class="st">&quot;csat.json&quot;</span></span>
 <span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>    <span class="cf">with</span> <span class="bu">open</span>(csat_path) <span class="im">as</span> f:</span>
 <span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>        csat_data <span class="op">=</span> json.load(f)</span>
@@ -820,34 +903,35 @@ become a shared AI platform</p>
 <span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a>    sample_comments <span class="op">=</span> [r[<span class="st">&quot;comment&quot;</span>] <span class="cf">for</span> r <span class="kw">in</span> filtered[:<span class="dv">5</span>]]</span>
 <span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="ss">f&quot;CSAT Summary (</span><span class="sc">{</span><span class="bu">len</span>(filtered)<span class="sc">}</span><span class="ss"> responses)</span><span class="ch">\n</span><span class="ss">Average score: </span><span class="sc">{</span>avg_score<span class="sc">:.2f}</span><span class="ss">/5</span><span class="ch">\n</span><span class="ss">...&quot;</span></span></code></pre></div>
-    <p><code>query_csat</code> doesn’t touch pgvector or the LLM. It
-    reads <code>csat.json</code> directly, filters in Python, and
-    returns a formatted summary. Two things worth noting:</p>
-    <p>First, the <code>category</code> parameter is defined in the tool
-    schema and accepted by the function signature — but the
-    implementation never filters by it. The parameter is silently
-    ignored. This is a genuine bug: if Claude passes
-    <code>category="fraud_dispute"</code> because the user asked about
-    fraud call satisfaction, the filter doesn’t apply and the result is
-    unscoped. Easy fix for a future post.</p>
-    <p>Second, this bypass is actually the <em>correct</em> architecture
-    for structured data at this scale. CSAT data is small, it has a
-    clear schema, and questions about it are aggregations over numeric
-    scores — exactly the kind of thing in-memory filtering handles
-    perfectly. Adding it to pgvector would add complexity and latency
-    with no benefit. If the dataset grew to millions of records, you’d
-    move to SQL; at 112 rows, loading a JSON file is the right call.</p>
-    <hr />
-    <h2 id="how-stdio-works">How stdio Works</h2>
-    <p>Running <code>python -m mcp.server</code> starts the server and
-    puts it into <code>stdio_server()</code> mode. The process reads MCP
-    messages from stdin and writes responses to stdout. That’s the
-    entire transport.</p>
-    <p>Claude Desktop connects by spawning the server process directly.
-    The <code>claude_desktop_config.json</code> entry for this server
-    looks like:</p>
-    <div class="sourceCode" id="cb7"><pre
-    class="sourceCode json"><code class="sourceCode json"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
+        <p><code>query_csat</code> doesn’t touch pgvector or the LLM. It
+        reads <code>csat.json</code> directly, filters in Python, and
+        returns a formatted summary. Two things worth noting:</p>
+        <p>First, the <code>category</code> parameter is defined in the
+        tool schema and accepted by the function signature — but the
+        implementation never filters by it. The parameter is silently
+        ignored. This is a genuine bug: if Claude passes
+        <code>category="fraud_dispute"</code> because the user asked
+        about fraud call satisfaction, the filter doesn’t apply and the
+        result is unscoped. Easy fix for a future post.</p>
+        <p>Second, this bypass is actually the <em>correct</em>
+        architecture for structured data at this scale. CSAT data is
+        small, it has a clear schema, and questions about it are
+        aggregations over numeric scores — exactly the kind of thing
+        in-memory filtering handles perfectly. Adding it to pgvector
+        would add complexity and latency with no benefit. If the dataset
+        grew to millions of records, you’d move to SQL; at 112 rows,
+        loading a JSON file is the right call.</p>
+        <hr />
+        <h2 id="how-stdio-works">How stdio Works</h2>
+        <p>Running <code>python -m mcp.server</code> starts the server
+        and puts it into <code>stdio_server()</code> mode. The process
+        reads MCP messages from stdin and writes responses to stdout.
+        That’s the entire transport.</p>
+        <p>Claude Desktop connects by spawning the server process
+        directly. The <code>claude_desktop_config.json</code> entry for
+        this server looks like:</p>
+        <div class="sourceCode" id="cb7"><pre
+        class="sourceCode json"><code class="sourceCode json"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
 <span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;mcpServers&quot;</span><span class="fu">:</span> <span class="fu">{</span></span>
 <span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;contact-center-ai&quot;</span><span class="fu">:</span> <span class="fu">{</span></span>
 <span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;command&quot;</span><span class="fu">:</span> <span class="st">&quot;python&quot;</span><span class="fu">,</span></span>
@@ -860,93 +944,97 @@ become a shared AI platform</p>
 <span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>    <span class="fu">}</span></span>
 <span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">}</span></span>
 <span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div>
-    <p>Claude Desktop spawns the process, sends an initialization
-    handshake, calls <code>list_tools()</code> to discover what’s
-    available, and then routes relevant user queries to the appropriate
-    tool. The user sees tool results incorporated into Claude’s response
-    — they don’t see the raw tool call at all.</p>
-    <p>The stdio model is clean for local development but doesn’t work
-    for production: you can’t spawn a local process from a cloud-hosted
-    client. In production on Azure App Service, the MCP SDK’s HTTP
-    transport layer surfaces the same tools over HTTPS. The Python code
-    is identical; only the transport changes. We’ll cover the
-    infrastructure side of that in Post 5.</p>
-    <hr />
-    <h2 id="why-mcp-and-not-a-rest-api">Why MCP and Not a REST API?</h2>
-    <p>The question comes up. If you already have a RAG pipeline, why
-    not expose it as a REST endpoint and call it with
-    <code>fetch()</code>?</p>
-    <p>Three reasons for this system in particular:</p>
-    <p><strong>Schema-driven tool use.</strong> A REST API requires the
-    calling application to know when to call it and how to format the
-    request. With MCP, the LLM reads the tool schema and decides on its
-    own whether a user’s question warrants a tool call and what
-    parameters to pass. The schema <em>is</em> the integration
-    contract.</p>
-    <p><strong>Multi-client without glue code.</strong> A REST API means
-    every client team writes their own HTTP client, their own auth
-    handling, their own error handling. MCP clients implement the
-    protocol once and pick up new tools automatically when the server
-    adds them. When the compliance team adds a
-    <code>search_policies</code> tool to this server next quarter, every
-    connected client gets it without a code change on their end.</p>
-    <p><strong>Transport agnosticism.</strong> The same server code runs
-    over stdio locally and over HTTPS in production. Swapping transports
-    doesn’t touch the business logic.</p>
-    <p>The trade-off is ecosystem maturity — MCP is newer than REST and
-    there are fewer off-the-shelf tools for testing, monitoring, and
-    debugging it. That’s a real cost, and it’s part of why observability
-    (Posts 6 and 7) matters more here than it would for a well-worn REST
-    API.</p>
-    <hr />
-    <h2 id="whats-next">What’s Next</h2>
-    <p>The MCP server is built. The RAG pipeline is working behind it.
-    In Post 4, we’ll swap the provider — replacing OpenAI with Ollama so
-    the entire system runs locally without an API key — and talk about
-    what that tradeoff actually looks like in practice.</p>
-    <p>If you want to connect Claude Desktop to this server right
-    now:</p>
-    <div class="sourceCode" id="cb8"><pre
-    class="sourceCode bash"><code class="sourceCode bash"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Start the server (leave this running)</span></span>
+        <p>Claude Desktop spawns the process, sends an initialization
+        handshake, calls <code>list_tools()</code> to discover what’s
+        available, and then routes relevant user queries to the
+        appropriate tool. The user sees tool results incorporated into
+        Claude’s response — they don’t see the raw tool call at all.</p>
+        <p>The stdio model is clean for local development but doesn’t
+        work for production: you can’t spawn a local process from a
+        cloud-hosted client. In production on Azure App Service, the MCP
+        SDK’s HTTP transport layer surfaces the same tools over HTTPS.
+        The Python code is identical; only the transport changes. We’ll
+        cover the infrastructure side of that in Post 5.</p>
+        <hr />
+        <h2 id="why-mcp-and-not-a-rest-api">Why MCP and Not a REST
+        API?</h2>
+        <p>The question comes up. If you already have a RAG pipeline,
+        why not expose it as a REST endpoint and call it with
+        <code>fetch()</code>?</p>
+        <p>Three reasons for this system in particular:</p>
+        <p><strong>Schema-driven tool use.</strong> A REST API requires
+        the calling application to know when to call it and how to
+        format the request. With MCP, the LLM reads the tool schema and
+        decides on its own whether a user’s question warrants a tool
+        call and what parameters to pass. The schema <em>is</em> the
+        integration contract.</p>
+        <p><strong>Multi-client without glue code.</strong> A REST API
+        means every client team writes their own HTTP client, their own
+        auth handling, their own error handling. MCP clients implement
+        the protocol once and pick up new tools automatically when the
+        server adds them. When the compliance team adds a
+        <code>search_policies</code> tool to this server next quarter,
+        every connected client gets it without a code change on their
+        end.</p>
+        <p><strong>Transport agnosticism.</strong> The same server code
+        runs over stdio locally and over HTTPS in production. Swapping
+        transports doesn’t touch the business logic.</p>
+        <p>The trade-off is ecosystem maturity — MCP is newer than REST
+        and there are fewer off-the-shelf tools for testing, monitoring,
+        and debugging it. That’s a real cost, and it’s part of why
+        observability (Posts 6 and 7) matters more here than it would
+        for a well-worn REST API.</p>
+        <hr />
+        <h2 id="whats-next">What’s Next</h2>
+        <p>The MCP server is built. The RAG pipeline is working behind
+        it. In Post 4, we’ll swap the provider — replacing OpenAI with
+        Ollama so the entire system runs locally without an API key —
+        and talk about what that tradeoff actually looks like in
+        practice.</p>
+        <p>If you want to connect Claude Desktop to this server right
+        now:</p>
+        <div class="sourceCode" id="cb8"><pre
+        class="sourceCode bash"><code class="sourceCode bash"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Start the server (leave this running)</span></span>
 <span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> <span class="at">-m</span> mcp.server</span>
 <span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a><span class="co"># In claude_desktop_config.json, add the server entry above.</span></span>
 <span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a><span class="co"># Restart Claude Desktop and the tools appear automatically.</span></span></code></pre></div>
-    <p>Then ask Claude: <em>“Use the search_transcripts tool to find
-    calls where members were frustrated with wait times.”</em> It will
-    invoke the tool, retrieve from pgvector, and synthesize an answer —
-    all transparently.</p>
-  </div>
+        <p>Then ask Claude: <em>“Use the search_transcripts tool to find
+        calls where members were frustrated with wait times.”</em> It
+        will invoke the tool, retrieve from pgvector, and synthesize an
+        answer — all transparently.</p>
+    </div>
 </article>
 
 <nav class="post-nav">
-    <a class="nav-prev" href="../02-from-text-to-vectors/">&#8592; From
+        <a class="nav-prev" href="../02-from-text-to-vectors/">&#8592; From
 Text to Vectors</a>
-    <a class="nav-index" href="../">Series Index</a>
-    <a class="nav-next" href="../04-run-anywhere/">Run
+        <a class="nav-index" href="../">Series Index</a>
+        <a class="nav-next" href="../04-run-anywhere/">Run
 Anywhere &#8594;</a>
-  </nav>
+    </nav>
 
 <footer class="site-footer">
-  <div class="footer-brand">
-    <span class="brand-hendo">Hendo</span><span class="brand-code">Code</span>
-  </div>
-  <p>Anchoring AI &mdash; a series on building production RAG systems</p>
-  <p><a href="https://github.com/HendoCode/contact-center-ai" target="_blank" rel="noopener">View the code on GitHub</a></p>
+    <div class="footer-brand">
+        <span class="brand-hendo">Hendo</span><span class="brand-code">Code</span>
+    </div>
+    <p>Anchoring AI &mdash; a series on building production RAG systems</p>
+    <p><a href="https://github.com/HendoCode/contact-center-ai" target="_blank" rel="noopener">View the code on
+        GitHub</a></p>
 </footer>
 
 <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
 <script>
-  // Scripts at bottom of <body> — DOM is fully parsed, no DOMContentLoaded needed.
-  // Pandoc outputs <pre class="mermaid"><code>...</code></pre>; Mermaid needs <div class="mermaid">.
-  document.querySelectorAll('pre.mermaid').forEach(function (el) {
-    var div = document.createElement('div');
-    div.className = 'mermaid';
-    div.textContent = el.textContent;
-    el.parentNode.replaceChild(div, el);
-  });
-  mermaid.initialize({ startOnLoad: false, theme: 'neutral', securityLevel: 'loose' });
-  mermaid.run();
+    // Scripts at bottom of <body> — DOM is fully parsed, no DOMContentLoaded needed.
+    // Pandoc outputs <pre class="mermaid"><code>...</code></pre>; Mermaid needs <div class="mermaid">.
+    document.querySelectorAll('pre.mermaid').forEach(function (el) {
+        var div = document.createElement('div');
+        div.className = 'mermaid';
+        div.textContent = el.textContent;
+        el.parentNode.replaceChild(div, el);
+    });
+    mermaid.initialize({startOnLoad: false, theme: 'neutral', securityLevel: 'loose'});
+    mermaid.run();
 </script>
 
 </body>

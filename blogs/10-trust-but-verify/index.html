@@ -1,728 +1,816 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Trust, but Verify | Anchoring AI — HendoCode</title>
-  <meta name="description" content="Post 10 of Anchoring AI: validation
-strategies for RAG systems — embedding drift, retrieval quality signals,
-CSAT as a ground-truth signal, LLM-as-judge, and SLOs for AI systems.">
-  <meta property="og:title" content="Trust, but Verify">
-  <meta property="og:description" content="Post 10 of Anchoring AI:
-validation strategies for RAG systems — embedding drift, retrieval
-quality signals, CSAT as a ground-truth signal, LLM-as-judge, and SLOs
-for AI systems.">
-  <meta property="og:type" content="article">
-  <meta name="twitter:card" content="summary">
-  <meta name="twitter:title" content="Trust, but Verify">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Josefin+Sans:wght@300;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <style>
-    /* ── HendoCode brand palette (from logo explorations tile 12) ── */
-    :root {
-      --slate:       #2E4A5F;
-      --slate-d:     #1e3245;
-      --slate-l:     #3d5f78;
-      --slate-ll:    #4a7090;
-      --cream:       #F0EDCF;
-      --amber:       #E8A44A;
-      --amber-d:     #c4852a;
-      --amber-l:     #f0bb72;
-      --muted:       #7FA8C0;
-      --bg-warm:     #f5f2ea;
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-7GZJFLG07M"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
 
-      /* semantic roles */
-      --nav:         var(--slate);
-      --accent:      var(--amber);
-      --accent-dark: var(--amber-d);
-      --text:        var(--slate-d);
-      --text-muted:  var(--slate-ll);
-      --bg:          #ffffff;
-      --code-bg:     var(--slate-d);
-      --code-text:   var(--cream);
-      --border:      #ddd9cc;
-      --surface:     #f8f6f0;
-      --tag-bg:      #fef7e8;
-      --tag-text:    var(--amber-d);
+        function gtag() {
+            dataLayer.push(arguments);
+        }
 
-      --font-brand:  'Josefin Sans', sans-serif;
-      --font-ui:     'Josefin Sans', sans-serif;
-      --font-body:   Georgia, 'Times New Roman', Times, serif;
-      --font-mono:   'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Courier New', monospace;
-      --width:       720px;
-    }
+        gtag('js', new Date());
 
-    /* ── Reset ── */
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    html { scroll-behavior: smooth; }
+        gtag('config', 'G-7GZJFLG07M');
+    </script>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Trust, but Verify | Anchoring AI — HendoCode</title>
+    <meta name="description"
+          content="Post 10 of Anchoring AI: validation strategies for
+RAG systems — embedding drift, retrieval quality signals, CSAT as a
+ground-truth signal, LLM-as-judge, and SLOs for AI systems.">
+    <meta property="og:title" content="Trust, but Verify">
+    <meta property="og:description"
+          content="Post 10 of Anchoring AI: validation strategies for
+RAG systems — embedding drift, retrieval quality signals, CSAT as a
+ground-truth signal, LLM-as-judge, and SLOs for AI systems.">
+    <meta property="og:type" content="article">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="Trust, but Verify">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Josefin+Sans:wght@300;700&family=JetBrains+Mono:wght@400;500&display=swap"
+          rel="stylesheet">
+    <style>
+        /* ── HendoCode brand palette (from logo explorations tile 12) ── */
+        :root {
+            --slate: #2E4A5F;
+            --slate-d: #1e3245;
+            --slate-l: #3d5f78;
+            --slate-ll: #4a7090;
+            --cream: #F0EDCF;
+            --amber: #E8A44A;
+            --amber-d: #c4852a;
+            --amber-l: #f0bb72;
+            --muted: #7FA8C0;
+            --bg-warm: #f5f2ea;
 
-    body {
-      font-family: var(--font-body);
-      font-size: 1.125rem;
-      line-height: 1.8;
-      color: var(--text);
-      background: var(--bg);
-    }
+            /* semantic roles */
+            --nav: var(--slate);
+            --accent: var(--amber);
+            --accent-dark: var(--amber-d);
+            --text: var(--slate-d);
+            --text-muted: var(--slate-ll);
+            --bg: #ffffff;
+            --code-bg: var(--slate-d);
+            --code-text: var(--cream);
+            --border: #ddd9cc;
+            --surface: #f8f6f0;
+            --tag-bg: #fef7e8;
+            --tag-text: var(--amber-d);
 
-    /* ── Top navigation bar ── */
-    nav.top-nav {
-      background: var(--nav);
-      padding: 0 2rem;
-      position: sticky;
-      top: 0;
-      z-index: 100;
-      border-bottom: 1px solid rgba(255,255,255,0.06);
-    }
+            --font-brand: 'Josefin Sans', sans-serif;
+            --font-ui: 'Josefin Sans', sans-serif;
+            --font-body: Georgia, 'Times New Roman', Times, serif;
+            --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Courier New', monospace;
+            --width: 720px;
+        }
 
-    .nav-inner {
-      max-width: var(--width);
-      margin: 0 auto;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      height: 56px;
-    }
+        /* ── Reset ── */
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
 
-    .nav-brand {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      text-decoration: none;
-    }
+        html {
+            scroll-behavior: smooth;
+        }
 
-    /* Tile-12 hairline/bold treatment at nav scale */
-    .brand-hendo {
-      font-family: var(--font-brand);
-      font-weight: 300;
-      font-size: 1.1rem;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      color: var(--cream);
-      line-height: 1;
-    }
+        body {
+            font-family: var(--font-body);
+            font-size: 1.125rem;
+            line-height: 1.8;
+            color: var(--text);
+            background: var(--bg);
+        }
 
-    .brand-code {
-      font-family: var(--font-brand);
-      font-weight: 700;
-      font-size: 1.1rem;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-      color: var(--accent);
-      line-height: 1;
-    }
+        /* ── Top navigation bar ── */
+        nav.top-nav {
+            background: var(--nav);
+            padding: 0 2rem;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        }
 
-    .nav-divider {
-      color: rgba(255,255,255,0.2);
-      font-family: var(--font-brand);
-      font-weight: 300;
-      font-size: 0.9rem;
-    }
+        .nav-inner {
+            max-width: var(--width);
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 56px;
+        }
 
-    .nav-series {
-      font-family: var(--font-brand);
-      font-weight: 300;
-      font-size: 0.75rem;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      color: var(--muted);
-    }
+        .nav-brand {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            text-decoration: none;
+        }
 
-    .post-label {
-      font-family: var(--font-brand);
-      font-weight: 300;
-      font-size: 0.75rem;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      color: rgba(255,255,255,0.3);
-    }
+        /* Tile-12 hairline/bold treatment at nav scale */
+        .brand-hendo {
+            font-family: var(--font-brand);
+            font-weight: 300;
+            font-size: 1.1rem;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--cream);
+            line-height: 1;
+        }
 
-    .nav-gh {
-      color: rgba(255,255,255,0.35);
-      text-decoration: none;
-      font-family: var(--font-brand);
-      font-weight: 300;
-      font-size: 0.75rem;
-      letter-spacing: 0.06em;
-      transition: color 0.15s;
-    }
-    .nav-gh:hover { color: var(--accent); }
+        .brand-code {
+            font-family: var(--font-brand);
+            font-weight: 700;
+            font-size: 1.1rem;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: var(--accent);
+            line-height: 1;
+        }
 
-    /* ── Article container ── */
-    article {
-      max-width: var(--width);
-      margin: 0 auto;
-      padding: 3.5rem 2rem 4rem;
-    }
+        .nav-divider {
+            color: rgba(255, 255, 255, 0.2);
+            font-family: var(--font-brand);
+            font-weight: 300;
+            font-size: 0.9rem;
+        }
 
-    /* ── Post header ── */
-    .post-header {
-      margin-bottom: 3rem;
-      padding-bottom: 2.5rem;
-      border-bottom: 1px solid var(--border);
-    }
+        .nav-series {
+            font-family: var(--font-brand);
+            font-weight: 300;
+            font-size: 0.75rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--muted);
+        }
 
-    .series-eyebrow {
-      font-family: var(--font-brand);
-      font-weight: 300;
-      font-size: 0.6875rem;
-      letter-spacing: 0.18em;
-      text-transform: uppercase;
-      color: var(--accent);
-      margin-bottom: 1rem;
-    }
+        .post-label {
+            font-family: var(--font-brand);
+            font-weight: 300;
+            font-size: 0.75rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: rgba(255, 255, 255, 0.3);
+        }
 
-    .post-header h1 {
-      font-family: var(--font-brand);
-      font-weight: 700;
-      font-size: 2.75rem;
-      line-height: 1.05;
-      letter-spacing: 0.01em;
-      text-transform: uppercase;
-      color: var(--slate);
-      margin-bottom: 0.75rem;
-    }
+        .nav-gh {
+            color: rgba(255, 255, 255, 0.35);
+            text-decoration: none;
+            font-family: var(--font-brand);
+            font-weight: 300;
+            font-size: 0.75rem;
+            letter-spacing: 0.06em;
+            transition: color 0.15s;
+        }
 
-    .post-subtitle {
-      font-family: var(--font-body);
-      font-size: 1.2rem;
-      color: var(--text-muted);
-      font-style: italic;
-      margin-bottom: 1.25rem;
-    }
+        .nav-gh:hover {
+            color: var(--accent);
+        }
 
-    .byline {
-      font-family: var(--font-brand);
-      font-weight: 300;
-      font-size: 0.8rem;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--text-muted);
-    }
+        /* ── Article container ── */
+        article {
+            max-width: var(--width);
+            margin: 0 auto;
+            padding: 3.5rem 2rem 4rem;
+        }
 
-    /* ── Amber rule under eyebrow ── */
-    .post-header::after {
-      content: '';
-      display: block;
-      width: 48px;
-      height: 2px;
-      background: var(--accent);
-      border-radius: 1px;
-      margin-top: 2.5rem;
-    }
+        /* ── Post header ── */
+        .post-header {
+            margin-bottom: 3rem;
+            padding-bottom: 2.5rem;
+            border-bottom: 1px solid var(--border);
+        }
 
-    /* ── Body content ── */
-    .post-body h2 {
-      font-family: var(--font-brand);
-      font-weight: 700;
-      font-size: 1.125rem;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      color: var(--slate);
-      margin: 3rem 0 1rem;
-      padding-top: 0.25rem;
-    }
+        .series-eyebrow {
+            font-family: var(--font-brand);
+            font-weight: 300;
+            font-size: 0.6875rem;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            color: var(--accent);
+            margin-bottom: 1rem;
+        }
 
-    .post-body h3 {
-      font-family: var(--font-brand);
-      font-weight: 700;
-      font-size: 0.875rem;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      color: var(--slate-l);
-      margin: 2rem 0 0.75rem;
-    }
+        .post-header h1 {
+            font-family: var(--font-brand);
+            font-weight: 700;
+            font-size: 2.75rem;
+            line-height: 1.05;
+            letter-spacing: 0.01em;
+            text-transform: uppercase;
+            color: var(--slate);
+            margin-bottom: 0.75rem;
+        }
 
-    .post-body h4 {
-      font-family: var(--font-brand);
-      font-weight: 700;
-      font-size: 0.8rem;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--text-muted);
-      margin: 1.5rem 0 0.5rem;
-    }
+        .post-subtitle {
+            font-family: var(--font-body);
+            font-size: 1.2rem;
+            color: var(--text-muted);
+            font-style: italic;
+            margin-bottom: 1.25rem;
+        }
 
-    .post-body p { margin-bottom: 1.5rem; }
+        .byline {
+            font-family: var(--font-brand);
+            font-weight: 300;
+            font-size: 0.8rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--text-muted);
+        }
 
-    .post-body a {
-      color: var(--amber-d);
-      text-decoration: underline;
-      text-underline-offset: 3px;
-      transition: color 0.15s;
-    }
-    .post-body a:hover { color: var(--slate); }
+        /* ── Amber rule under eyebrow ── */
+        .post-header::after {
+            content: '';
+            display: block;
+            width: 48px;
+            height: 2px;
+            background: var(--accent);
+            border-radius: 1px;
+            margin-top: 2.5rem;
+        }
 
-    /* ── Inline code ── */
-    .post-body :not(pre) > code {
-      font-family: var(--font-mono);
-      font-size: 0.85em;
-      background: var(--tag-bg);
-      color: var(--tag-text);
-      padding: 0.1em 0.35em;
-      border-radius: 3px;
-      border: 1px solid rgba(196,133,42,0.15);
-    }
+        /* ── Body content ── */
+        .post-body h2 {
+            font-family: var(--font-brand);
+            font-weight: 700;
+            font-size: 1.125rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--slate);
+            margin: 3rem 0 1rem;
+            padding-top: 0.25rem;
+        }
 
-    /* ── Code blocks ── */
-    .post-body pre {
-      background: var(--code-bg);
-      border-radius: 8px;
-      padding: 1.25rem 1.5rem;
-      overflow-x: auto;
-      margin: 1.75rem 0;
-      border: 1px solid rgba(255,255,255,0.04);
-    }
+        .post-body h3 {
+            font-family: var(--font-brand);
+            font-weight: 700;
+            font-size: 0.875rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--slate-l);
+            margin: 2rem 0 0.75rem;
+        }
 
-    .post-body pre code {
-      font-family: var(--font-mono);
-      font-size: 0.875rem;
-      background: none;
-      color: var(--cream);
-      padding: 0;
-      border: none;
-    }
+        .post-body h4 {
+            font-family: var(--font-brand);
+            font-weight: 700;
+            font-size: 0.8rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            margin: 1.5rem 0 0.5rem;
+        }
 
-    .post-body div.sourceCode {
-      background: var(--code-bg);
-      border-radius: 8px;
-      margin: 1.75rem 0;
-      overflow: hidden;
-      border: 1px solid rgba(255,255,255,0.04);
-    }
+        .post-body p {
+            margin-bottom: 1.5rem;
+        }
 
-    .post-body div.sourceCode pre {
-      background: transparent;
-      margin: 0;
-      border: none;
-      border-radius: 0;
-      padding: 1.25rem 1.5rem;
-    }
+        .post-body a {
+            color: var(--amber-d);
+            text-decoration: underline;
+            text-underline-offset: 3px;
+            transition: color 0.15s;
+        }
 
-    /* ── Mermaid diagrams ── */
-    .mermaid {
-      margin: 2.25rem 0;
-      background: var(--surface);
-      border-radius: 8px;
-      padding: 2rem 1.5rem;
-      border: 1px solid var(--border);
-      overflow-x: auto;
-      text-align: center;
-    }
+        .post-body a:hover {
+            color: var(--slate);
+        }
 
-    .mermaid svg { max-width: 100%; }
+        /* ── Inline code ── */
+        .post-body :not(pre) > code {
+            font-family: var(--font-mono);
+            font-size: 0.85em;
+            background: var(--tag-bg);
+            color: var(--tag-text);
+            padding: 0.1em 0.35em;
+            border-radius: 3px;
+            border: 1px solid rgba(196, 133, 42, 0.15);
+        }
 
-    /* ── Tables ── */
-    .post-body table {
-      width: 100%;
-      border-collapse: collapse;
-      margin: 1.75rem 0;
-      font-family: var(--font-brand);
-      font-weight: 300;
-      font-size: 0.875rem;
-      border-radius: 8px;
-      overflow: hidden;
-      border: 1px solid var(--border);
-    }
+        /* ── Code blocks ── */
+        .post-body pre {
+            background: var(--code-bg);
+            border-radius: 8px;
+            padding: 1.25rem 1.5rem;
+            overflow-x: auto;
+            margin: 1.75rem 0;
+            border: 1px solid rgba(255, 255, 255, 0.04);
+        }
 
-    .post-body th {
-      background: var(--slate);
-      color: var(--cream);
-      padding: 0.75rem 1rem;
-      text-align: left;
-      font-weight: 700;
-      font-size: 0.75rem;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-    }
+        .post-body pre code {
+            font-family: var(--font-mono);
+            font-size: 0.875rem;
+            background: none;
+            color: var(--cream);
+            padding: 0;
+            border: none;
+        }
 
-    .post-body td {
-      padding: 0.75rem 1rem;
-      border-bottom: 1px solid var(--border);
-      vertical-align: top;
-      font-family: var(--font-body);
-      font-size: 0.95rem;
-    }
+        .post-body div.sourceCode {
+            background: var(--code-bg);
+            border-radius: 8px;
+            margin: 1.75rem 0;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.04);
+        }
 
-    .post-body tr:last-child td { border-bottom: none; }
-    .post-body tr:nth-child(even) td { background: var(--surface); }
+        .post-body div.sourceCode pre {
+            background: transparent;
+            margin: 0;
+            border: none;
+            border-radius: 0;
+            padding: 1.25rem 1.5rem;
+        }
 
-    /* ── Blockquotes ── */
-    .post-body blockquote {
-      border-left: 3px solid var(--accent);
-      padding: 0.5rem 0 0.5rem 1.5rem;
-      margin: 2rem 0;
-      color: var(--text-muted);
-      font-style: italic;
-    }
-    .post-body blockquote p { margin-bottom: 0; }
+        /* ── Mermaid diagrams ── */
+        .mermaid {
+            margin: 2.25rem 0;
+            background: var(--surface);
+            border-radius: 8px;
+            padding: 2rem 1.5rem;
+            border: 1px solid var(--border);
+            overflow-x: auto;
+            text-align: center;
+        }
 
-    /* ── Lists ── */
-    .post-body ul, .post-body ol {
-      margin: 0.75rem 0 1.5rem 1.75rem;
-    }
-    .post-body li { margin-bottom: 0.4rem; }
-    .post-body li > ul, .post-body li > ol {
-      margin-top: 0.4rem;
-      margin-bottom: 0.4rem;
-    }
+        .mermaid svg {
+            max-width: 100%;
+        }
 
-    /* ── HR ── */
-    .post-body hr {
-      border: none;
-      border-top: 1px solid var(--border);
-      margin: 3.5rem 0;
-    }
+        /* ── Tables ── */
+        .post-body table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1.75rem 0;
+            font-family: var(--font-brand);
+            font-weight: 300;
+            font-size: 0.875rem;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+        }
 
-    /* ── Strong ── */
-    .post-body strong { color: var(--slate); font-weight: 700; }
+        .post-body th {
+            background: var(--slate);
+            color: var(--cream);
+            padding: 0.75rem 1rem;
+            text-align: left;
+            font-weight: 700;
+            font-size: 0.75rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
 
-    /* ── Post navigation ── */
-    nav.post-nav {
-      max-width: var(--width);
-      margin: 0 auto;
-      padding: 2rem;
-      display: grid;
-      grid-template-columns: 1fr auto 1fr;
-      gap: 1rem;
-      align-items: center;
-      border-top: 1px solid var(--border);
-    }
+        .post-body td {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--border);
+            vertical-align: top;
+            font-family: var(--font-body);
+            font-size: 0.95rem;
+        }
 
-    .nav-prev {
-      color: var(--text-muted);
-      text-decoration: none;
-      font-family: var(--font-brand);
-      font-weight: 300;
-      font-size: 0.8rem;
-      letter-spacing: 0.05em;
-      text-transform: uppercase;
-      transition: color 0.15s;
-    }
-    .nav-prev:hover { color: var(--accent-dark); }
+        .post-body tr:last-child td {
+            border-bottom: none;
+        }
 
-    .nav-index {
-      color: var(--slate);
-      text-decoration: none;
-      font-family: var(--font-brand);
-      font-weight: 700;
-      font-size: 0.7rem;
-      text-transform: uppercase;
-      letter-spacing: 0.12em;
-      text-align: center;
-      padding: 0.4rem 0.9rem;
-      border: 1px solid var(--slate);
-      border-radius: 3px;
-      transition: all 0.15s;
-      white-space: nowrap;
-    }
-    .nav-index:hover {
-      background: var(--slate);
-      color: var(--cream);
-    }
+        .post-body tr:nth-child(even) td {
+            background: var(--surface);
+        }
 
-    .nav-next {
-      color: var(--text-muted);
-      text-decoration: none;
-      font-family: var(--font-brand);
-      font-weight: 300;
-      font-size: 0.8rem;
-      letter-spacing: 0.05em;
-      text-transform: uppercase;
-      text-align: right;
-      display: block;
-      transition: color 0.15s;
-    }
-    .nav-next:hover { color: var(--accent-dark); }
+        /* ── Blockquotes ── */
+        .post-body blockquote {
+            border-left: 3px solid var(--accent);
+            padding: 0.5rem 0 0.5rem 1.5rem;
+            margin: 2rem 0;
+            color: var(--text-muted);
+            font-style: italic;
+        }
 
-    /* ── Footer ── */
-    footer.site-footer {
-      background: var(--slate);
-      color: rgba(255,255,255,0.4);
-      padding: 2.5rem 2rem;
-      text-align: center;
-      font-family: var(--font-brand);
-      font-weight: 300;
-      font-size: 0.8rem;
-      letter-spacing: 0.06em;
-      margin-top: 1rem;
-    }
+        .post-body blockquote p {
+            margin-bottom: 0;
+        }
 
-    footer.site-footer p { margin-bottom: 0.5rem; }
+        /* ── Lists ── */
+        .post-body ul, .post-body ol {
+            margin: 0.75rem 0 1.5rem 1.75rem;
+        }
 
-    footer.site-footer .footer-brand { margin-bottom: 1rem; }
-    footer.site-footer .footer-brand .brand-hendo {
-      font-size: 1.4rem;
-      letter-spacing: 0.12em;
-    }
-    footer.site-footer .footer-brand .brand-code {
-      font-size: 1.4rem;
-      letter-spacing: 0.06em;
-    }
+        .post-body li {
+            margin-bottom: 0.4rem;
+        }
 
-    footer.site-footer a {
-      color: rgba(255,255,255,0.4);
-      text-decoration: underline;
-      transition: color 0.15s;
-    }
-    footer.site-footer a:hover { color: var(--accent); }
+        .post-body li > ul, .post-body li > ol {
+            margin-top: 0.4rem;
+            margin-bottom: 0.4rem;
+        }
 
-    /* ── Responsive ── */
-    @media (max-width: 640px) {
-      article { padding: 2rem 1.25rem 3rem; }
-      .post-header h1 { font-size: 2rem; }
-      nav.post-nav {
-        grid-template-columns: 1fr;
-        text-align: center;
-      }
-      .nav-next { text-align: center; }
-      .nav-prev { text-align: center; }
-      .post-label { display: none; }
-    }
-  </style>
-  </head>
+        /* ── HR ── */
+        .post-body hr {
+            border: none;
+            border-top: 1px solid var(--border);
+            margin: 3.5rem 0;
+        }
+
+        /* ── Strong ── */
+        .post-body strong {
+            color: var(--slate);
+            font-weight: 700;
+        }
+
+        /* ── Post navigation ── */
+        nav.post-nav {
+            max-width: var(--width);
+            margin: 0 auto;
+            padding: 2rem;
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            gap: 1rem;
+            align-items: center;
+            border-top: 1px solid var(--border);
+        }
+
+        .nav-prev {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-family: var(--font-brand);
+            font-weight: 300;
+            font-size: 0.8rem;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            transition: color 0.15s;
+        }
+
+        .nav-prev:hover {
+            color: var(--accent-dark);
+        }
+
+        .nav-index {
+            color: var(--slate);
+            text-decoration: none;
+            font-family: var(--font-brand);
+            font-weight: 700;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            text-align: center;
+            padding: 0.4rem 0.9rem;
+            border: 1px solid var(--slate);
+            border-radius: 3px;
+            transition: all 0.15s;
+            white-space: nowrap;
+        }
+
+        .nav-index:hover {
+            background: var(--slate);
+            color: var(--cream);
+        }
+
+        .nav-next {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-family: var(--font-brand);
+            font-weight: 300;
+            font-size: 0.8rem;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            text-align: right;
+            display: block;
+            transition: color 0.15s;
+        }
+
+        .nav-next:hover {
+            color: var(--accent-dark);
+        }
+
+        /* ── Footer ── */
+        footer.site-footer {
+            background: var(--slate);
+            color: rgba(255, 255, 255, 0.4);
+            padding: 2.5rem 2rem;
+            text-align: center;
+            font-family: var(--font-brand);
+            font-weight: 300;
+            font-size: 0.8rem;
+            letter-spacing: 0.06em;
+            margin-top: 1rem;
+        }
+
+        footer.site-footer p {
+            margin-bottom: 0.5rem;
+        }
+
+        footer.site-footer .footer-brand {
+            margin-bottom: 1rem;
+        }
+
+        footer.site-footer .footer-brand .brand-hendo {
+            font-size: 1.4rem;
+            letter-spacing: 0.12em;
+        }
+
+        footer.site-footer .footer-brand .brand-code {
+            font-size: 1.4rem;
+            letter-spacing: 0.06em;
+        }
+
+        footer.site-footer a {
+            color: rgba(255, 255, 255, 0.4);
+            text-decoration: underline;
+            transition: color 0.15s;
+        }
+
+        footer.site-footer a:hover {
+            color: var(--accent);
+        }
+
+        /* ── Responsive ── */
+        @media (max-width: 640px) {
+            article {
+                padding: 2rem 1.25rem 3rem;
+            }
+
+            .post-header h1 {
+                font-size: 2rem;
+            }
+
+            nav.post-nav {
+                grid-template-columns: 1fr;
+                text-align: center;
+            }
+
+            .nav-next {
+                text-align: center;
+            }
+
+            .nav-prev {
+                text-align: center;
+            }
+
+            .post-label {
+                display: none;
+            }
+        }
+    </style>
+    </head>
 <body>
 
 <nav class="top-nav">
-  <div class="nav-inner">
-    <div style="display:flex;align-items:center;gap:0.65rem;">
-      <a class="nav-brand" href="../">
-        <span class="brand-hendo">Hendo</span><span class="brand-code">Code</span>
-      </a>
-      <span class="nav-divider">/</span>
-      <span class="nav-series">Anchoring AI</span>
+    <div class="nav-inner">
+        <div style="display:flex;align-items:center;gap:0.65rem;">
+            <a class="nav-brand" href="../">
+                <span class="brand-hendo">Hendo</span><span class="brand-code">Code</span>
+            </a>
             <span class="nav-divider">/</span>
-      <span class="post-label">Post 10</span>
-          </div>
-    <a class="nav-gh" href="https://github.com/HendoCode/contact-center-ai" target="_blank" rel="noopener">GitHub ↗</a>
-  </div>
+            <span class="nav-series">Anchoring AI</span>
+                        <span class="nav-divider">/</span>
+            <span class="post-label">Post 10</span>
+                    </div>
+        <a class="nav-gh" href="https://github.com/HendoCode/contact-center-ai" target="_blank" rel="noopener">GitHub
+            ↗</a>
+    </div>
 </nav>
 
 <article>
-  <header class="post-header">
-        <div class="series-eyebrow">Anchoring AI &mdash; Post 10</div>
-        <h1>Trust, but Verify</h1>
-    <p class="post-subtitle">Detecting RAG degradation before your users
-do</p>
-        <div class="byline">
-      Stephen Henderson &middot; TBD
-    </div>
-      </header>
+    <header class="post-header">
+                <div class="series-eyebrow">Anchoring AI &mdash; Post 10</div>
+                <h1>Trust, but Verify</h1>
+        <p class="post-subtitle">Detecting RAG degradation before your
+users do</p>
+                <div class="byline">
+            Stephen Henderson &middot; TBD
+        </div>
+            </header>
 
-  <div class="post-body">
-    <blockquote>
-    <p><strong>Status: Structured draft.</strong> This post has a
-    detailed outline and will be written after Posts 02–07 are
-    complete.</p>
-    </blockquote>
-    <hr />
-    <h2 id="thesis">Thesis</h2>
-    <p>RAG systems degrade silently. Embeddings drift as language
-    evolves, retrieval quality erodes as the corpus grows, and LLM
-    behavior shifts between model versions. By the time users complain,
-    the damage is done. A 200 OK response with a confidently stated
-    wrong answer is worse than an error — at least an error is
-    visible.</p>
-    <p>This post shows how to use the telemetry from Post 7 to detect
-    degradation early — and how the CSAT scores we already collect
-    become a lagging ground-truth signal for answer quality. The goal is
-    to move from “we hope it’s working” to “we know when it’s not.”</p>
-    <hr />
-    <h2 id="key-concepts">Key Concepts</h2>
-    <ul>
-    <li><strong>Three failure modes to watch</strong>
-    <ul>
-    <li><em>Data drift</em>: new call categories appear that weren’t in
-    the original corpus; the model has no good neighbors to
-    retrieve</li>
-    <li><em>Concept drift</em>: the meaning of “fraud” or “escalation”
-    changes as call center language evolves; old embeddings become
-    stale</li>
-    <li><em>Retrieval drift</em>: top-k results become less relevant as
-    the corpus grows and the ANN index quality degrades</li>
-    </ul></li>
-    <li><strong>Embedding drift</strong> — cosine similarity
-    distributions shift over time; how to detect it using the
-    <code>rag_retrieval_score</code> metric from Post 7</li>
-    <li><strong>Retrieval quality metrics</strong> — MRR, NDCG, top-k
-    relevance; how to estimate these without human labels using
-    LLM-as-judge</li>
-    <li><strong>CSAT as a lagging ground-truth signal</strong> — when
-    call center agents rate calls poorly <em>after</em> using the AI
-    tool, that’s signal; correlating CSAT scores with MCP query volume
-    by category reveals where the system is failing</li>
-    <li><strong>LLM-as-judge</strong> — a lightweight evaluation
-    pattern: periodically sample recent query/answer pairs and ask a
-    cheap model to rate answer quality; emit scores as OTel metrics</li>
-    <li><strong>SLOs for AI systems</strong> — what “good enough” looks
-    like expressed as thresholds, not just dashboards</li>
-    <li><strong>Shadow mode evaluation</strong> — running a new
-    embedding model in parallel to compare retrieval quality before
-    promoting it</li>
-    <li><strong>Human-in-the-loop checkpoints</strong> — when to trigger
-    a human review: retrieval score below threshold, new call category
-    detected, embedding distribution shift</li>
-    </ul>
-    <hr />
-    <h2 id="planned-outline">Planned Outline</h2>
-    <ol type="1">
-    <li><p><strong>The silent failure problem</strong> — a wrong answer
-    delivered confidently is worse than no answer; why 200 OK means
-    nothing for AI systems</p></li>
-    <li><p><strong>Three failure modes, diagnosed</strong></p>
-    <ul>
-    <li><em>Data drift</em>: detecting new categories that weren’t in
-    the corpus at ingest time; how to surface this from query logs</li>
-    <li><em>Concept drift</em>: embedding the same phrase from 2023
-    vs. 2026 produces different vectors; when to re-embed the
-    corpus</li>
-    <li><em>Retrieval drift</em>: how ANN index quality degrades as a
-    pgvector collection grows; HNSW vs. IVFFlat behavior; when to
-    rebuild the index</li>
-    </ul></li>
-    <li><p><strong>The telemetry we have (from Post 7)</strong> — what
-    <code>rag_retrieval_score</code>,
-    <code>rag_documents_retrieved_total</code>, and
-    <code>llm_tokens_prompt_total</code> tell us; what’s still
-    missing</p></li>
-    <li><p><strong>Adding the missing retrieval quality
-    signal</strong></p>
-    <ul>
-    <li>Emit max cosine similarity from <code>retrieve()</code> as a
-    Prometheus histogram</li>
-    <li>A Grafana alert rule: fire when p50 retrieval score drops below
-    0.70 for 30 minutes</li>
-    </ul></li>
-    <li><p><strong>CSAT as ground truth</strong></p>
-    <ul>
-    <li>Revisit <code>query_csat()</code> — correlating low CSAT weeks
-    with MCP query patterns from Post 7 telemetry</li>
-    <li>New Grafana panel: CSAT score distribution vs. RAG query volume
-    by category (time series overlay)</li>
-    <li>What a correlated drop looks like; how to investigate</li>
-    </ul></li>
-    <li><p><strong>LLM-as-judge for answer quality</strong></p>
-    <ul>
-    <li>A lightweight <code>scripts/eval_sample.py</code>: sample N
-    recent query/answer pairs from logs, ask a cheap model to rate 1–5,
-    emit scores as a metric</li>
-    <li>How to automate this as a nightly job (cron or GitHub
-    Actions)</li>
-    <li>The limits of LLM-as-judge: what it catches and what it
-    misses</li>
-    </ul></li>
-    <li><p><strong>Drift detection in practice</strong> — Grafana alert
-    rules for:</p>
-    <ul>
-    <li>Retrieval score p50 degradation</li>
-    <li>Embedding latency spikes (OpenAI model API changes)</li>
-    <li>New category labels not seen at original ingest time</li>
-    </ul></li>
-    <li><p><strong>SLOs for this system</strong> — proposed thresholds
-    that make sense for the Northgate Federal use case:</p>
-    <table>
-    <thead>
-    <tr>
-    <th>SLO</th>
-    <th>Threshold</th>
-    <th>Window</th>
-    </tr>
-    </thead>
-    <tbody>
-    <tr>
-    <td>Retrieval score p50</td>
-    <td>&gt; 0.70</td>
-    <td>Rolling 7-day</td>
-    </tr>
-    <tr>
-    <td>Query latency p95</td>
-    <td>&lt; 4 seconds</td>
-    <td>Rolling 24-hour</td>
-    </tr>
-    <tr>
-    <td>CSAT trend</td>
-    <td>≥ 4.0 average</td>
-    <td>Rolling 30-day</td>
-    </tr>
-    <tr>
-    <td>LLM-as-judge score p50</td>
-    <td>&gt; 3.5 / 5</td>
-    <td>Rolling 7-day</td>
-    </tr>
-    </tbody>
-    </table></li>
-    <li><p><strong>Runbook sketch: what to do when alerts
-    fire</strong></p>
-    <ul>
-    <li>Retrieval score drops → check for corpus skew; consider
-    re-ingest or index rebuild</li>
-    <li>Latency spike → check OpenAI status; consider Ollama
-    fallback</li>
-    <li>CSAT drop → trigger LLM-as-judge eval; review flagged
-    query/answer pairs with a human</li>
-    <li>New category detected → add representative calls; re-embed
-    corpus; update retrieval tests</li>
-    </ul></li>
-    <li><p><strong>Shadow mode evaluation</strong> — running a new
-    embedding model (<code>text-embedding-3-large</code> or a future
-    Ollama model) in a shadow collection; comparing retrieval scores
-    before promoting</p></li>
-    </ol>
-    <hr />
-    <h2 id="code-changes-for-this-post">Code Changes for This Post</h2>
-    <ul>
-    <li>Add <code>retrieval_score</code> metric to
-    <code>rag/pipeline.py</code> (emit highest cosine score from
-    pgvector results as OTel metric)</li>
-    <li>Add <code>scripts/eval_sample.py</code> — samples N recent
-    queries from logs, rates quality with LLM-as-judge, prints report
-    and optionally emits as metrics</li>
-    <li>New Grafana panel: CSAT score vs. RAG query volume (time series,
-    JSON committed to <code>infra/grafana/</code>)</li>
-    <li>Grafana alert rule for retrieval score degradation (provisioned
-    alert YAML)</li>
-    </ul>
-    <hr />
-    <h2 id="outstanding-questions-tbd">Outstanding Questions / TBD</h2>
-    <ul>
-    <li>How to log query/answer pairs for the LLM-as-judge eval? Need a
-    structured log format from Post 7 instrumentation.</li>
-    <li>Include Ragas (the open-source RAG eval framework) as an
-    alternative to hand-rolled LLM-as-judge?</li>
-    <li>Show the HNSW index rebuild command for pgvector?</li>
-    <li>Discuss the annotation / human feedback loop as a path toward
-    true supervised eval?</li>
-    </ul>
-  </div>
+    <div class="post-body">
+        <blockquote>
+        <p><strong>Status: Structured draft.</strong> This post has a
+        detailed outline and will be written after Posts 02–07 are
+        complete.</p>
+        </blockquote>
+        <hr />
+        <h2 id="thesis">Thesis</h2>
+        <p>RAG systems degrade silently. Embeddings drift as language
+        evolves, retrieval quality erodes as the corpus grows, and LLM
+        behavior shifts between model versions. By the time users
+        complain, the damage is done. A 200 OK response with a
+        confidently stated wrong answer is worse than an error — at
+        least an error is visible.</p>
+        <p>This post shows how to use the telemetry from Post 7 to
+        detect degradation early — and how the CSAT scores we already
+        collect become a lagging ground-truth signal for answer quality.
+        The goal is to move from “we hope it’s working” to “we know when
+        it’s not.”</p>
+        <hr />
+        <h2 id="key-concepts">Key Concepts</h2>
+        <ul>
+        <li><strong>Three failure modes to watch</strong>
+        <ul>
+        <li><em>Data drift</em>: new call categories appear that weren’t
+        in the original corpus; the model has no good neighbors to
+        retrieve</li>
+        <li><em>Concept drift</em>: the meaning of “fraud” or
+        “escalation” changes as call center language evolves; old
+        embeddings become stale</li>
+        <li><em>Retrieval drift</em>: top-k results become less relevant
+        as the corpus grows and the ANN index quality degrades</li>
+        </ul></li>
+        <li><strong>Embedding drift</strong> — cosine similarity
+        distributions shift over time; how to detect it using the
+        <code>rag_retrieval_score</code> metric from Post 7</li>
+        <li><strong>Retrieval quality metrics</strong> — MRR, NDCG,
+        top-k relevance; how to estimate these without human labels
+        using LLM-as-judge</li>
+        <li><strong>CSAT as a lagging ground-truth signal</strong> —
+        when call center agents rate calls poorly <em>after</em> using
+        the AI tool, that’s signal; correlating CSAT scores with MCP
+        query volume by category reveals where the system is
+        failing</li>
+        <li><strong>LLM-as-judge</strong> — a lightweight evaluation
+        pattern: periodically sample recent query/answer pairs and ask a
+        cheap model to rate answer quality; emit scores as OTel
+        metrics</li>
+        <li><strong>SLOs for AI systems</strong> — what “good enough”
+        looks like expressed as thresholds, not just dashboards</li>
+        <li><strong>Shadow mode evaluation</strong> — running a new
+        embedding model in parallel to compare retrieval quality before
+        promoting it</li>
+        <li><strong>Human-in-the-loop checkpoints</strong> — when to
+        trigger a human review: retrieval score below threshold, new
+        call category detected, embedding distribution shift</li>
+        </ul>
+        <hr />
+        <h2 id="planned-outline">Planned Outline</h2>
+        <ol type="1">
+        <li><p><strong>The silent failure problem</strong> — a wrong
+        answer delivered confidently is worse than no answer; why 200 OK
+        means nothing for AI systems</p></li>
+        <li><p><strong>Three failure modes, diagnosed</strong></p>
+        <ul>
+        <li><em>Data drift</em>: detecting new categories that weren’t
+        in the corpus at ingest time; how to surface this from query
+        logs</li>
+        <li><em>Concept drift</em>: embedding the same phrase from 2023
+        vs. 2026 produces different vectors; when to re-embed the
+        corpus</li>
+        <li><em>Retrieval drift</em>: how ANN index quality degrades as
+        a pgvector collection grows; HNSW vs. IVFFlat behavior; when to
+        rebuild the index</li>
+        </ul></li>
+        <li><p><strong>The telemetry we have (from Post 7)</strong> —
+        what <code>rag_retrieval_score</code>,
+        <code>rag_documents_retrieved_total</code>, and
+        <code>llm_tokens_prompt_total</code> tell us; what’s still
+        missing</p></li>
+        <li><p><strong>Adding the missing retrieval quality
+        signal</strong></p>
+        <ul>
+        <li>Emit max cosine similarity from <code>retrieve()</code> as a
+        Prometheus histogram</li>
+        <li>A Grafana alert rule: fire when p50 retrieval score drops
+        below 0.70 for 30 minutes</li>
+        </ul></li>
+        <li><p><strong>CSAT as ground truth</strong></p>
+        <ul>
+        <li>Revisit <code>query_csat()</code> — correlating low CSAT
+        weeks with MCP query patterns from Post 7 telemetry</li>
+        <li>New Grafana panel: CSAT score distribution vs. RAG query
+        volume by category (time series overlay)</li>
+        <li>What a correlated drop looks like; how to investigate</li>
+        </ul></li>
+        <li><p><strong>LLM-as-judge for answer quality</strong></p>
+        <ul>
+        <li>A lightweight <code>scripts/eval_sample.py</code>: sample N
+        recent query/answer pairs from logs, ask a cheap model to rate
+        1–5, emit scores as a metric</li>
+        <li>How to automate this as a nightly job (cron or GitHub
+        Actions)</li>
+        <li>The limits of LLM-as-judge: what it catches and what it
+        misses</li>
+        </ul></li>
+        <li><p><strong>Drift detection in practice</strong> — Grafana
+        alert rules for:</p>
+        <ul>
+        <li>Retrieval score p50 degradation</li>
+        <li>Embedding latency spikes (OpenAI model API changes)</li>
+        <li>New category labels not seen at original ingest time</li>
+        </ul></li>
+        <li><p><strong>SLOs for this system</strong> — proposed
+        thresholds that make sense for the Northgate Federal use
+        case:</p>
+        <table>
+        <thead>
+        <tr>
+        <th>SLO</th>
+        <th>Threshold</th>
+        <th>Window</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr>
+        <td>Retrieval score p50</td>
+        <td>&gt; 0.70</td>
+        <td>Rolling 7-day</td>
+        </tr>
+        <tr>
+        <td>Query latency p95</td>
+        <td>&lt; 4 seconds</td>
+        <td>Rolling 24-hour</td>
+        </tr>
+        <tr>
+        <td>CSAT trend</td>
+        <td>≥ 4.0 average</td>
+        <td>Rolling 30-day</td>
+        </tr>
+        <tr>
+        <td>LLM-as-judge score p50</td>
+        <td>&gt; 3.5 / 5</td>
+        <td>Rolling 7-day</td>
+        </tr>
+        </tbody>
+        </table></li>
+        <li><p><strong>Runbook sketch: what to do when alerts
+        fire</strong></p>
+        <ul>
+        <li>Retrieval score drops → check for corpus skew; consider
+        re-ingest or index rebuild</li>
+        <li>Latency spike → check OpenAI status; consider Ollama
+        fallback</li>
+        <li>CSAT drop → trigger LLM-as-judge eval; review flagged
+        query/answer pairs with a human</li>
+        <li>New category detected → add representative calls; re-embed
+        corpus; update retrieval tests</li>
+        </ul></li>
+        <li><p><strong>Shadow mode evaluation</strong> — running a new
+        embedding model (<code>text-embedding-3-large</code> or a future
+        Ollama model) in a shadow collection; comparing retrieval scores
+        before promoting</p></li>
+        </ol>
+        <hr />
+        <h2 id="code-changes-for-this-post">Code Changes for This
+        Post</h2>
+        <ul>
+        <li>Add <code>retrieval_score</code> metric to
+        <code>rag/pipeline.py</code> (emit highest cosine score from
+        pgvector results as OTel metric)</li>
+        <li>Add <code>scripts/eval_sample.py</code> — samples N recent
+        queries from logs, rates quality with LLM-as-judge, prints
+        report and optionally emits as metrics</li>
+        <li>New Grafana panel: CSAT score vs. RAG query volume (time
+        series, JSON committed to <code>infra/grafana/</code>)</li>
+        <li>Grafana alert rule for retrieval score degradation
+        (provisioned alert YAML)</li>
+        </ul>
+        <hr />
+        <h2 id="outstanding-questions-tbd">Outstanding Questions /
+        TBD</h2>
+        <ul>
+        <li>How to log query/answer pairs for the LLM-as-judge eval?
+        Need a structured log format from Post 7 instrumentation.</li>
+        <li>Include Ragas (the open-source RAG eval framework) as an
+        alternative to hand-rolled LLM-as-judge?</li>
+        <li>Show the HNSW index rebuild command for pgvector?</li>
+        <li>Discuss the annotation / human feedback loop as a path
+        toward true supervised eval?</li>
+        </ul>
+    </div>
 </article>
 
 <nav class="post-nav">
-    <a class="nav-prev" href="../09-wiring-it-up/">&#8592; Wiring It
+        <a class="nav-prev" href="../09-wiring-it-up/">&#8592; Wiring It
 Up</a>
-    <a class="nav-index" href="../">Series Index</a>
-    <a class="nav-next" href="../11-whats-next/">What’s Next &#8594;</a>
-  </nav>
+        <a class="nav-index" href="../">Series Index</a>
+        <a class="nav-next" href="../11-whats-next/">What’s
+Next &#8594;</a>
+    </nav>
 
 <footer class="site-footer">
-  <div class="footer-brand">
-    <span class="brand-hendo">Hendo</span><span class="brand-code">Code</span>
-  </div>
-  <p>Anchoring AI &mdash; a series on building production RAG systems</p>
-  <p><a href="https://github.com/HendoCode/contact-center-ai" target="_blank" rel="noopener">View the code on GitHub</a></p>
+    <div class="footer-brand">
+        <span class="brand-hendo">Hendo</span><span class="brand-code">Code</span>
+    </div>
+    <p>Anchoring AI &mdash; a series on building production RAG systems</p>
+    <p><a href="https://github.com/HendoCode/contact-center-ai" target="_blank" rel="noopener">View the code on
+        GitHub</a></p>
 </footer>
 
 <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
 <script>
-  // Scripts at bottom of <body> — DOM is fully parsed, no DOMContentLoaded needed.
-  // Pandoc outputs <pre class="mermaid"><code>...</code></pre>; Mermaid needs <div class="mermaid">.
-  document.querySelectorAll('pre.mermaid').forEach(function (el) {
-    var div = document.createElement('div');
-    div.className = 'mermaid';
-    div.textContent = el.textContent;
-    el.parentNode.replaceChild(div, el);
-  });
-  mermaid.initialize({ startOnLoad: false, theme: 'neutral', securityLevel: 'loose' });
-  mermaid.run();
+    // Scripts at bottom of <body> — DOM is fully parsed, no DOMContentLoaded needed.
+    // Pandoc outputs <pre class="mermaid"><code>...</code></pre>; Mermaid needs <div class="mermaid">.
+    document.querySelectorAll('pre.mermaid').forEach(function (el) {
+        var div = document.createElement('div');
+        div.className = 'mermaid';
+        div.textContent = el.textContent;
+        el.parentNode.replaceChild(div, el);
+    });
+    mermaid.initialize({startOnLoad: false, theme: 'neutral', securityLevel: 'loose'});
+    mermaid.run();
 </script>
 
 </body>
