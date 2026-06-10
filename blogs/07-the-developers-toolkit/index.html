@@ -648,6 +648,11 @@ debugging, and JetBrains AI in the same workflow</p>
         preview, Git integration, running build.sh from the terminal —
         all from the same workspace as the Python source code; the case
         for not switching contexts</li>
+        <li><strong>IDE landscape comparison</strong> — JetBrains
+        vs. Windsurf vs. Cursor vs. Copilot: agentic (“do this whole
+        task”) vs. assistant (“help with this selection”) paradigms;
+        where each tool is strongest; a tool-equivalence table so
+        readers on other IDEs can translate the workflow</li>
         </ul>
         <hr />
         <h2 id="the-new-architecture">The New Architecture</h2>
@@ -693,6 +698,15 @@ Both surfaces share the same tool implementations.</code></pre>
         <li><strong>Authoring in JetBrains</strong> — the blog post
         you’re reading was written in the same IDE; Markdown preview,
         terminal, Git — one window</li>
+        <li><strong>IDE comparison: JetBrains in context</strong> — this
+        workflow is one ecosystem, not the only one; Windsurf (Cascade,
+        agentic multi-file flows), Cursor (VS Code fork + full-repo
+        context, configurable model), GitHub Copilot (ubiquitous,
+        completion-first); the key distinctions: agentic vs. assistant
+        paradigm, depth of Docker/Python tooling, whether
+        <code>.http</code>-style testing is built in or
+        plugin-dependent; a tool-equivalence table so readers on other
+        stacks can map each JetBrains feature to their own workflow</li>
         </ol>
         <hr />
         <h2 id="code-changes-for-this-post">Code Changes for This
@@ -714,6 +728,116 @@ Both surfaces share the same tool implementations.</code></pre>
         from Post 3, tested by new test)</li>
         </ul>
         <hr />
+        <h2 id="ide-comparison-reference">IDE Comparison Reference</h2>
+        <p>Framing for section 10: the JetBrains workflow is one valid
+        path, not the only one. The post should give readers enough to
+        translate it to their own stack.</p>
+        <p><strong>Paradigm distinction:</strong> - <em>Assistant</em>
+        (Junie, Copilot): responds to specific prompts inside a file or
+        selection — you direct every step - <em>Agentic</em> (Windsurf
+        Cascade, Cursor Composer): takes an instruction like “add rate
+        limiting and write the tests” and executes across multiple files
+        autonomously — faster for greenfield work, less control when the
+        answer isn’t obvious</p>
+        <p><strong>Landscape table (for the post):</strong></p>
+        <table>
+        <colgroup>
+        <col style="width: 25%" />
+        <col style="width: 25%" />
+        <col style="width: 25%" />
+        <col style="width: 25%" />
+        </colgroup>
+        <thead>
+        <tr>
+        <th>Tool</th>
+        <th>Paradigm</th>
+        <th>Strongest at</th>
+        <th>Weakest at</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr>
+        <td>PyCharm + Junie</td>
+        <td>Assistant</td>
+        <td>Deep Python tooling, Docker debugger, <code>.http</code>
+        testing, single-window blog authoring</td>
+        <td>AI waits to be asked; no autonomous multi-file flows</td>
+        </tr>
+        <tr>
+        <td>Windsurf (Cascade)</td>
+        <td>Agentic</td>
+        <td>“Do this whole task” across multiple files; whole-repo
+        context maintained automatically</td>
+        <td>Thinner Python-specific tooling; Docker debugging setup more
+        manual</td>
+        </tr>
+        <tr>
+        <td>Cursor</td>
+        <td>Agentic/assistant hybrid</td>
+        <td>Best-in-class autocomplete with repo context; configurable
+        model (Claude or GPT-4o); large VS Code plugin ecosystem</td>
+        <td>Less opinionated than Windsurf; still feels like VS Code + a
+        smart copilot</td>
+        </tr>
+        <tr>
+        <td>GitHub Copilot</td>
+        <td>Assistant</td>
+        <td>Ubiquitous; good autocomplete; tight GitHub integration</td>
+        <td>Primarily completion-focused; Workspace (agentic mode) is
+        early</td>
+        </tr>
+        <tr>
+        <td>Claude Code (CLI)</td>
+        <td>Agentic</td>
+        <td>Autonomous multi-step tasks across the whole repo</td>
+        <td>No GUI, no debugger, no <code>.http</code> runner — power
+        tool, not daily driver</td>
+        </tr>
+        </tbody>
+        </table>
+        <p><strong>Tool equivalence table (for the post — end of section
+        10):</strong></p>
+        <table>
+        <colgroup>
+        <col style="width: 33%" />
+        <col style="width: 33%" />
+        <col style="width: 33%" />
+        </colgroup>
+        <thead>
+        <tr>
+        <th>JetBrains feature</th>
+        <th>VS Code / Cursor equivalent</th>
+        <th>Windsurf equivalent</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr>
+        <td>Junie (test gen + PEP8)</td>
+        <td>Copilot Chat / Cursor Composer</td>
+        <td>Cascade flow</td>
+        </tr>
+        <tr>
+        <td>HTTP Request files</td>
+        <td>REST Client extension (plugin)</td>
+        <td>External tool (Bruno, Insomnia)</td>
+        </tr>
+        <tr>
+        <td>Docker remote interpreter</td>
+        <td>Docker extension + <code>launch.json</code></td>
+        <td>Docker extension + <code>launch.json</code></td>
+        </tr>
+        <tr>
+        <td>Terminal + Markdown + Git</td>
+        <td>Built into VS Code</td>
+        <td>Built into Windsurf</td>
+        </tr>
+        </tbody>
+        </table>
+        <p><strong>Closing note for the section:</strong> if your team
+        is on Windsurf or Cursor, the <code>.http</code> files and
+        Junie-generated tests translate directly — the workflows are the
+        same; the tools have different names.</p>
+        <hr />
         <h2 id="outstanding-questions-tbd">Outstanding Questions /
         TBD</h2>
         <ul>
@@ -728,6 +852,9 @@ Both surfaces share the same tool implementations.</code></pre>
         <code>get_call_summary()</code> as well?</li>
         <li><code>debugpy</code> for Docker debugging or PyCharm’s
         built-in Docker interpreter?</li>
+        <li>For the IDE comparison: keep it as a short closing section,
+        or pull it up earlier as context-setting for why JetBrains was
+        chosen for this post?</li>
         </ul>
     </div>
 </article>
