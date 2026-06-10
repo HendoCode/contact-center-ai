@@ -30,16 +30,3 @@ The repo lives at [github.com/HendoCode/contact-center-ai](https://github.com/He
 | [08](./08-trust-but-verify/) | **Trust, but Verify** | Validation strategies, drift detection, CSAT as a ground-truth signal, SLOs for AI systems |
 | [09](./09-whats-next/) | **What's Next** | GitAgent, LangGraph, Azure AI Foundry — comparing what we built with the emerging landscape |
 
----
-
-## How to Build the HTML
-
-The posts are authored in Markdown and compiled to standalone HTML with [pandoc](https://pandoc.org).
-
-```bash
-brew install pandoc          # one-time setup
-./blogs/build.sh             # build all posts
-./blogs/build.sh 01          # build a specific post
-```
-
-Output files are `index.html` alongside each `index.md`.
