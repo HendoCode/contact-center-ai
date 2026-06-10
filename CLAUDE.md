@@ -93,6 +93,25 @@ AZURE_CLIENT_ID=        # used by Terraform, not the app
 
 See `.env.example` for the full list including AWS credentials and MCP server host/port.
 
+## Blog series
+
+A nine-post "Anchoring AI" series lives in `blogs/`. Posts use this codebase as a live playground.
+
+```bash
+# Build all HTML from Markdown (requires pandoc: brew install pandoc)
+bash blogs/build.sh
+
+# Build a single post
+bash blogs/build.sh 01
+```
+
+Posts 1–4 are fully drafted. Posts 5–9 are structured placeholders/drafts.
+Deployed via GitHub Actions → GitHub Pages at https://hendocode.github.io/contact-center-ai/
+
+**Known bugs documented in the series (not yet fixed in code):**
+- `mcp/tools.py` `get_call_summary()`: retrieved document is never passed to the LLM — a second `rag_query()` call re-retrieves independently, so the specific call may not be summarized
+- `mcp/tools.py` `query_csat()`: `category` parameter is accepted in the schema and function signature but the filter is not implemented — the parameter is silently ignored
+
 ## What's built vs. what's next
 
 **Built:** synthetic data generator, full RAG ingest/retrieve/respond pipeline, pgvector + OpenAI integration, Ollama as local provider alternative (no API key), 3-tool MCP server, Terraform for Azure (App Service + PostgreSQL Flexible Server), Docker Compose for local dev.
