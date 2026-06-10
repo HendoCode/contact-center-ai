@@ -4,14 +4,14 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Series Overview | Anchoring AI — HendoCode</title>
-  <meta name="description" content="Anchoring AI is a nine-part blog
+  <meta name="description" content="Anchoring AI is an eleven-part blog
 series about building a real RAG pipeline, MCP server, and observability
 stack for a call center — from synthetic data to production
 infrastructure.">
   <meta property="og:title" content="Series Overview">
-  <meta property="og:description" content="Anchoring AI is a nine-part
-blog series about building a real RAG pipeline, MCP server, and
-observability stack for a call center — from synthetic data to
+  <meta property="og:description" content="Anchoring AI is an
+eleven-part blog series about building a real RAG pipeline, MCP server,
+and observability stack for a call center — from synthetic data to
 production infrastructure.">
   <meta property="og:type" content="article">
   <meta name="twitter:card" content="summary">
@@ -501,7 +501,7 @@ production infrastructure.">
   <header class="post-header">
         <div class="series-eyebrow">Anchoring AI</div>
         <h1>Series Overview</h1>
-    <p class="post-subtitle">Nine posts on building a production RAG
+    <p class="post-subtitle">Eleven posts on building a production RAG
 system from scratch</p>
         <div class="byline">
       Stephen Henderson &middot; 2026
@@ -510,17 +510,17 @@ system from scratch</p>
 
   <div class="post-body">
     <h2 id="what-is-anchoring-ai">What is Anchoring AI?</h2>
-    <p>This is a nine-post series about building a real AI system — not
-    a demo, not a tutorial with a toy dataset, but the kind of thing
+    <p>This is an eleven-post series about building a real AI system —
+    not a demo, not a tutorial with a toy dataset, but the kind of thing
     you’d actually deploy for a paying client. The codebase is a
     portfolio mirror of consulting work I did for a credit union. The
     data is synthetic. The architecture decisions, trade-offs, and
     lessons are real.</p>
     <p>The series follows a <strong>build-with-me</strong> arc: each
     post adds a layer to the system. By the end, we’ll have a RAG
-    pipeline, an MCP server, Azure infrastructure, a Grafana
-    observability stack, and a validation framework — all grounded in a
-    real use case.</p>
+    pipeline, an MCP server, object storage ingestion, a REST API, Azure
+    infrastructure, a Grafana observability stack, and a validation
+    framework — all grounded in a real use case.</p>
     <p>The repo lives at <a
     href="https://github.com/HendoCode/contact-center-ai">github.com/HendoCode/contact-center-ai</a>.</p>
     <hr />
@@ -564,31 +564,43 @@ system from scratch</p>
     cost and privacy trade-offs</td>
     </tr>
     <tr>
-    <td><a href="./05-built-to-last/">05</a></td>
+    <td><a href="./05-real-data-in/">05</a></td>
+    <td><strong>Real Data In</strong></td>
+    <td>MinIO, S3-compatible object storage, implementing the S3 ingest
+    stub, deduplication</td>
+    </tr>
+    <tr>
+    <td><a href="./06-built-to-last/">06</a></td>
     <td><strong>Built to Last</strong></td>
     <td>Terraform/OpenTofu on Azure, App Service, PostgreSQL Flexible,
     Entra Easy Auth pattern</td>
     </tr>
     <tr>
-    <td><a href="./06-what-should-we-measure/">06</a></td>
+    <td><a href="./07-the-developers-toolkit/">07</a></td>
+    <td><strong>The Developer’s Toolkit</strong></td>
+    <td>REST API + OpenAPI/Swagger, PyCharm debugging, Junie for tests
+    and PEP8, HTTP Request files</td>
+    </tr>
+    <tr>
+    <td><a href="./08-what-should-we-measure/">08</a></td>
     <td><strong>What Should We Measure?</strong></td>
     <td>LLM and RAG-specific metrics, Grafana + OpenTelemetry landscape,
     dashboard design</td>
     </tr>
     <tr>
-    <td><a href="./07-wiring-it-up/">07</a></td>
+    <td><a href="./09-wiring-it-up/">09</a></td>
     <td><strong>Wiring It Up</strong></td>
     <td>OpenTelemetry instrumentation, docker-compose additions, live
     Grafana dashboards</td>
     </tr>
     <tr>
-    <td><a href="./08-trust-but-verify/">08</a></td>
+    <td><a href="./10-trust-but-verify/">10</a></td>
     <td><strong>Trust, but Verify</strong></td>
     <td>Validation strategies, drift detection, CSAT as a ground-truth
     signal, SLOs for AI systems</td>
     </tr>
     <tr>
-    <td><a href="./09-whats-next/">09</a></td>
+    <td><a href="./11-whats-next/">11</a></td>
     <td><strong>What’s Next</strong></td>
     <td>GitAgent, LangGraph, Azure AI Foundry — comparing what we built
     with the emerging landscape</td>

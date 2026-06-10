@@ -3,19 +3,19 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>What’s Next | Anchoring AI — HendoCode</title>
-  <meta name="description" content="Post 9 of Anchoring AI: comparing
-the handcrafted MCP approach with the emerging landscape of AI agent
-frameworks — GitAgent, LangGraph, Azure AI Agents, GitHub Copilot
-Workspace — and what to look for when choosing.">
-  <meta property="og:title" content="What’s Next">
-  <meta property="og:description" content="Post 9 of Anchoring AI:
-comparing the handcrafted MCP approach with the emerging landscape of AI
-agent frameworks — GitAgent, LangGraph, Azure AI Agents, GitHub Copilot
-Workspace — and what to look for when choosing.">
+  <title>What Should We Measure? | Anchoring AI — HendoCode</title>
+  <meta name="description" content="Post 8 of Anchoring AI: what metrics
+actually matter for LLM and RAG systems, how Grafana and OpenTelemetry
+fit together, and how to design dashboards before you instrument
+anything.">
+  <meta property="og:title" content="What Should We Measure?">
+  <meta property="og:description" content="Post 8 of Anchoring AI: what
+metrics actually matter for LLM and RAG systems, how Grafana and
+OpenTelemetry fit together, and how to design dashboards before you
+instrument anything.">
   <meta property="og:type" content="article">
   <meta name="twitter:card" content="summary">
-  <meta name="twitter:title" content="What’s Next">
+  <meta name="twitter:title" content="What Should We Measure?">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Josefin+Sans:wght@300;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -493,7 +493,7 @@ Workspace — and what to look for when choosing.">
       <span class="nav-divider">/</span>
       <span class="nav-series">Anchoring AI</span>
             <span class="nav-divider">/</span>
-      <span class="post-label">Post 09</span>
+      <span class="post-label">Post 08</span>
           </div>
     <a class="nav-gh" href="https://github.com/HendoCode/contact-center-ai" target="_blank" rel="noopener">GitHub ↗</a>
   </div>
@@ -501,10 +501,10 @@ Workspace — and what to look for when choosing.">
 
 <article>
   <header class="post-header">
-        <div class="series-eyebrow">Anchoring AI &mdash; Post 09</div>
-        <h1>What’s Next</h1>
-    <p class="post-subtitle">GitAgent, LangGraph, Azure AI Foundry — and
-why the MCP-first approach stays durable</p>
+        <div class="series-eyebrow">Anchoring AI &mdash; Post 08</div>
+        <h1>What Should We Measure?</h1>
+    <p class="post-subtitle">Designing LLM and RAG observability before
+writing a line of instrumentation code</p>
         <div class="byline">
       Stephen Henderson &middot; TBD
     </div>
@@ -512,260 +512,155 @@ why the MCP-first approach stays durable</p>
 
   <div class="post-body">
     <blockquote>
-    <p><strong>Status: Structured draft.</strong> This post has a
-    detailed outline and will be written after Posts 02–08 are
-    complete.</p>
+    <p><strong>Status: Placeholder.</strong> This post is planned. The
+    outline and key concepts below describe what it will cover.</p>
     </blockquote>
     <hr />
-    <h2 id="thesis">Thesis</h2>
-    <p>The system we built — a handcrafted MCP tool server with a RAG
-    pipeline — is a deliberate choice for a specific context: multiple
-    teams, multiple LLM vendors, a need for reuse across use cases, and
-    a client not yet ready to standardize. Every design decision in this
-    series has been shaped by those constraints.</p>
-    <p>But the landscape is shifting fast. GitAgent-style coding agents,
-    managed agent runtimes from Microsoft and OpenAI, and stateful
-    orchestration frameworks like LangGraph are changing what “build
-    your own” looks like — and what it competes with. This final post
-    maps the next horizon: what these tools are, where they fit, and
-    whether the nine posts of work you just read still make sense.</p>
-    <p>The short answer: yes. Here’s why.</p>
+    <h2 id="what-this-post-covers">What This Post Covers</h2>
+    <p>Most observability posts start with “add these metrics.” This one
+    starts with “what do you actually need to know?” LLM and RAG systems
+    have failure modes that traditional SRE metrics don’t capture:
+    answer quality degrades silently, retrieval relevance erodes as the
+    corpus grows, and a 200 response code tells you nothing about
+    whether the answer was correct.</p>
+    <p>This is a design post. Post 7 implements it. By the end of this
+    post, you’ll have a clear mental model of what to measure, why each
+    metric matters, and how Grafana + OpenTelemetry fit into the stack —
+    without having written a single <code>meter.record()</code> call
+    yet.</p>
     <hr />
     <h2 id="key-concepts">Key Concepts</h2>
     <ul>
-    <li><strong>Agentic AI vs. RAG tools</strong> — the shift from
-    “query a tool and get an answer” to “agent plans and executes
-    multi-step tasks autonomously”</li>
-    <li><strong>GitAgent / GitHub Copilot Workspace</strong> — AI agents
-    that operate on repositories: read code, write PRs, run tests,
-    respond to issues; how they could use the MCP server as a data
-    source <em>or</em> how a coding agent could evolve this codebase
-    autonomously</li>
-    <li><strong>LangGraph</strong> — stateful, multi-step agent
-    orchestration built on LangChain (already a dependency); when a
-    graph of steps is the right abstraction over a simple RAG chain</li>
-    <li><strong>Azure AI Foundry Agents</strong> — Microsoft’s managed
-    agent runtime; how it compares to self-hosted MCP; what “managed”
-    gets you and what it costs</li>
-    <li><strong>OpenAI Assistants API</strong> — the OpenAI-native
-    alternative to MCP; threads, runs, and tool calls; trade-offs
-    vs. the protocol-based approach</li>
-    <li><strong>MCP as the stable adapter layer</strong> — regardless of
-    which agent framework wins, MCP tools remain the interface; the work
-    in this series doesn’t get thrown away when the orchestration layer
-    changes</li>
-    <li><strong>The consolidation question</strong> — Northgate Federal
-    Credit Union was going to consolidate GenAI efforts in 3–6 months;
-    what criteria should drive that decision?</li>
+    <li><strong>The four observability layers for AI systems</strong> —
+    infrastructure metrics (CPU, memory), API metrics (latency, error
+    rate), LLM metrics (token counts, cost, model version), RAG metrics
+    (retrieval score, result count, context size)</li>
+    <li><strong>Why standard SRE metrics aren’t enough</strong> — a 200
+    OK with a hallucinated answer looks identical to a 200 OK with a
+    correct one</li>
+    <li><strong>OpenTelemetry</strong> — traces, metrics, logs as a
+    unified model; why OTel is the right standard for language-agnostic
+    instrumentation</li>
+    <li><strong>Grafana + Prometheus</strong> — how metrics flow from
+    OTel collector → Prometheus → Grafana; the local docker-compose
+    setup</li>
+    <li><strong>Retrieval quality as a metric</strong> — cosine
+    similarity scores from pgvector as a proxy for answer groundedness;
+    how to emit them as OTel metrics</li>
+    <li><strong>Token cost tracking</strong> — why you want to know how
+    much each MCP query costs; how to compute it from the OpenAI
+    response</li>
+    <li><strong>LLM latency decomposition</strong> — total request time
+    vs. embedding time vs. completion time; where the time actually
+    goes</li>
     </ul>
+    <hr />
+    <h2 id="planned-metrics-inventory">Planned Metrics Inventory</h2>
+    <table>
+    <colgroup>
+    <col style="width: 33%" />
+    <col style="width: 33%" />
+    <col style="width: 33%" />
+    </colgroup>
+    <thead>
+    <tr>
+    <th>Metric</th>
+    <th>Type</th>
+    <th>Why it matters</th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr>
+    <td><code>mcp_tool_duration_seconds</code></td>
+    <td>Histogram</td>
+    <td>End-to-end tool latency by tool name</td>
+    </tr>
+    <tr>
+    <td><code>rag_query_duration_seconds</code></td>
+    <td>Histogram</td>
+    <td>RAG pipeline latency (excludes MCP overhead)</td>
+    </tr>
+    <tr>
+    <td><code>embedding_duration_seconds</code></td>
+    <td>Histogram</td>
+    <td>Embedding API call latency</td>
+    </tr>
+    <tr>
+    <td><code>llm_completion_duration_seconds</code></td>
+    <td>Histogram</td>
+    <td>LLM completion latency</td>
+    </tr>
+    <tr>
+    <td><code>llm_tokens_prompt_total</code></td>
+    <td>Counter</td>
+    <td>Cumulative prompt tokens (cost proxy)</td>
+    </tr>
+    <tr>
+    <td><code>llm_tokens_completion_total</code></td>
+    <td>Counter</td>
+    <td>Cumulative completion tokens (cost proxy)</td>
+    </tr>
+    <tr>
+    <td><code>rag_retrieval_score</code></td>
+    <td>Gauge/Histogram</td>
+    <td>Max cosine similarity of returned docs (quality proxy)</td>
+    </tr>
+    <tr>
+    <td><code>rag_documents_retrieved_total</code></td>
+    <td>Histogram</td>
+    <td>Number of docs returned per query</td>
+    </tr>
+    <tr>
+    <td><code>csat_query_results_count</code></td>
+    <td>Histogram</td>
+    <td>Number of CSAT records returned per query</td>
+    </tr>
+    </tbody>
+    </table>
     <hr />
     <h2 id="planned-outline">Planned Outline</h2>
     <ol type="1">
-    <li><p><strong>Where we started and where we are</strong> — recap
-    the nine-post arc; what was built, what it cost in time and API
-    calls, what it taught about RAG system design</p></li>
-    <li><p><strong>The agentic shift</strong> — RAG tools answer
-    questions; agents take actions. The call center supervisor use case
-    has natural next steps:</p>
-    <ul>
-    <li><em>“Find all fraud calls from last month and draft a summary
-    report”</em> — multi-step task, not a query</li>
-    <li><em>“Flag any call where an agent promised something outside
-    policy”</em> — needs reasoning across multiple retrieved
-    documents</li>
-    <li>These tasks require an agent that can plan, retrieve, reason,
-    and act — not just <code>rag_query()</code></li>
-    </ul></li>
-    <li><p><strong>GitAgent and coding agents</strong></p>
-    <ul>
-    <li>What GitAgent-style tools do: repo-aware, code-gen, PR
-    automation, issue triage</li>
-    <li>How they could integrate with this MCP server: a coding agent
-    queries call data to understand what’s failing before opening a fix
-    PR</li>
-    <li>The meta case: using Claude Code (or a similar coding agent) to
-    evolve this codebase autonomously — we already did this during
-    development</li>
-    <li>The implication: the MCP server is not just for call center
-    supervisors; it’s a data source for any AI agent that needs call
-    center context</li>
-    </ul></li>
-    <li><p><strong>Framework comparison</strong></p>
-    <table>
-    <colgroup>
-    <col style="width: 25%" />
-    <col style="width: 25%" />
-    <col style="width: 25%" />
-    <col style="width: 25%" />
-    </colgroup>
-    <thead>
-    <tr>
-    <th>Framework</th>
-    <th>Strengths</th>
-    <th>Weaknesses</th>
-    <th>Fit for this project</th>
-    </tr>
-    </thead>
-    <tbody>
-    <tr>
-    <td>Custom MCP (built here)</td>
-    <td>Maximum control, reusable, protocol-standard</td>
-    <td>You own the ops; stateless by default</td>
-    <td>✅ Right for multi-team shared access</td>
-    </tr>
-    <tr>
-    <td>LangGraph</td>
-    <td>Stateful, graph-based agents; built on LangChain (already a
-    dep)</td>
-    <td>Adds complexity; opinionated</td>
-    <td>✅ Right next step for multi-step agent tasks</td>
-    </tr>
-    <tr>
-    <td>Azure AI Foundry Agents</td>
-    <td>Managed, Azure-native; built-in persistence</td>
-    <td>Vendor lock-in; cost; less flexibility</td>
-    <td>⚠️ Evaluate in 6 months</td>
-    </tr>
-    <tr>
-    <td>OpenAI Assistants</td>
-    <td>Mature API, good tooling; threads &amp; runs</td>
-    <td>No Ollama fallback; OpenAI-only</td>
-    <td>⚠️ If committing to OpenAI</td>
-    </tr>
-    <tr>
-    <td>GitHub Copilot Workspace</td>
-    <td>Excellent for code-centric tasks</td>
-    <td>Not designed for domain data query</td>
-    <td>❌ Wrong tool for call center RAG</td>
-    </tr>
-    </tbody>
-    </table></li>
-    <li><p><strong>The MCP advantage</strong> — MCP is an interface
-    standard, not an implementation. Whichever orchestration layer wins
-    in 12 months, the three tools defined in <code>mcp/tools.py</code>
-    remain the stable API surface. The investment is durable in a way
-    that rewriting to a specific framework’s native tool format is
-    not.</p></li>
-    <li><p><strong>Criteria for the consolidation decision</strong> — a
-    decision matrix for Northgate Federal Credit Union (and any similar
-    organization):</p>
-    <ul>
-    <li>Team size and AI expertise (small team → managed &gt;
-    self-hosted)</li>
-    <li>Data sensitivity (PII, regulated data → local Ollama or private
-    cloud &gt; external API)</li>
-    <li>Vendor contracts already in place (Azure EA → Azure AI Foundry
-    becomes cheaper at the margin)</li>
-    <li>Time-to-market pressure (six weeks to demo → build on existing
-    MCP &gt; rewrite to new framework)</li>
-    <li>Consolidation timeline (&lt; 6 months → don’t optimize for the
-    future state; &gt; 12 months → design for it)</li>
-    </ul></li>
-    <li><p><strong>Our recommendation for Northgate Federal</strong></p>
-    <ul>
-    <li><em>Stay on MCP + add LangGraph for multi-step agent tasks</em>
-    — the existing tools become nodes in a LangGraph workflow; no
-    rewrite required</li>
-    <li><em>Evaluate Azure AI Foundry in 6 months</em> after the
-    provider consolidation decision is final; don’t pre-optimize</li>
-    <li><em>Revisit CSAT integration</em> once the 3rd-party provider
-    transition unblocks; a SQL-backed approach (not in-memory JSON) is
-    the right upgrade</li>
-    <li><em>Add the S3 ingestion path</em> once the data pipeline is
-    productionized; the stub in <code>pipeline.py</code> is ready to
-    fill in</li>
-    </ul></li>
-    <li><p><strong>The nine-post arc, complete</strong></p>
-    <table>
-    <colgroup>
-    <col style="width: 33%" />
-    <col style="width: 33%" />
-    <col style="width: 33%" />
-    </colgroup>
-    <thead>
-    <tr>
-    <th>Post</th>
-    <th>What we built</th>
-    <th>What we learned</th>
-    </tr>
-    </thead>
-    <tbody>
-    <tr>
-    <td>01</td>
-    <td>Architecture and diagrams</td>
-    <td>The value of a clear system context before writing code</td>
-    </tr>
-    <tr>
-    <td>02</td>
-    <td>RAG pipeline + pgvector</td>
-    <td>Embeddings are powerful; dimensions matter; no free dedup</td>
-    </tr>
-    <tr>
-    <td>03</td>
-    <td>MCP server and tools</td>
-    <td>Protocols beat APIs for multi-team AI platforms</td>
-    </tr>
-    <tr>
-    <td>04</td>
-    <td>Ollama provider swap</td>
-    <td>Env-var abstraction is worth the upfront design cost</td>
-    </tr>
-    <tr>
-    <td>05</td>
-    <td>Terraform / Azure / Entra</td>
-    <td>Auth at the infra layer beats auth in the app</td>
-    </tr>
-    <tr>
-    <td>06</td>
-    <td>Observability design</td>
-    <td>What to measure matters more than how to measure it</td>
-    </tr>
-    <tr>
-    <td>07</td>
-    <td>OTel + Grafana</td>
-    <td>Instrumentation is cheap; the hard part is defining good
-    thresholds</td>
-    </tr>
-    <tr>
-    <td>08</td>
-    <td>Validation + drift detection</td>
-    <td>RAG systems need ongoing validation, not just initial
-    testing</td>
-    </tr>
-    <tr>
-    <td>09</td>
-    <td>Landscape comparison</td>
-    <td>MCP-first ages well; the interface standard outlives the
-    implementation</td>
-    </tr>
-    </tbody>
-    </table></li>
-    <li><p><strong>What to read next</strong> — links to: LangGraph
-    documentation, MCP spec, Ragas (RAG evaluation), Azure AI Foundry
-    overview, OpenTelemetry Python SDK</p></li>
+    <li><strong>The problem with AI observability</strong> — why p95
+    latency and error rate aren’t enough; the silent failure modes
+    unique to LLM systems</li>
+    <li><strong>A mental model for AI system observability</strong> —
+    four layers: infra, API, LLM, RAG; what breaks at each layer</li>
+    <li><strong>The OpenTelemetry basics</strong> — traces, metrics,
+    logs; why OTel; the collector as the central router</li>
+    <li><strong>Grafana + Prometheus architecture</strong> — how metrics
+    flow; the docker-compose additions we’ll add in Post 7</li>
+    <li><strong>Metrics that matter for RAG</strong> — retrieval score,
+    context window utilization, document staleness</li>
+    <li><strong>Metrics that matter for LLM</strong> — token counts,
+    cost per query, model version tracking, latency decomposition</li>
+    <li><strong>Dashboard design</strong> — what panels to build; alert
+    thresholds that make sense; the CSAT panel idea</li>
+    <li><strong>What we’ll build in Post 7</strong> — a preview of the
+    implementation: OTel instrumentation points, the docker-compose
+    additions, the Grafana dashboard JSON</li>
     </ol>
     <hr />
     <h2 id="code-changes-for-this-post">Code Changes for This Post</h2>
-    <p>None — this is a retrospective and forward-looking design post.
-    No new code added.</p>
+    <p>None — this is a design post. The next post (Post 7) implements
+    the instrumentation.</p>
     <hr />
     <h2 id="outstanding-questions-tbd">Outstanding Questions / TBD</h2>
     <ul>
-    <li>Include a live demo of adding a LangGraph workflow on top of the
-    existing MCP tools?</li>
-    <li>Compare response quality: single RAG query vs. LangGraph
-    multi-step agent on the same question?</li>
-    <li>Discuss Claude Code specifically as a GitAgent-style tool and
-    how it was used to build this very codebase?</li>
+    <li>Include Langfuse as an alternative to Prometheus/Grafana for
+    LLM-specific observability?</li>
+    <li>Show a mockup of the Grafana dashboard layout?</li>
+    <li>Compare OTel vs. OpenLLMetry vs. Langfuse in a trade-off
+    table?</li>
     </ul>
   </div>
 </article>
 
 <nav class="post-nav">
-    <a class="nav-prev" href="../08-trust-but-verify/">&#8592; Trust,
-but Verify</a>
+    <a class="nav-prev" href="../07-the-developers-toolkit/">&#8592; The
+Developer’s Toolkit</a>
     <a class="nav-index" href="../">Series Index</a>
-    <span></span>
+    <a class="nav-next" href="../09-wiring-it-up/">Wiring It
+Up &#8594;</a>
   </nav>
 
 <footer class="site-footer">

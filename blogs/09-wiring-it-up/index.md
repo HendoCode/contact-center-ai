@@ -3,11 +3,11 @@ title: "Wiring It Up"
 subtitle: "OpenTelemetry instrumentation, Grafana in docker-compose, and live LLM/RAG dashboards"
 author: Stephen Henderson
 date: "TBD"
-post_number: "07"
-description: "Post 7 of Anchoring AI: implementing the observability stack designed in Post 6 — OTel instrumentation in Python, adding Grafana + Prometheus to docker-compose, and building live dashboards."
-prev_url: "../06-what-should-we-measure/"
+post_number: "09"
+description: "Post 9 of Anchoring AI: implementing the observability stack designed in Post 8 — OTel instrumentation in Python, adding Grafana + Prometheus to docker-compose, and building live dashboards."
+prev_url: "../08-what-should-we-measure/"
 prev_title: "What Should We Measure?"
-next_url: "../08-trust-but-verify/"
+next_url: "../10-trust-but-verify/"
 next_title: "Trust, but Verify"
 ---
 

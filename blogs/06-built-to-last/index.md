@@ -3,12 +3,12 @@ title: "Built to Last"
 subtitle: "Infrastructure as code for AI systems: Terraform/OpenTofu, Azure, and the auth-at-infra pattern"
 author: Stephen Henderson
 date: "TBD"
-post_number: "05"
-description: "Post 5 of Anchoring AI: walking through the Terraform configuration for Azure App Service + PostgreSQL Flexible Server, the Entra Easy Auth pattern, and OpenTofu as an open-source Terraform alternative."
-prev_url: "../04-run-anywhere/"
-prev_title: "Run Anywhere"
-next_url: "../06-what-should-we-measure/"
-next_title: "What Should We Measure?"
+post_number: "06"
+description: "Post 6 of Anchoring AI: walking through the Terraform configuration for Azure App Service + PostgreSQL Flexible Server, the Entra Easy Auth pattern, and OpenTofu as an open-source Terraform alternative."
+prev_url: "../05-real-data-in/"
+prev_title: "Real Data In"
+next_url: "../07-the-developers-toolkit/"
+next_title: "The Developer's Toolkit"
 ---
 
 > **Status: Placeholder.** This post is planned. The outline and key concepts below describe what it will cover.
