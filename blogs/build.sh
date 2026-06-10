@@ -34,7 +34,7 @@ PANDOC_OPTS=(
   --template="$TEMPLATE"
   --syntax-highlighting=breezedark
   --standalone
-  -f "markdown+yaml_metadata_block+smart"
+  -f "markdown+yaml_metadata_block"
   -t html5
 )
 
