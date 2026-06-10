@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>What Should We Measure? | Anchoring AI</title>
+  <meta name="description" content="Post 6 of Anchoring AI: what metrics
+actually matter for LLM and RAG systems, how Grafana and OpenTelemetry
+fit together, and how to design dashboards before you instrument
+anything.">
+  <meta property="og:title" content="What Should We Measure?">
+  <meta property="og:description" content="Post 6 of Anchoring AI: what
+metrics actually matter for LLM and RAG systems, how Grafana and
+OpenTelemetry fit together, and how to design dashboards before you
+instrument anything.">
+  <meta property="og:type" content="article">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="What Should We Measure?">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    /* ── Reset ─────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    /* ── Design tokens ─────────────────────────────────── */
+    :root {
+      --nav:          #0f1923;
+      --accent:       #00b4d8;
+      --accent-dark:  #0090ad;
+      --text:         #1a202c;
+      --text-muted:   #4a5568;
+      --bg:           #ffffff;
+      --code-bg:      #1e2a3a;
+      --code-text:    #e2e8f0;
+      --border:       #e2e8f0;
+      --surface:      #f8fafc;
+      --tag-bg:       #ebf8ff;
+      --tag-text:     #2b6cb0;
+      --font-ui:      -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      --font-body:    Georgia, "Times New Roman", Times, serif;
+      --font-mono:    "JetBrains Mono", "Fira Code", "Cascadia Code", "Courier New", monospace;
+      --width:        720px;
+    }
+
+    /* ── Base ──────────────────────────────────────────── */
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: var(--font-body);
+      font-size: 1.125rem;
+      line-height: 1.8;
+      color: var(--text);
+      background: var(--bg);
+    }
+
+    /* ── Top navigation bar ────────────────────────────── */
+    nav.top-nav {
+      background: var(--nav);
+      padding: 0 2rem;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .nav-inner {
+      max-width: var(--width);
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 56px;
+    }
+
+    .series-brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .series-link {
+      color: var(--accent);
+      text-decoration: none;
+      font-family: var(--font-ui);
+      font-weight: 800;
+      font-size: 1rem;
+      letter-spacing: -0.01em;
+      transition: color 0.15s;
+    }
+    .series-link:hover { color: #ffffff; }
+
+    .nav-divider {
+      color: rgba(255,255,255,0.2);
+      font-family: var(--font-ui);
+    }
+
+    .post-label {
+      color: rgba(255,255,255,0.45);
+      font-family: var(--font-ui);
+      font-size: 0.8125rem;
+    }
+
+    .nav-gh {
+      color: rgba(255,255,255,0.4);
+      text-decoration: none;
+      font-family: var(--font-ui);
+      font-size: 0.8125rem;
+      transition: color 0.15s;
+    }
+    .nav-gh:hover { color: var(--accent); }
+
+    /* ── Article container ─────────────────────────────── */
+    article {
+      max-width: var(--width);
+      margin: 0 auto;
+      padding: 3.5rem 2rem 4rem;
+    }
+
+    /* ── Post header ───────────────────────────────────── */
+    .post-header {
+      margin-bottom: 3rem;
+      padding-bottom: 2.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .series-eyebrow {
+      font-family: var(--font-ui);
+      font-size: 0.6875rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 1rem;
+    }
+
+    .post-header h1 {
+      font-family: var(--font-ui);
+      font-size: 2.75rem;
+      font-weight: 800;
+      line-height: 1.1;
+      letter-spacing: -0.03em;
+      color: var(--nav);
+      margin-bottom: 1.25rem;
+    }
+
+    .post-subtitle {
+      font-size: 1.25rem;
+      color: var(--text-muted);
+      margin-bottom: 1.25rem;
+      font-style: italic;
+    }
+
+    .byline {
+      font-family: var(--font-ui);
+      font-size: 0.875rem;
+      color: var(--text-muted);
+    }
+
+    /* ── Post body ─────────────────────────────────────── */
+    .post-body h2 {
+      font-family: var(--font-ui);
+      font-size: 1.625rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: var(--nav);
+      margin: 3rem 0 1rem;
+      padding-top: 0.5rem;
+    }
+
+    .post-body h3 {
+      font-family: var(--font-ui);
+      font-size: 1.125rem;
+      font-weight: 600;
+      color: var(--nav);
+      margin: 2rem 0 0.75rem;
+    }
+
+    .post-body h4 {
+      font-family: var(--font-ui);
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--text);
+      margin: 1.5rem 0 0.5rem;
+    }
+
+    .post-body p {
+      margin-bottom: 1.5rem;
+    }
+
+    .post-body a {
+      color: var(--accent-dark);
+      text-decoration: underline;
+      text-underline-offset: 3px;
+      transition: color 0.15s;
+    }
+    .post-body a:hover { color: var(--nav); }
+
+    /* ── Inline code ───────────────────────────────────── */
+    .post-body :not(pre) > code {
+      font-family: var(--font-mono);
+      font-size: 0.85em;
+      background: var(--tag-bg);
+      color: var(--tag-text);
+      padding: 0.1em 0.35em;
+      border-radius: 3px;
+      border: 1px solid rgba(43,108,176,0.12);
+    }
+
+    /* ── Code blocks ───────────────────────────────────── */
+    .post-body pre {
+      background: var(--code-bg);
+      border-radius: 8px;
+      padding: 1.25rem 1.5rem;
+      overflow-x: auto;
+      margin: 1.75rem 0;
+      border: 1px solid rgba(255,255,255,0.05);
+    }
+
+    .post-body pre code {
+      font-family: var(--font-mono);
+      font-size: 0.875rem;
+      background: none;
+      color: var(--code-text);
+      padding: 0;
+      border: none;
+    }
+
+    /* Pandoc syntax highlighting wrapper */
+    .post-body div.sourceCode {
+      background: var(--code-bg);
+      border-radius: 8px;
+      margin: 1.75rem 0;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.05);
+    }
+
+    .post-body div.sourceCode pre {
+      background: transparent;
+      margin: 0;
+      border: none;
+      border-radius: 0;
+      padding: 1.25rem 1.5rem;
+    }
+
+    /* ── Mermaid diagrams ──────────────────────────────── */
+    .mermaid {
+      margin: 2.25rem 0;
+      background: var(--surface);
+      border-radius: 10px;
+      padding: 2rem 1.5rem;
+      border: 1px solid var(--border);
+      overflow-x: auto;
+      text-align: center;
+    }
+
+    .mermaid svg {
+      max-width: 100%;
+    }
+
+    .diagram-label {
+      font-family: var(--font-ui);
+      font-size: 0.8125rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-align: center;
+      margin-top: -1rem;
+      margin-bottom: 2rem;
+      letter-spacing: 0.02em;
+    }
+
+    /* ── Tables ────────────────────────────────────────── */
+    .post-body table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1.75rem 0;
+      font-family: var(--font-ui);
+      font-size: 0.875rem;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+
+    .post-body th {
+      background: var(--nav);
+      color: white;
+      padding: 0.75rem 1rem;
+      text-align: left;
+      font-weight: 600;
+      font-size: 0.8125rem;
+      letter-spacing: 0.02em;
+    }
+
+    .post-body td {
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+
+    .post-body tr:last-child td { border-bottom: none; }
+    .post-body tr:nth-child(even) td { background: var(--surface); }
+
+    /* ── Blockquotes ───────────────────────────────────── */
+    .post-body blockquote {
+      border-left: 3px solid var(--accent);
+      padding: 0.5rem 0 0.5rem 1.5rem;
+      margin: 2rem 0;
+      color: var(--text-muted);
+      font-style: italic;
+    }
+
+    .post-body blockquote p { margin-bottom: 0; }
+
+    /* ── Lists ─────────────────────────────────────────── */
+    .post-body ul, .post-body ol {
+      margin: 0.75rem 0 1.5rem 1.75rem;
+    }
+
+    .post-body li {
+      margin-bottom: 0.4rem;
+    }
+
+    .post-body li > ul, .post-body li > ol {
+      margin-top: 0.4rem;
+      margin-bottom: 0.4rem;
+    }
+
+    /* ── HR ────────────────────────────────────────────── */
+    .post-body hr {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 3.5rem 0;
+    }
+
+    /* ── Strong ────────────────────────────────────────── */
+    .post-body strong { color: var(--nav); font-weight: 700; }
+
+    /* ── Post navigation ───────────────────────────────── */
+    nav.post-nav {
+      max-width: var(--width);
+      margin: 0 auto;
+      padding: 2rem;
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      gap: 1rem;
+      align-items: center;
+      border-top: 1px solid var(--border);
+    }
+
+    .nav-prev {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-family: var(--font-ui);
+      font-size: 0.875rem;
+      transition: color 0.15s;
+    }
+    .nav-prev:hover { color: var(--accent-dark); }
+
+    .nav-index {
+      color: var(--accent-dark);
+      text-decoration: none;
+      font-family: var(--font-ui);
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      text-align: center;
+      padding: 0.4rem 0.75rem;
+      border: 1px solid var(--accent-dark);
+      border-radius: 4px;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+    .nav-index:hover {
+      background: var(--accent-dark);
+      color: white;
+    }
+
+    .nav-next {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-family: var(--font-ui);
+      font-size: 0.875rem;
+      text-align: right;
+      display: block;
+      transition: color 0.15s;
+    }
+    .nav-next:hover { color: var(--accent-dark); }
+
+    /* ── Footer ────────────────────────────────────────── */
+    footer.site-footer {
+      background: var(--nav);
+      color: rgba(255,255,255,0.5);
+      padding: 2.5rem 2rem;
+      text-align: center;
+      font-family: var(--font-ui);
+      font-size: 0.875rem;
+      margin-top: 1rem;
+    }
+
+    footer.site-footer p { margin-bottom: 0.5rem; }
+    footer.site-footer strong { color: var(--accent); }
+
+    footer.site-footer a {
+      color: rgba(255,255,255,0.5);
+      text-decoration: underline;
+      transition: color 0.15s;
+    }
+    footer.site-footer a:hover { color: var(--accent); }
+
+    /* ── Responsive ────────────────────────────────────── */
+    @media (max-width: 640px) {
+      article { padding: 2rem 1.25rem 3rem; }
+      .post-header h1 { font-size: 2rem; }
+      nav.post-nav {
+        grid-template-columns: 1fr;
+        text-align: center;
+      }
+      .nav-next { text-align: center; }
+      .nav-prev { text-align: center; }
+      .post-label { display: none; }
+    }
+  </style>
+  </head>
+<body>
+
+<nav class="top-nav">
+  <div class="nav-inner">
+    <div class="series-brand">
+      <a class="series-link" href="../">Anchoring AI</a>
+            <span class="nav-divider">/</span>
+      <span class="post-label">Post 06</span>
+          </div>
+    <a class="nav-gh" href="https://github.com/HendoCode/contact-center-ai" target="_blank" rel="noopener">GitHub ↗</a>
+  </div>
+</nav>
+
+<article>
+  <header class="post-header">
+        <div class="series-eyebrow">Anchoring AI &mdash; Post 06</div>
+        <h1>What Should We Measure?</h1>
+    <p class="post-subtitle">Designing LLM and RAG observability before
+writing a line of instrumentation code</p>
+        <div class="byline">
+      By Stephen Henderson &middot; TBD
+    </div>
+      </header>
+
+  <div class="post-body">
+    <blockquote>
+    <p><strong>Status: Placeholder.</strong> This post is planned. The
+    outline and key concepts below describe what it will cover.</p>
+    </blockquote>
+    <hr />
+    <h2 id="what-this-post-covers">What This Post Covers</h2>
+    <p>Most observability posts start with “add these metrics.” This one
+    starts with “what do you actually need to know?” LLM and RAG systems
+    have failure modes that traditional SRE metrics don’t capture:
+    answer quality degrades silently, retrieval relevance erodes as the
+    corpus grows, and a 200 response code tells you nothing about
+    whether the answer was correct.</p>
+    <p>This is a design post. Post 7 implements it. By the end of this
+    post, you’ll have a clear mental model of what to measure, why each
+    metric matters, and how Grafana + OpenTelemetry fit into the stack —
+    without having written a single <code>meter.record()</code> call
+    yet.</p>
+    <hr />
+    <h2 id="key-concepts">Key Concepts</h2>
+    <ul>
+    <li><strong>The four observability layers for AI systems</strong> —
+    infrastructure metrics (CPU, memory), API metrics (latency, error
+    rate), LLM metrics (token counts, cost, model version), RAG metrics
+    (retrieval score, result count, context size)</li>
+    <li><strong>Why standard SRE metrics aren’t enough</strong> — a 200
+    OK with a hallucinated answer looks identical to a 200 OK with a
+    correct one</li>
+    <li><strong>OpenTelemetry</strong> — traces, metrics, logs as a
+    unified model; why OTel is the right standard for language-agnostic
+    instrumentation</li>
+    <li><strong>Grafana + Prometheus</strong> — how metrics flow from
+    OTel collector → Prometheus → Grafana; the local docker-compose
+    setup</li>
+    <li><strong>Retrieval quality as a metric</strong> — cosine
+    similarity scores from pgvector as a proxy for answer groundedness;
+    how to emit them as OTel metrics</li>
+    <li><strong>Token cost tracking</strong> — why you want to know how
+    much each MCP query costs; how to compute it from the OpenAI
+    response</li>
+    <li><strong>LLM latency decomposition</strong> — total request time
+    vs. embedding time vs. completion time; where the time actually
+    goes</li>
+    </ul>
+    <hr />
+    <h2 id="planned-metrics-inventory">Planned Metrics Inventory</h2>
+    <table>
+    <colgroup>
+    <col style="width: 33%" />
+    <col style="width: 33%" />
+    <col style="width: 33%" />
+    </colgroup>
+    <thead>
+    <tr>
+    <th>Metric</th>
+    <th>Type</th>
+    <th>Why it matters</th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr>
+    <td><code>mcp_tool_duration_seconds</code></td>
+    <td>Histogram</td>
+    <td>End-to-end tool latency by tool name</td>
+    </tr>
+    <tr>
+    <td><code>rag_query_duration_seconds</code></td>
+    <td>Histogram</td>
+    <td>RAG pipeline latency (excludes MCP overhead)</td>
+    </tr>
+    <tr>
+    <td><code>embedding_duration_seconds</code></td>
+    <td>Histogram</td>
+    <td>Embedding API call latency</td>
+    </tr>
+    <tr>
+    <td><code>llm_completion_duration_seconds</code></td>
+    <td>Histogram</td>
+    <td>LLM completion latency</td>
+    </tr>
+    <tr>
+    <td><code>llm_tokens_prompt_total</code></td>
+    <td>Counter</td>
+    <td>Cumulative prompt tokens (cost proxy)</td>
+    </tr>
+    <tr>
+    <td><code>llm_tokens_completion_total</code></td>
+    <td>Counter</td>
+    <td>Cumulative completion tokens (cost proxy)</td>
+    </tr>
+    <tr>
+    <td><code>rag_retrieval_score</code></td>
+    <td>Gauge/Histogram</td>
+    <td>Max cosine similarity of returned docs (quality proxy)</td>
+    </tr>
+    <tr>
+    <td><code>rag_documents_retrieved_total</code></td>
+    <td>Histogram</td>
+    <td>Number of docs returned per query</td>
+    </tr>
+    <tr>
+    <td><code>csat_query_results_count</code></td>
+    <td>Histogram</td>
+    <td>Number of CSAT records returned per query</td>
+    </tr>
+    </tbody>
+    </table>
+    <hr />
+    <h2 id="planned-outline">Planned Outline</h2>
+    <ol type="1">
+    <li><strong>The problem with AI observability</strong> — why p95
+    latency and error rate aren’t enough; the silent failure modes
+    unique to LLM systems</li>
+    <li><strong>A mental model for AI system observability</strong> —
+    four layers: infra, API, LLM, RAG; what breaks at each layer</li>
+    <li><strong>The OpenTelemetry basics</strong> — traces, metrics,
+    logs; why OTel; the collector as the central router</li>
+    <li><strong>Grafana + Prometheus architecture</strong> — how metrics
+    flow; the docker-compose additions we’ll add in Post 7</li>
+    <li><strong>Metrics that matter for RAG</strong> — retrieval score,
+    context window utilization, document staleness</li>
+    <li><strong>Metrics that matter for LLM</strong> — token counts,
+    cost per query, model version tracking, latency decomposition</li>
+    <li><strong>Dashboard design</strong> — what panels to build; alert
+    thresholds that make sense; the CSAT panel idea</li>
+    <li><strong>What we’ll build in Post 7</strong> — a preview of the
+    implementation: OTel instrumentation points, the docker-compose
+    additions, the Grafana dashboard JSON</li>
+    </ol>
+    <hr />
+    <h2 id="code-changes-for-this-post">Code Changes for This Post</h2>
+    <p>None — this is a design post. The next post (Post 7) implements
+    the instrumentation.</p>
+    <hr />
+    <h2 id="outstanding-questions-tbd">Outstanding Questions / TBD</h2>
+    <ul>
+    <li>Include Langfuse as an alternative to Prometheus/Grafana for
+    LLM-specific observability?</li>
+    <li>Show a mockup of the Grafana dashboard layout?</li>
+    <li>Compare OTel vs. OpenLLMetry vs. Langfuse in a trade-off
+    table?</li>
+    </ul>
+  </div>
+</article>
+
+<nav class="post-nav">
+    <a class="nav-prev" href="../05-built-to-last/">&#8592; Built to
+Last</a>
+    <a class="nav-index" href="../">Series Index</a>
+    <a class="nav-next" href="../07-wiring-it-up/">Wiring It
+Up &#8594;</a>
+  </nav>
+
+<footer class="site-footer">
+  <p>Part of the <strong>Anchoring AI</strong> series by Stephen Henderson</p>
+  <p><a href="https://github.com/HendoCode/contact-center-ai" target="_blank" rel="noopener">View the code on GitHub</a></p>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    // Pandoc emits mermaid blocks as <pre><code class="language-mermaid">.
+    // Mermaid.js needs <div class="mermaid">. Convert before initialising.
+    document.querySelectorAll('pre code.language-mermaid').forEach(function (el) {
+      var div = document.createElement('div');
+      div.className = 'mermaid';
+      div.textContent = el.textContent;
+      el.parentNode.parentNode.replaceChild(div, el.parentNode);
+    });
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'neutral',
+      securityLevel: 'loose',
+      fontFamily: 'var(--font-ui)',
+    });
+  });
+</script>
+
+</body>
+</html>
