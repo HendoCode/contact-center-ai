@@ -217,7 +217,7 @@ The one thing worth resisting: switching providers mid-project to chase marginal
 
 ## What's Next
 
-Post 5 takes the system to production. We'll walk through `infra/terraform/main.tf` — the Azure infrastructure that hosts the MCP server, the managed pgvector database, and the Entra authentication layer that means the Python code never has to handle a token.
+Post 5 completes the ingestion pipeline. There's a `NotImplementedError` sitting in `pipeline.py` — the S3 source path has always been a stub. We'll implement it using MinIO, a local S3-compatible Docker service, so the full stack runs without touching AWS. The same code connects to a real S3 bucket or Azure Blob container with one environment variable change.
 
 To switch to Ollama locally right now:
 

@@ -851,11 +851,13 @@ Ollama with one environment variable</p>
     difference between good prompts and bad ones.</p>
     <hr />
     <h2 id="whats-next">What’s Next</h2>
-    <p>Post 5 takes the system to production. We’ll walk through
-    <code>infra/terraform/main.tf</code> — the Azure infrastructure that
-    hosts the MCP server, the managed pgvector database, and the Entra
-    authentication layer that means the Python code never has to handle
-    a token.</p>
+    <p>Post 5 completes the ingestion pipeline. There’s a
+    <code>NotImplementedError</code> sitting in <code>pipeline.py</code>
+    — the S3 source path has always been a stub. We’ll implement it
+    using MinIO, a local S3-compatible Docker service, so the full stack
+    runs without touching AWS. The same code connects to a real S3
+    bucket or Azure Blob container with one environment variable
+    change.</p>
     <p>To switch to Ollama locally right now:</p>
     <div class="sourceCode" id="cb10"><pre
     class="sourceCode bash"><code class="sourceCode bash"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="ex">docker</span> compose up <span class="at">-d</span> ollama</span>
