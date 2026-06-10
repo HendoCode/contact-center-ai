@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Built to Last | Anchoring AI</title>
+  <title>Built to Last | Anchoring AI — HendoCode</title>
   <meta name="description" content="Post 5 of Anchoring AI: walking
 through the Terraform configuration for Azure App Service + PostgreSQL
 Flexible Server, the Entra Easy Auth pattern, and OpenTofu as an
@@ -18,32 +18,44 @@ an open-source Terraform alternative.">
   <meta name="twitter:title" content="Built to Last">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Josefin+Sans:wght@300;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
-    /* ── Reset ─────────────────────────────────────────── */
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-    /* ── Design tokens ─────────────────────────────────── */
+    /* ── HendoCode brand palette (from logo explorations tile 12) ── */
     :root {
-      --nav:          #0f1923;
-      --accent:       #00b4d8;
-      --accent-dark:  #0090ad;
-      --text:         #1a202c;
-      --text-muted:   #4a5568;
-      --bg:           #ffffff;
-      --code-bg:      #1e2a3a;
-      --code-text:    #e2e8f0;
-      --border:       #e2e8f0;
-      --surface:      #f8fafc;
-      --tag-bg:       #ebf8ff;
-      --tag-text:     #2b6cb0;
-      --font-ui:      -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      --font-body:    Georgia, "Times New Roman", Times, serif;
-      --font-mono:    "JetBrains Mono", "Fira Code", "Cascadia Code", "Courier New", monospace;
-      --width:        720px;
+      --slate:       #2E4A5F;
+      --slate-d:     #1e3245;
+      --slate-l:     #3d5f78;
+      --slate-ll:    #4a7090;
+      --cream:       #F0EDCF;
+      --amber:       #E8A44A;
+      --amber-d:     #c4852a;
+      --amber-l:     #f0bb72;
+      --muted:       #7FA8C0;
+      --bg-warm:     #f5f2ea;
+
+      /* semantic roles */
+      --nav:         var(--slate);
+      --accent:      var(--amber);
+      --accent-dark: var(--amber-d);
+      --text:        var(--slate-d);
+      --text-muted:  var(--slate-ll);
+      --bg:          #ffffff;
+      --code-bg:     var(--slate-d);
+      --code-text:   var(--cream);
+      --border:      #ddd9cc;
+      --surface:     #f8f6f0;
+      --tag-bg:      #fef7e8;
+      --tag-text:    var(--amber-d);
+
+      --font-brand:  'Josefin Sans', sans-serif;
+      --font-ui:     'Josefin Sans', sans-serif;
+      --font-body:   Georgia, 'Times New Roman', Times, serif;
+      --font-mono:   'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Courier New', monospace;
+      --width:       720px;
     }
 
-    /* ── Base ──────────────────────────────────────────── */
+    /* ── Reset ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html { scroll-behavior: smooth; }
 
     body {
@@ -54,7 +66,7 @@ an open-source Terraform alternative.">
       background: var(--bg);
     }
 
-    /* ── Top navigation bar ────────────────────────────── */
+    /* ── Top navigation bar ── */
     nav.top-nav {
       background: var(--nav);
       padding: 0 2rem;
@@ -73,51 +85,78 @@ an open-source Terraform alternative.">
       height: 56px;
     }
 
-    .series-brand {
+    .nav-brand {
       display: flex;
       align-items: center;
       gap: 0.75rem;
+      text-decoration: none;
     }
 
-    .series-link {
-      color: var(--accent);
-      text-decoration: none;
-      font-family: var(--font-ui);
-      font-weight: 800;
-      font-size: 1rem;
-      letter-spacing: -0.01em;
-      transition: color 0.15s;
+    /* Tile-12 hairline/bold treatment at nav scale */
+    .brand-hendo {
+      font-family: var(--font-brand);
+      font-weight: 300;
+      font-size: 1.1rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--cream);
+      line-height: 1;
     }
-    .series-link:hover { color: #ffffff; }
+
+    .brand-code {
+      font-family: var(--font-brand);
+      font-weight: 700;
+      font-size: 1.1rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--accent);
+      line-height: 1;
+    }
 
     .nav-divider {
       color: rgba(255,255,255,0.2);
-      font-family: var(--font-ui);
+      font-family: var(--font-brand);
+      font-weight: 300;
+      font-size: 0.9rem;
+    }
+
+    .nav-series {
+      font-family: var(--font-brand);
+      font-weight: 300;
+      font-size: 0.75rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
     }
 
     .post-label {
-      color: rgba(255,255,255,0.45);
-      font-family: var(--font-ui);
-      font-size: 0.8125rem;
+      font-family: var(--font-brand);
+      font-weight: 300;
+      font-size: 0.75rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.3);
     }
 
     .nav-gh {
-      color: rgba(255,255,255,0.4);
+      color: rgba(255,255,255,0.35);
       text-decoration: none;
-      font-family: var(--font-ui);
-      font-size: 0.8125rem;
+      font-family: var(--font-brand);
+      font-weight: 300;
+      font-size: 0.75rem;
+      letter-spacing: 0.06em;
       transition: color 0.15s;
     }
     .nav-gh:hover { color: var(--accent); }
 
-    /* ── Article container ─────────────────────────────── */
+    /* ── Article container ── */
     article {
       max-width: var(--width);
       margin: 0 auto;
       padding: 3.5rem 2rem 4rem;
     }
 
-    /* ── Post header ───────────────────────────────────── */
+    /* ── Post header ── */
     .post-header {
       margin-bottom: 3rem;
       padding-bottom: 2.5rem;
@@ -125,78 +164,97 @@ an open-source Terraform alternative.">
     }
 
     .series-eyebrow {
-      font-family: var(--font-ui);
+      font-family: var(--font-brand);
+      font-weight: 300;
       font-size: 0.6875rem;
-      font-weight: 700;
-      letter-spacing: 0.1em;
+      letter-spacing: 0.18em;
       text-transform: uppercase;
       color: var(--accent);
       margin-bottom: 1rem;
     }
 
     .post-header h1 {
-      font-family: var(--font-ui);
+      font-family: var(--font-brand);
+      font-weight: 700;
       font-size: 2.75rem;
-      font-weight: 800;
-      line-height: 1.1;
-      letter-spacing: -0.03em;
-      color: var(--nav);
-      margin-bottom: 1.25rem;
+      line-height: 1.05;
+      letter-spacing: 0.01em;
+      text-transform: uppercase;
+      color: var(--slate);
+      margin-bottom: 0.75rem;
     }
 
     .post-subtitle {
-      font-size: 1.25rem;
+      font-family: var(--font-body);
+      font-size: 1.2rem;
       color: var(--text-muted);
-      margin-bottom: 1.25rem;
       font-style: italic;
+      margin-bottom: 1.25rem;
     }
 
     .byline {
-      font-family: var(--font-ui);
-      font-size: 0.875rem;
+      font-family: var(--font-brand);
+      font-weight: 300;
+      font-size: 0.8rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
       color: var(--text-muted);
     }
 
-    /* ── Post body ─────────────────────────────────────── */
+    /* ── Amber rule under eyebrow ── */
+    .post-header::after {
+      content: '';
+      display: block;
+      width: 48px;
+      height: 2px;
+      background: var(--accent);
+      border-radius: 1px;
+      margin-top: 2.5rem;
+    }
+
+    /* ── Body content ── */
     .post-body h2 {
-      font-family: var(--font-ui);
-      font-size: 1.625rem;
+      font-family: var(--font-brand);
       font-weight: 700;
-      letter-spacing: -0.02em;
-      color: var(--nav);
+      font-size: 1.125rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--slate);
       margin: 3rem 0 1rem;
-      padding-top: 0.5rem;
+      padding-top: 0.25rem;
     }
 
     .post-body h3 {
-      font-family: var(--font-ui);
-      font-size: 1.125rem;
-      font-weight: 600;
-      color: var(--nav);
+      font-family: var(--font-brand);
+      font-weight: 700;
+      font-size: 0.875rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--slate-l);
       margin: 2rem 0 0.75rem;
     }
 
     .post-body h4 {
-      font-family: var(--font-ui);
-      font-size: 1rem;
-      font-weight: 600;
-      color: var(--text);
+      font-family: var(--font-brand);
+      font-weight: 700;
+      font-size: 0.8rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-muted);
       margin: 1.5rem 0 0.5rem;
     }
 
-    .post-body p {
-      margin-bottom: 1.5rem;
-    }
+    .post-body p { margin-bottom: 1.5rem; }
 
     .post-body a {
-      color: var(--accent-dark);
+      color: var(--amber-d);
       text-decoration: underline;
       text-underline-offset: 3px;
       transition: color 0.15s;
     }
-    .post-body a:hover { color: var(--nav); }
+    .post-body a:hover { color: var(--slate); }
 
-    /* ── Inline code ───────────────────────────────────── */
+    /* ── Inline code ── */
     .post-body :not(pre) > code {
       font-family: var(--font-mono);
       font-size: 0.85em;
@@ -204,35 +262,34 @@ an open-source Terraform alternative.">
       color: var(--tag-text);
       padding: 0.1em 0.35em;
       border-radius: 3px;
-      border: 1px solid rgba(43,108,176,0.12);
+      border: 1px solid rgba(196,133,42,0.15);
     }
 
-    /* ── Code blocks ───────────────────────────────────── */
+    /* ── Code blocks ── */
     .post-body pre {
       background: var(--code-bg);
       border-radius: 8px;
       padding: 1.25rem 1.5rem;
       overflow-x: auto;
       margin: 1.75rem 0;
-      border: 1px solid rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.04);
     }
 
     .post-body pre code {
       font-family: var(--font-mono);
       font-size: 0.875rem;
       background: none;
-      color: var(--code-text);
+      color: var(--cream);
       padding: 0;
       border: none;
     }
 
-    /* Pandoc syntax highlighting wrapper */
     .post-body div.sourceCode {
       background: var(--code-bg);
       border-radius: 8px;
       margin: 1.75rem 0;
       overflow: hidden;
-      border: 1px solid rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.04);
     }
 
     .post-body div.sourceCode pre {
@@ -243,38 +300,26 @@ an open-source Terraform alternative.">
       padding: 1.25rem 1.5rem;
     }
 
-    /* ── Mermaid diagrams ──────────────────────────────── */
+    /* ── Mermaid diagrams ── */
     .mermaid {
       margin: 2.25rem 0;
       background: var(--surface);
-      border-radius: 10px;
+      border-radius: 8px;
       padding: 2rem 1.5rem;
       border: 1px solid var(--border);
       overflow-x: auto;
       text-align: center;
     }
 
-    .mermaid svg {
-      max-width: 100%;
-    }
+    .mermaid svg { max-width: 100%; }
 
-    .diagram-label {
-      font-family: var(--font-ui);
-      font-size: 0.8125rem;
-      font-weight: 600;
-      color: var(--text-muted);
-      text-align: center;
-      margin-top: -1rem;
-      margin-bottom: 2rem;
-      letter-spacing: 0.02em;
-    }
-
-    /* ── Tables ────────────────────────────────────────── */
+    /* ── Tables ── */
     .post-body table {
       width: 100%;
       border-collapse: collapse;
       margin: 1.75rem 0;
-      font-family: var(--font-ui);
+      font-family: var(--font-brand);
+      font-weight: 300;
       font-size: 0.875rem;
       border-radius: 8px;
       overflow: hidden;
@@ -282,25 +327,28 @@ an open-source Terraform alternative.">
     }
 
     .post-body th {
-      background: var(--nav);
-      color: white;
+      background: var(--slate);
+      color: var(--cream);
       padding: 0.75rem 1rem;
       text-align: left;
-      font-weight: 600;
-      font-size: 0.8125rem;
-      letter-spacing: 0.02em;
+      font-weight: 700;
+      font-size: 0.75rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
     }
 
     .post-body td {
       padding: 0.75rem 1rem;
       border-bottom: 1px solid var(--border);
       vertical-align: top;
+      font-family: var(--font-body);
+      font-size: 0.95rem;
     }
 
     .post-body tr:last-child td { border-bottom: none; }
     .post-body tr:nth-child(even) td { background: var(--surface); }
 
-    /* ── Blockquotes ───────────────────────────────────── */
+    /* ── Blockquotes ── */
     .post-body blockquote {
       border-left: 3px solid var(--accent);
       padding: 0.5rem 0 0.5rem 1.5rem;
@@ -308,34 +356,29 @@ an open-source Terraform alternative.">
       color: var(--text-muted);
       font-style: italic;
     }
-
     .post-body blockquote p { margin-bottom: 0; }
 
-    /* ── Lists ─────────────────────────────────────────── */
+    /* ── Lists ── */
     .post-body ul, .post-body ol {
       margin: 0.75rem 0 1.5rem 1.75rem;
     }
-
-    .post-body li {
-      margin-bottom: 0.4rem;
-    }
-
+    .post-body li { margin-bottom: 0.4rem; }
     .post-body li > ul, .post-body li > ol {
       margin-top: 0.4rem;
       margin-bottom: 0.4rem;
     }
 
-    /* ── HR ────────────────────────────────────────────── */
+    /* ── HR ── */
     .post-body hr {
       border: none;
       border-top: 1px solid var(--border);
       margin: 3.5rem 0;
     }
 
-    /* ── Strong ────────────────────────────────────────── */
-    .post-body strong { color: var(--nav); font-weight: 700; }
+    /* ── Strong ── */
+    .post-body strong { color: var(--slate); font-weight: 700; }
 
-    /* ── Post navigation ───────────────────────────────── */
+    /* ── Post navigation ── */
     nav.post-nav {
       max-width: var(--width);
       margin: 0 auto;
@@ -350,65 +393,82 @@ an open-source Terraform alternative.">
     .nav-prev {
       color: var(--text-muted);
       text-decoration: none;
-      font-family: var(--font-ui);
-      font-size: 0.875rem;
+      font-family: var(--font-brand);
+      font-weight: 300;
+      font-size: 0.8rem;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
       transition: color 0.15s;
     }
     .nav-prev:hover { color: var(--accent-dark); }
 
     .nav-index {
-      color: var(--accent-dark);
+      color: var(--slate);
       text-decoration: none;
-      font-family: var(--font-ui);
-      font-size: 0.75rem;
+      font-family: var(--font-brand);
       font-weight: 700;
+      font-size: 0.7rem;
       text-transform: uppercase;
-      letter-spacing: 0.08em;
+      letter-spacing: 0.12em;
       text-align: center;
-      padding: 0.4rem 0.75rem;
-      border: 1px solid var(--accent-dark);
-      border-radius: 4px;
+      padding: 0.4rem 0.9rem;
+      border: 1px solid var(--slate);
+      border-radius: 3px;
       transition: all 0.15s;
       white-space: nowrap;
     }
     .nav-index:hover {
-      background: var(--accent-dark);
-      color: white;
+      background: var(--slate);
+      color: var(--cream);
     }
 
     .nav-next {
       color: var(--text-muted);
       text-decoration: none;
-      font-family: var(--font-ui);
-      font-size: 0.875rem;
+      font-family: var(--font-brand);
+      font-weight: 300;
+      font-size: 0.8rem;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
       text-align: right;
       display: block;
       transition: color 0.15s;
     }
     .nav-next:hover { color: var(--accent-dark); }
 
-    /* ── Footer ────────────────────────────────────────── */
+    /* ── Footer ── */
     footer.site-footer {
-      background: var(--nav);
-      color: rgba(255,255,255,0.5);
+      background: var(--slate);
+      color: rgba(255,255,255,0.4);
       padding: 2.5rem 2rem;
       text-align: center;
-      font-family: var(--font-ui);
-      font-size: 0.875rem;
+      font-family: var(--font-brand);
+      font-weight: 300;
+      font-size: 0.8rem;
+      letter-spacing: 0.06em;
       margin-top: 1rem;
     }
 
     footer.site-footer p { margin-bottom: 0.5rem; }
-    footer.site-footer strong { color: var(--accent); }
+
+    footer.site-footer .footer-brand { margin-bottom: 1rem; }
+    footer.site-footer .footer-brand .brand-hendo {
+      font-size: 1.4rem;
+      letter-spacing: 0.12em;
+    }
+    footer.site-footer .footer-brand .brand-code {
+      font-size: 1.4rem;
+      letter-spacing: 0.06em;
+    }
 
     footer.site-footer a {
-      color: rgba(255,255,255,0.5);
+      color: rgba(255,255,255,0.4);
       text-decoration: underline;
       transition: color 0.15s;
     }
     footer.site-footer a:hover { color: var(--accent); }
 
-    /* ── Responsive ────────────────────────────────────── */
+    /* ── Responsive ── */
     @media (max-width: 640px) {
       article { padding: 2rem 1.25rem 3rem; }
       .post-header h1 { font-size: 2rem; }
@@ -426,8 +486,12 @@ an open-source Terraform alternative.">
 
 <nav class="top-nav">
   <div class="nav-inner">
-    <div class="series-brand">
-      <a class="series-link" href="../">Anchoring AI</a>
+    <div style="display:flex;align-items:center;gap:0.65rem;">
+      <a class="nav-brand" href="../">
+        <span class="brand-hendo">Hendo</span><span class="brand-code">Code</span>
+      </a>
+      <span class="nav-divider">/</span>
+      <span class="nav-series">Anchoring AI</span>
             <span class="nav-divider">/</span>
       <span class="post-label">Post 05</span>
           </div>
@@ -442,7 +506,7 @@ an open-source Terraform alternative.">
     <p class="post-subtitle">Infrastructure as code for AI systems:
 Terraform/OpenTofu, Azure, and the auth-at-infra pattern</p>
         <div class="byline">
-      By Stephen Henderson &middot; TBD
+      Stephen Henderson &middot; TBD
     </div>
       </header>
 
@@ -545,13 +609,16 @@ We Measure? &#8594;</a>
   </nav>
 
 <footer class="site-footer">
-  <p>Part of the <strong>Anchoring AI</strong> series by Stephen Henderson</p>
+  <div class="footer-brand">
+    <span class="brand-hendo">Hendo</span><span class="brand-code">Code</span>
+  </div>
+  <p>Anchoring AI &mdash; a series on building production RAG systems</p>
   <p><a href="https://github.com/HendoCode/contact-center-ai" target="_blank" rel="noopener">View the code on GitHub</a></p>
 </footer>
 
 <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
 <script>
-  // Scripts are at bottom of <body> — DOM is fully parsed, no DOMContentLoaded needed.
+  // Scripts at bottom of <body> — DOM is fully parsed, no DOMContentLoaded needed.
   // Pandoc outputs <pre class="mermaid"><code>...</code></pre>; Mermaid needs <div class="mermaid">.
   document.querySelectorAll('pre.mermaid').forEach(function (el) {
     var div = document.createElement('div');
