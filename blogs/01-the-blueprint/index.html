@@ -1,0 +1,884 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Blueprint | Anchoring AI</title>
+  <meta name="description" content="Post 1 of Anchoring AI: architecture
+overview, C4 diagrams, and sequence diagrams for a RAG pipeline behind
+an MCP server.">
+  <meta property="og:title" content="The Blueprint">
+  <meta property="og:description" content="Post 1 of Anchoring AI:
+architecture overview, C4 diagrams, and sequence diagrams for a RAG
+pipeline behind an MCP server.">
+  <meta property="og:type" content="article">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="The Blueprint">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    /* ── Reset ─────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    /* ── Design tokens ─────────────────────────────────── */
+    :root {
+      --nav:          #0f1923;
+      --accent:       #00b4d8;
+      --accent-dark:  #0090ad;
+      --text:         #1a202c;
+      --text-muted:   #4a5568;
+      --bg:           #ffffff;
+      --code-bg:      #1e2a3a;
+      --code-text:    #e2e8f0;
+      --border:       #e2e8f0;
+      --surface:      #f8fafc;
+      --tag-bg:       #ebf8ff;
+      --tag-text:     #2b6cb0;
+      --font-ui:      -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      --font-body:    Georgia, "Times New Roman", Times, serif;
+      --font-mono:    "JetBrains Mono", "Fira Code", "Cascadia Code", "Courier New", monospace;
+      --width:        720px;
+    }
+
+    /* ── Base ──────────────────────────────────────────── */
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: var(--font-body);
+      font-size: 1.125rem;
+      line-height: 1.8;
+      color: var(--text);
+      background: var(--bg);
+    }
+
+    /* ── Top navigation bar ────────────────────────────── */
+    nav.top-nav {
+      background: var(--nav);
+      padding: 0 2rem;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .nav-inner {
+      max-width: var(--width);
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 56px;
+    }
+
+    .series-brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .series-link {
+      color: var(--accent);
+      text-decoration: none;
+      font-family: var(--font-ui);
+      font-weight: 800;
+      font-size: 1rem;
+      letter-spacing: -0.01em;
+      transition: color 0.15s;
+    }
+    .series-link:hover { color: #ffffff; }
+
+    .nav-divider {
+      color: rgba(255,255,255,0.2);
+      font-family: var(--font-ui);
+    }
+
+    .post-label {
+      color: rgba(255,255,255,0.45);
+      font-family: var(--font-ui);
+      font-size: 0.8125rem;
+    }
+
+    .nav-gh {
+      color: rgba(255,255,255,0.4);
+      text-decoration: none;
+      font-family: var(--font-ui);
+      font-size: 0.8125rem;
+      transition: color 0.15s;
+    }
+    .nav-gh:hover { color: var(--accent); }
+
+    /* ── Article container ─────────────────────────────── */
+    article {
+      max-width: var(--width);
+      margin: 0 auto;
+      padding: 3.5rem 2rem 4rem;
+    }
+
+    /* ── Post header ───────────────────────────────────── */
+    .post-header {
+      margin-bottom: 3rem;
+      padding-bottom: 2.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .series-eyebrow {
+      font-family: var(--font-ui);
+      font-size: 0.6875rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 1rem;
+    }
+
+    .post-header h1 {
+      font-family: var(--font-ui);
+      font-size: 2.75rem;
+      font-weight: 800;
+      line-height: 1.1;
+      letter-spacing: -0.03em;
+      color: var(--nav);
+      margin-bottom: 1.25rem;
+    }
+
+    .post-subtitle {
+      font-size: 1.25rem;
+      color: var(--text-muted);
+      margin-bottom: 1.25rem;
+      font-style: italic;
+    }
+
+    .byline {
+      font-family: var(--font-ui);
+      font-size: 0.875rem;
+      color: var(--text-muted);
+    }
+
+    /* ── Post body ─────────────────────────────────────── */
+    .post-body h2 {
+      font-family: var(--font-ui);
+      font-size: 1.625rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: var(--nav);
+      margin: 3rem 0 1rem;
+      padding-top: 0.5rem;
+    }
+
+    .post-body h3 {
+      font-family: var(--font-ui);
+      font-size: 1.125rem;
+      font-weight: 600;
+      color: var(--nav);
+      margin: 2rem 0 0.75rem;
+    }
+
+    .post-body h4 {
+      font-family: var(--font-ui);
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--text);
+      margin: 1.5rem 0 0.5rem;
+    }
+
+    .post-body p {
+      margin-bottom: 1.5rem;
+    }
+
+    .post-body a {
+      color: var(--accent-dark);
+      text-decoration: underline;
+      text-underline-offset: 3px;
+      transition: color 0.15s;
+    }
+    .post-body a:hover { color: var(--nav); }
+
+    /* ── Inline code ───────────────────────────────────── */
+    .post-body :not(pre) > code {
+      font-family: var(--font-mono);
+      font-size: 0.85em;
+      background: var(--tag-bg);
+      color: var(--tag-text);
+      padding: 0.1em 0.35em;
+      border-radius: 3px;
+      border: 1px solid rgba(43,108,176,0.12);
+    }
+
+    /* ── Code blocks ───────────────────────────────────── */
+    .post-body pre {
+      background: var(--code-bg);
+      border-radius: 8px;
+      padding: 1.25rem 1.5rem;
+      overflow-x: auto;
+      margin: 1.75rem 0;
+      border: 1px solid rgba(255,255,255,0.05);
+    }
+
+    .post-body pre code {
+      font-family: var(--font-mono);
+      font-size: 0.875rem;
+      background: none;
+      color: var(--code-text);
+      padding: 0;
+      border: none;
+    }
+
+    /* Pandoc syntax highlighting wrapper */
+    .post-body div.sourceCode {
+      background: var(--code-bg);
+      border-radius: 8px;
+      margin: 1.75rem 0;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.05);
+    }
+
+    .post-body div.sourceCode pre {
+      background: transparent;
+      margin: 0;
+      border: none;
+      border-radius: 0;
+      padding: 1.25rem 1.5rem;
+    }
+
+    /* ── Mermaid diagrams ──────────────────────────────── */
+    .mermaid {
+      margin: 2.25rem 0;
+      background: var(--surface);
+      border-radius: 10px;
+      padding: 2rem 1.5rem;
+      border: 1px solid var(--border);
+      overflow-x: auto;
+      text-align: center;
+    }
+
+    .mermaid svg {
+      max-width: 100%;
+    }
+
+    .diagram-label {
+      font-family: var(--font-ui);
+      font-size: 0.8125rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-align: center;
+      margin-top: -1rem;
+      margin-bottom: 2rem;
+      letter-spacing: 0.02em;
+    }
+
+    /* ── Tables ────────────────────────────────────────── */
+    .post-body table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1.75rem 0;
+      font-family: var(--font-ui);
+      font-size: 0.875rem;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+
+    .post-body th {
+      background: var(--nav);
+      color: white;
+      padding: 0.75rem 1rem;
+      text-align: left;
+      font-weight: 600;
+      font-size: 0.8125rem;
+      letter-spacing: 0.02em;
+    }
+
+    .post-body td {
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+
+    .post-body tr:last-child td { border-bottom: none; }
+    .post-body tr:nth-child(even) td { background: var(--surface); }
+
+    /* ── Blockquotes ───────────────────────────────────── */
+    .post-body blockquote {
+      border-left: 3px solid var(--accent);
+      padding: 0.5rem 0 0.5rem 1.5rem;
+      margin: 2rem 0;
+      color: var(--text-muted);
+      font-style: italic;
+    }
+
+    .post-body blockquote p { margin-bottom: 0; }
+
+    /* ── Lists ─────────────────────────────────────────── */
+    .post-body ul, .post-body ol {
+      margin: 0.75rem 0 1.5rem 1.75rem;
+    }
+
+    .post-body li {
+      margin-bottom: 0.4rem;
+    }
+
+    .post-body li > ul, .post-body li > ol {
+      margin-top: 0.4rem;
+      margin-bottom: 0.4rem;
+    }
+
+    /* ── HR ────────────────────────────────────────────── */
+    .post-body hr {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 3.5rem 0;
+    }
+
+    /* ── Strong ────────────────────────────────────────── */
+    .post-body strong { color: var(--nav); font-weight: 700; }
+
+    /* ── Post navigation ───────────────────────────────── */
+    nav.post-nav {
+      max-width: var(--width);
+      margin: 0 auto;
+      padding: 2rem;
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      gap: 1rem;
+      align-items: center;
+      border-top: 1px solid var(--border);
+    }
+
+    .nav-prev {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-family: var(--font-ui);
+      font-size: 0.875rem;
+      transition: color 0.15s;
+    }
+    .nav-prev:hover { color: var(--accent-dark); }
+
+    .nav-index {
+      color: var(--accent-dark);
+      text-decoration: none;
+      font-family: var(--font-ui);
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      text-align: center;
+      padding: 0.4rem 0.75rem;
+      border: 1px solid var(--accent-dark);
+      border-radius: 4px;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+    .nav-index:hover {
+      background: var(--accent-dark);
+      color: white;
+    }
+
+    .nav-next {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-family: var(--font-ui);
+      font-size: 0.875rem;
+      text-align: right;
+      display: block;
+      transition: color 0.15s;
+    }
+    .nav-next:hover { color: var(--accent-dark); }
+
+    /* ── Footer ────────────────────────────────────────── */
+    footer.site-footer {
+      background: var(--nav);
+      color: rgba(255,255,255,0.5);
+      padding: 2.5rem 2rem;
+      text-align: center;
+      font-family: var(--font-ui);
+      font-size: 0.875rem;
+      margin-top: 1rem;
+    }
+
+    footer.site-footer p { margin-bottom: 0.5rem; }
+    footer.site-footer strong { color: var(--accent); }
+
+    footer.site-footer a {
+      color: rgba(255,255,255,0.5);
+      text-decoration: underline;
+      transition: color 0.15s;
+    }
+    footer.site-footer a:hover { color: var(--accent); }
+
+    /* ── Responsive ────────────────────────────────────── */
+    @media (max-width: 640px) {
+      article { padding: 2rem 1.25rem 3rem; }
+      .post-header h1 { font-size: 2rem; }
+      nav.post-nav {
+        grid-template-columns: 1fr;
+        text-align: center;
+      }
+      .nav-next { text-align: center; }
+      .nav-prev { text-align: center; }
+      .post-label { display: none; }
+    }
+  </style>
+    <style>
+    html { -webkit-text-size-adjust: 100%; }
+    pre > code.sourceCode { white-space: pre; position: relative; }
+    pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+    pre > code.sourceCode > span:empty { height: 1.2em; }
+    .sourceCode { overflow: visible; }
+    code.sourceCode > span { color: inherit; text-decoration: inherit; }
+    div.sourceCode { margin: 1em 0; }
+    pre.sourceCode { margin: 0; }
+    @media screen {
+    div.sourceCode { overflow: auto; }
+    }
+    @media print {
+    pre > code.sourceCode { white-space: pre-wrap; }
+    pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+    }
+    pre.numberSource code
+      { counter-reset: source-line 0; }
+    pre.numberSource code > span
+      { position: relative; left: -4em; counter-increment: source-line; }
+    pre.numberSource code > span > a:first-child::before
+      { content: counter(source-line);
+        position: relative; left: -1em; text-align: right; vertical-align: baseline;
+        border: none; display: inline-block;
+        -webkit-touch-callout: none; -webkit-user-select: none;
+        -khtml-user-select: none; -moz-user-select: none;
+        -ms-user-select: none; user-select: none;
+        padding: 0 4px; width: 4em;
+        background-color: #232629;
+        color: #7a7c7d;
+      }
+    pre.numberSource { margin-left: 3em; border-left: 1px solid #7a7c7d;  padding-left: 4px; }
+    div.sourceCode
+      { color: #cfcfc2; background-color: #232629; }
+    @media screen {
+    pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+    }
+    code span { color: #cfcfc2; } /* Normal */
+    code span.al { color: #95da4c; background-color: #4d1f24; font-weight: bold; } /* Alert */
+    code span.an { color: #3f8058; } /* Annotation */
+    code span.at { color: #2980b9; } /* Attribute */
+    code span.bn { color: #f67400; } /* BaseN */
+    code span.bu { color: #7f8c8d; } /* BuiltIn */
+    code span.cf { color: #fdbc4b; font-weight: bold; } /* ControlFlow */
+    code span.ch { color: #3daee9; } /* Char */
+    code span.cn { color: #27aeae; font-weight: bold; } /* Constant */
+    code span.co { color: #7a7c7d; } /* Comment */
+    code span.cv { color: #7f8c8d; } /* CommentVar */
+    code span.do { color: #a43340; } /* Documentation */
+    code span.dt { color: #2980b9; } /* DataType */
+    code span.dv { color: #f67400; } /* DecVal */
+    code span.er { color: #da4453; text-decoration: underline; } /* Error */
+    code span.ex { color: #0099ff; font-weight: bold; } /* Extension */
+    code span.fl { color: #f67400; } /* Float */
+    code span.fu { color: #8e44ad; } /* Function */
+    code span.im { color: #27ae60; } /* Import */
+    code span.in { color: #c45b00; } /* Information */
+    code span.kw { color: #cfcfc2; font-weight: bold; } /* Keyword */
+    code span.op { color: #cfcfc2; } /* Operator */
+    code span.ot { color: #27ae60; } /* Other */
+    code span.pp { color: #27ae60; } /* Preprocessor */
+    code span.re { color: #2980b9; background-color: #153042; } /* RegionMarker */
+    code span.sc { color: #3daee9; } /* SpecialChar */
+    code span.ss { color: #da4453; } /* SpecialString */
+    code span.st { color: #f44f4f; } /* String */
+    code span.va { color: #27aeae; } /* Variable */
+    code span.vs { color: #da4453; } /* VerbatimString */
+    code span.wa { color: #da4453; } /* Warning */
+  </style>
+  </head>
+<body>
+
+<nav class="top-nav">
+  <div class="nav-inner">
+    <div class="series-brand">
+      <a class="series-link" href="../">Anchoring AI</a>
+            <span class="nav-divider">/</span>
+      <span class="post-label">Post 01</span>
+          </div>
+    <a class="nav-gh" href="https://github.com/HendoCode/contact-center-ai" target="_blank" rel="noopener">GitHub ↗</a>
+  </div>
+</nav>
+
+<article>
+  <header class="post-header">
+        <div class="series-eyebrow">Anchoring AI &mdash; Post 01</div>
+        <h1>The Blueprint</h1>
+    <p class="post-subtitle">Designing a production RAG system from the
+ground up</p>
+        <div class="byline">
+      By Stephen Henderson &middot; June 2026
+    </div>
+      </header>
+
+  <div class="post-body">
+    <p>There’s a question that haunts every call center manager: “What’s
+    actually going on out there?”</p>
+    <p>The data exists. Hundreds of call transcripts, recorded and
+    transcribed every week. CSAT surveys from members who bothered to
+    respond. Agent notes. Outcome codes. But turning that pile of raw
+    data into an answer to “show me all fraud disputes that escalated
+    last month” requires someone to actually dig through it — manually.
+    Keyword searching, listening to recordings, building mental models
+    across dozens of calls. It’s slow, it misses context, and it doesn’t
+    scale.</p>
+    <p>This series is about building a system that makes that question
+    answerable in seconds, using natural language. Not as a demo, not as
+    a tutorial with 10 rows of fake data — but as a real, deployable
+    system with production infrastructure, swap-friendly LLM providers,
+    and the kind of observability that lets you trust what you’ve
+    built.</p>
+    <hr />
+    <h2 id="the-context">The Context</h2>
+    <p>The system documented in this series grew out of a consulting
+    engagement with a financial institution — let’s call them Northgate
+    Federal Credit Union, a name I’ve invented. They had a problem
+    familiar to any enterprise mid-AI-adoption: multiple teams
+    independently using Claude, OpenAI, and Gemini, no shared
+    infrastructure, and no way to reuse the work across teams.</p>
+    <p>The call center team wanted to query call recordings and
+    transcripts in natural language. The compliance team wanted to run
+    ad-hoc CSAT analyses. The operations team had something different in
+    mind. All of them were going to end up building separate pipelines
+    to the same underlying data.</p>
+    <p>The design constraint that shaped everything: <strong>build one
+    thing that all of them can use.</strong> That meant the core
+    retrieval and data access layer needed to be a shared service, not a
+    team-specific application. MCP — the Model Context Protocol — turned
+    out to be the right abstraction for that.</p>
+    <p>This repo (and this series) uses fully synthetic data. No real
+    member information, no real call recordings, no PII. The
+    architecture decisions are real. The code is real. The numbers are
+    fake.</p>
+    <hr />
+    <h2 id="what-were-building">What We’re Building</h2>
+    <p>At its core, this is a <strong>RAG pipeline</strong>
+    (Retrieval-Augmented Generation) surfaced through an <strong>MCP
+    server</strong>. Call transcripts are embedded into a vector
+    database. When a supervisor asks a natural language question, the
+    system finds the most semantically relevant transcripts, constructs
+    a context window, and lets an LLM synthesize an answer grounded in
+    the actual call data.</p>
+    <p>The MCP server exposes three tools:</p>
+    <ul>
+    <li><strong><code>search_transcripts</code></strong> — semantic
+    search across call transcripts; returns an AI-generated answer
+    grounded in the top-k most relevant calls</li>
+    <li><strong><code>get_call_summary</code></strong> — retrieve and
+    summarize a specific call by ID</li>
+    <li><strong><code>query_csat</code></strong> — filter and aggregate
+    CSAT survey data by score range and call category</li>
+    </ul>
+    <p>Any MCP-compatible client — Claude Desktop, a custom web UI, or
+    another team’s internal tool — can call these tools without knowing
+    anything about the underlying retrieval machinery.</p>
+    <hr />
+    <h2 id="the-architecture">The Architecture</h2>
+    <h3 id="system-context">System Context</h3>
+    <p>The outermost view shows the actors and systems this solution
+    touches.</p>
+    <pre class="mermaid"><code>C4Context
+    title System Context — Anchoring AI
+
+    Person(supervisor, &quot;Call Center Supervisor&quot;, &quot;Queries call transcripts and CSAT data using natural language via an MCP client&quot;)
+    Person(teams, &quot;Other Teams&quot;, &quot;Future consumers of the shared MCP tools&quot;)
+
+    System(ccai, &quot;Contact Center AI&quot;, &quot;RAG pipeline and MCP server. Exposes call center data as three tools to any MCP-compatible client.&quot;)
+
+    System_Ext(openai, &quot;OpenAI API&quot;, &quot;text-embedding-3-small for vectorisation, gpt-4o-mini for answer synthesis&quot;)
+    System_Ext(ollama, &quot;Ollama (local)&quot;, &quot;nomic-embed-text + llama3.2 — local alternative, no API key required&quot;)
+    System_Ext(azure, &quot;Azure App Service&quot;, &quot;Production host for the MCP server&quot;)
+    System_Ext(entra, &quot;Microsoft Entra&quot;, &quot;Intercepts requests and validates Bearer tokens — auth at the infra layer, not in Python code&quot;)
+    System_Ext(s3, &quot;AWS S3&quot;, &quot;Planned: source of production call recordings (currently stubbed)&quot;)
+
+    Rel(supervisor, ccai, &quot;Queries call data&quot;, &quot;MCP over stdio (local) / HTTPS (production)&quot;)
+    Rel(teams, ccai, &quot;Future consumers&quot;, &quot;MCP&quot;)
+    Rel(ccai, openai, &quot;Embeddings + completions&quot;, &quot;HTTPS&quot;)
+    Rel(ccai, ollama, &quot;Local alternative&quot;, &quot;HTTP&quot;)
+    Rel(ccai, azure, &quot;Deployed to&quot;, &quot;Terraform&quot;)
+    Rel(entra, azure, &quot;Validates tokens before requests reach Python&quot;, &quot;Easy Auth middleware&quot;)
+    Rel(ccai, s3, &quot;Planned ingestion path&quot;, &quot;HTTPS — NotImplementedError today&quot;)</code></pre>
+    <p><em>Figure 1 — System context. Two details are worth noting:
+    Entra authentication is handled entirely at the infrastructure layer
+    (the Python application contains zero auth code), and the Ollama
+    path is a drop-in swap controlled by a single environment
+    variable.</em></p>
+    <hr />
+    <h3 id="containers">Containers</h3>
+    <p>Zooming in, the system is six containers. Two are live data
+    paths; one is a future-planned external source.</p>
+    <pre class="mermaid"><code>C4Container
+    title Container View — Anchoring AI
+
+    Person(supervisor, &quot;Call Center Supervisor&quot;)
+
+    System_Boundary(ccai, &quot;Contact Center AI&quot;) {
+        Container(mcpServer, &quot;MCP Server&quot;, &quot;Python / MCP SDK 1.0&quot;, &quot;Async stdio/HTTP server. Registers tool schemas and routes incoming tool calls. Entry point: mcp/server.py.&quot;)
+        Container(ragPipeline, &quot;RAG Pipeline&quot;, &quot;Python / LangChain 0.3&quot;, &quot;Orchestrates ingestion, semantic retrieval, and answer synthesis. rag/pipeline.py.&quot;)
+        Container(embedModule, &quot;Embeddings Module&quot;, &quot;Python / LangChain&quot;, &quot;Provider abstraction layer. get_embeddings() and get_vector_store() are the only provider-coupling points. rag/embeddings.py.&quot;)
+        ContainerDb(pgvector, &quot;PostgreSQL + pgvector&quot;, &quot;PostgreSQL 16&quot;, &quot;Stores 1536-dim call transcript embeddings in the call_transcripts collection.&quot;)
+        Container(dataFiles, &quot;Data Files&quot;, &quot;JSON on disk&quot;, &quot;transcripts.json (150 synthetic calls) + csat.json (112 CSAT surveys). Generated by generate_data.py.&quot;)
+    }
+
+    System_Ext(llmProvider, &quot;LLM Provider&quot;, &quot;OpenAI API or Ollama — controlled by LLM_PROVIDER env var&quot;)
+
+    Rel(supervisor, mcpServer, &quot;Tool calls&quot;, &quot;MCP stdio (local) / HTTPS (production)&quot;)
+    Rel(mcpServer, ragPipeline, &quot;rag_query(), retrieve()&quot;, &quot;Python function call&quot;)
+    Rel(mcpServer, dataFiles, &quot;Reads csat.json directly&quot;, &quot;File I/O — bypasses vector store&quot;)
+    Rel(ragPipeline, embedModule, &quot;get_vector_store()&quot;, &quot;Python function call&quot;)
+    Rel(ragPipeline, dataFiles, &quot;Reads transcripts.json&quot;, &quot;File I/O&quot;)
+    Rel(ragPipeline, pgvector, &quot;Store + similarity search&quot;, &quot;SQL / pgvector extension&quot;)
+    Rel(ragPipeline, llmProvider, &quot;Answer synthesis&quot;, &quot;HTTPS or local HTTP&quot;)
+    Rel(embedModule, llmProvider, &quot;Vectorize text&quot;, &quot;HTTPS or local HTTP&quot;)
+    Rel(embedModule, pgvector, &quot;Read/write embeddings&quot;, &quot;SQL via psycopg2&quot;)</code></pre>
+    <p><em>Figure 2 — Container view. The split between
+    <code>search_transcripts</code>/<code>get_call_summary</code> (which
+    go through the full RAG stack) and <code>query_csat</code> (which
+    reads JSON directly) is a deliberate design choice — CSAT data is
+    structured and small enough that vector search adds no
+    value.</em></p>
+    <hr />
+    <h3 id="components-the-mcp-tool-layer">Components — The MCP Tool
+    Layer</h3>
+    <p>The MCP server is a single Python process. <code>server.py</code>
+    is the async entry point; <code>tools.py</code> is where the actual
+    work happens.</p>
+    <pre class="mermaid"><code>C4Component
+    title Component View — MCP Server and Tools
+
+    Container_Boundary(mcp, &quot;MCP Server (mcp/server.py + mcp/tools.py)&quot;) {
+        Component(listTools, &quot;list_tools handler&quot;, &quot;Python async&quot;, &quot;Registers the three MCP tool definitions — name, description, inputSchema — with the SDK.&quot;)
+        Component(callTool, &quot;call_tool handler&quot;, &quot;Python async&quot;, &quot;Routes incoming tool calls by name to the correct function. Wraps results in TextContent.&quot;)
+        Component(mainFn, &quot;main()&quot;, &quot;Python async&quot;, &quot;Initialises stdio_server context and starts the MCP application loop.&quot;)
+
+        Component(searchTool, &quot;search_transcripts()&quot;, &quot;Python&quot;, &quot;Accepts a natural-language query + optional k. Calls rag_query(). Returns an AI-generated answer grounded in top-k retrieved transcripts.&quot;)
+        Component(summaryTool, &quot;get_call_summary()&quot;, &quot;Python&quot;, &quot;Accepts a call_id. Retrieves the matching transcript via retrieve(), then calls rag_query() to produce a concise summary.&quot;)
+        Component(csatTool, &quot;query_csat()&quot;, &quot;Python&quot;, &quot;Accepts optional score range and category. Loads csat.json from disk. Filters in-memory. Does not call pgvector or the LLM.&quot;)
+    }
+
+    Container(ragPipeline, &quot;RAG Pipeline&quot;, &quot;Python&quot;, &quot;rag_query() and retrieve()&quot;)
+    Container(dataFiles, &quot;Data Files&quot;, &quot;JSON&quot;, &quot;csat.json&quot;)
+
+    Rel(callTool, searchTool, &quot;routes search_transcripts calls&quot;)
+    Rel(callTool, summaryTool, &quot;routes get_call_summary calls&quot;)
+    Rel(callTool, csatTool, &quot;routes query_csat calls&quot;)
+    Rel(searchTool, ragPipeline, &quot;calls rag_query(query, k)&quot;)
+    Rel(summaryTool, ragPipeline, &quot;calls retrieve() then rag_query()&quot;)
+    Rel(csatTool, dataFiles, &quot;reads csat.json — bypasses RAG entirely&quot;)</code></pre>
+    <p><em>Figure 3 — The tool dispatch layer. <code>query_csat()</code>
+    is the outlier: it’s the only tool that doesn’t go through the
+    vector store or the LLM. It’s just a JSON file and some Python
+    filtering logic.</em></p>
+    <hr />
+    <h2 id="the-flows">The Flows</h2>
+    <p>Architecture diagrams show structure. Sequence diagrams show what
+    actually happens when a request comes in.</p>
+    <h3 id="flow-1-a-single-mcp-query">Flow 1 — A Single MCP Query</h3>
+    <p>When a supervisor types “show me fraud disputes from last week”
+    into Claude Desktop, here’s the full path:</p>
+    <pre class="mermaid"><code>sequenceDiagram
+    actor Supervisor
+    participant CD as Claude Desktop
+    participant MCP as MCP Server
+    participant Tools as tools.py
+    participant RAG as pipeline.py
+    participant Embed as embeddings.py
+    participant PG as pgvector
+    participant LLM as OpenAI / Ollama
+
+    Supervisor-&gt;&gt;CD: &quot;Show me fraud disputes from last week&quot;
+    CD-&gt;&gt;MCP: call_tool(&quot;search_transcripts&quot;,&lt;br/&gt;{query: &quot;fraud disputes last week&quot;, k: 5})
+    MCP-&gt;&gt;Tools: search_transcripts(query, k=5)
+    Tools-&gt;&gt;RAG: rag_query(query, k=5)
+    RAG-&gt;&gt;Embed: get_vector_store()
+    Embed--&gt;&gt;RAG: PGVector instance (connection established)
+    RAG-&gt;&gt;LLM: embed(query) → 1536-dim vector
+    LLM--&gt;&gt;RAG: query embedding
+    RAG-&gt;&gt;PG: similarity_search(query_embedding, k=5)
+    PG--&gt;&gt;RAG: top-5 LangChain Documents&lt;br/&gt;(call text + metadata)
+    RAG-&gt;&gt;LLM: ChatOpenAI.invoke(&lt;br/&gt;  system_prompt + retrieved context)
+    LLM--&gt;&gt;RAG: &quot;Based on the transcripts, 3 fraud disputes were logged...&quot;
+    RAG--&gt;&gt;Tools: answer string
+    Tools--&gt;&gt;MCP: TextContent(answer)
+    MCP--&gt;&gt;CD: tool result
+    CD--&gt;&gt;Supervisor: displays grounded answer</code></pre>
+    <p><em>Figure 4 — MCP query flow. The round-trip involves two LLM
+    calls: one to embed the query (fast, cheap), one to synthesize the
+    answer (slower, more expensive). Both happen over the same provider
+    — swap the <code>LLM_PROVIDER</code> env var and both switch
+    simultaneously.</em></p>
+    <hr />
+    <h3 id="flow-2-ingest-and-embedding">Flow 2 — Ingest and
+    Embedding</h3>
+    <p>Before any query can work, the transcripts need to be in the
+    vector store. This is the ingestion flow:</p>
+    <pre class="mermaid"><code>sequenceDiagram
+    participant Gen as generate_data.py
+    participant JSON as transcripts.json
+    participant CLI as pipeline.py --ingest
+    participant Embed as embeddings.py
+    participant LLM as OpenAI Embeddings&lt;br/&gt;(or Ollama nomic-embed-text)
+    participant PG as pgvector
+
+    Gen-&gt;&gt;JSON: write 150 synthetic call records&lt;br/&gt;(call_id, date, category, outcome, full_text)
+    CLI-&gt;&gt;JSON: load_synthetic_data() reads file
+    JSON--&gt;&gt;CLI: 150 raw dicts
+    CLI-&gt;&gt;CLI: transcripts_to_documents()&lt;br/&gt;wrap in LangChain Document objects&lt;br/&gt;(page_content=full_text, metadata=call fields)
+    CLI-&gt;&gt;Embed: get_vector_store()
+    Embed-&gt;&gt;LLM: get_embeddings()&lt;br/&gt;text-embedding-3-small (1536 dims)&lt;br/&gt;or nomic-embed-text (Ollama)
+    Embed-&gt;&gt;PG: initialize pgvector extension + schema&lt;br/&gt;(first run only)
+    PG--&gt;&gt;Embed: ready
+    CLI-&gt;&gt;Embed: vector_store.add_documents(docs)
+    loop for each document batch
+        Embed-&gt;&gt;LLM: embed(doc.page_content)
+        LLM--&gt;&gt;Embed: 1536-dim float vector
+        Embed-&gt;&gt;PG: INSERT (vector, JSONB metadata)
+    end
+    PG--&gt;&gt;CLI: 150 documents stored
+    CLI-&gt;&gt;CLI: print(&quot;Ingested 150 documents&quot;)</code></pre>
+    <p><em>Figure 5 — Ingest flow. One thing to note: there’s no
+    deduplication guard. Running <code>--ingest</code> twice creates
+    duplicate rows. Fine for a portfolio project; a production
+    deployment would need upsert logic or an idempotency check before
+    calling <code>add_documents()</code>.</em></p>
+    <hr />
+    <h2 id="whats-coming">What’s Coming</h2>
+    <p>This first post covered the architecture at a high level. The
+    next eight posts build the system layer by layer:</p>
+    <table>
+    <colgroup>
+    <col style="width: 33%" />
+    <col style="width: 33%" />
+    <col style="width: 33%" />
+    </colgroup>
+    <thead>
+    <tr>
+    <th>Post</th>
+    <th>Title</th>
+    <th>What gets built</th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr>
+    <td>02</td>
+    <td><a href="../02-from-text-to-vectors/">From Text to
+    Vectors</a></td>
+    <td>Deep dive on the data pipeline: synthetic generation,
+    embeddings, pgvector setup, LangChain abstractions</td>
+    </tr>
+    <tr>
+    <td>03</td>
+    <td><a href="../03-the-interface-layer/">The Interface
+    Layer</a></td>
+    <td>MCP internals: tool schemas, the stdio transport, connecting
+    Claude Desktop, reusability across teams</td>
+    </tr>
+    <tr>
+    <td>04</td>
+    <td><a href="../04-run-anywhere/">Run Anywhere</a></td>
+    <td>Swapping LLM providers via <code>LLM_PROVIDER</code>; running
+    entirely local with Ollama; cost and privacy trade-offs</td>
+    </tr>
+    <tr>
+    <td>05</td>
+    <td><a href="../05-built-to-last/">Built to Last</a></td>
+    <td>Infrastructure as code: Terraform/OpenTofu on Azure, App
+    Service, Entra Easy Auth pattern</td>
+    </tr>
+    <tr>
+    <td>06</td>
+    <td><a href="../06-what-should-we-measure/">What Should We
+    Measure?</a></td>
+    <td>LLM and RAG observability design: what metrics matter, what
+    Grafana and OpenTelemetry bring</td>
+    </tr>
+    <tr>
+    <td>07</td>
+    <td><a href="../07-wiring-it-up/">Wiring It Up</a></td>
+    <td>Implementing observability: OTel instrumentation, docker-compose
+    additions, live Grafana dashboards</td>
+    </tr>
+    <tr>
+    <td>08</td>
+    <td><a href="../08-trust-but-verify/">Trust, but Verify</a></td>
+    <td>Detecting RAG degradation: embedding drift, retrieval quality
+    signals, CSAT as ground truth, SLOs</td>
+    </tr>
+    <tr>
+    <td>09</td>
+    <td><a href="../09-whats-next/">What’s Next</a></td>
+    <td>The emerging landscape: GitAgent, LangGraph, Azure AI Foundry —
+    and how this MCP-first approach stays durable</td>
+    </tr>
+    </tbody>
+    </table>
+    <hr />
+    <h2 id="try-it-yourself">Try It Yourself</h2>
+    <p>The full code is at <a
+    href="https://github.com/HendoCode/contact-center-ai">github.com/HendoCode/contact-center-ai</a>.
+    Here’s the quickstart:</p>
+    <div class="sourceCode" id="cb6"><pre
+    class="sourceCode bash"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="co"># 1. Start the local infrastructure</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="ex">docker</span> compose up <span class="at">-d</span></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a><span class="co"># 2. Create a virtualenv and install dependencies (uses uv)</span></span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> venv <span class="at">--python</span> 3.12</span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> sync <span class="at">--extra</span> dev</span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a><span class="co"># 3. Configure your environment</span></span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a><span class="fu">cp</span> .env.example .env</span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a><span class="co"># Edit .env: set OPENAI_API_KEY (or set LLM_PROVIDER=ollama for no API key)</span></span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a><span class="co"># 4. Generate synthetic data</span></span>
+<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> data/synthetic/generate_data.py</span>
+<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a><span class="co"># 5. Embed and store in pgvector</span></span>
+<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> <span class="at">-m</span> rag.pipeline <span class="at">--ingest</span></span>
+<span id="cb6-17"><a href="#cb6-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-18"><a href="#cb6-18" aria-hidden="true" tabindex="-1"></a><span class="co"># 6. Test a query end-to-end</span></span>
+<span id="cb6-19"><a href="#cb6-19" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> <span class="at">-m</span> rag.pipeline <span class="at">--query</span> <span class="st">&quot;fraud disputes from last week&quot;</span></span>
+<span id="cb6-20"><a href="#cb6-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-21"><a href="#cb6-21" aria-hidden="true" tabindex="-1"></a><span class="co"># 7. Start the MCP server (connect with Claude Desktop)</span></span>
+<span id="cb6-22"><a href="#cb6-22" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> <span class="at">-m</span> mcp.server</span></code></pre></div>
+    <p>Post 2 goes much deeper on what each of these steps actually does
+    — the data structures, the LangChain abstractions, the SQL that
+    pgvector generates under the hood.</p>
+  </div>
+</article>
+
+<nav class="post-nav">
+    <span></span>
+    <a class="nav-index" href="../">Series Index</a>
+    <a class="nav-next" href="../02-from-text-to-vectors/">From Text to
+Vectors &#8594;</a>
+  </nav>
+
+<footer class="site-footer">
+  <p>Part of the <strong>Anchoring AI</strong> series by Stephen Henderson</p>
+  <p><a href="https://github.com/HendoCode/contact-center-ai" target="_blank" rel="noopener">View the code on GitHub</a></p>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    // Pandoc emits mermaid blocks as <pre><code class="language-mermaid">.
+    // Mermaid.js needs <div class="mermaid">. Convert before initialising.
+    document.querySelectorAll('pre code.language-mermaid').forEach(function (el) {
+      var div = document.createElement('div');
+      div.className = 'mermaid';
+      div.textContent = el.textContent;
+      el.parentNode.parentNode.replaceChild(div, el.parentNode);
+    });
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'neutral',
+      securityLevel: 'loose',
+      fontFamily: 'var(--font-ui)',
+    });
+  });
+</script>
+
+</body>
+</html>
