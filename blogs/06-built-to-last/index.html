@@ -3,19 +3,19 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Series Overview | Anchoring AI — HendoCode</title>
-  <meta name="description" content="Anchoring AI is an eleven-part blog
-series about building a real RAG pipeline, MCP server, and observability
-stack for a call center — from synthetic data to production
-infrastructure.">
-  <meta property="og:title" content="Series Overview">
-  <meta property="og:description" content="Anchoring AI is an
-eleven-part blog series about building a real RAG pipeline, MCP server,
-and observability stack for a call center — from synthetic data to
-production infrastructure.">
+  <title>Built to Last | Anchoring AI — HendoCode</title>
+  <meta name="description" content="Post 6 of Anchoring AI: walking
+through the Terraform configuration for Azure App Service + PostgreSQL
+Flexible Server, the Entra Easy Auth pattern, and OpenTofu as an
+open-source Terraform alternative.">
+  <meta property="og:title" content="Built to Last">
+  <meta property="og:description" content="Post 6 of Anchoring AI:
+walking through the Terraform configuration for Azure App Service +
+PostgreSQL Flexible Server, the Entra Easy Auth pattern, and OpenTofu as
+an open-source Terraform alternative.">
   <meta property="og:type" content="article">
   <meta name="twitter:card" content="summary">
-  <meta name="twitter:title" content="Series Overview">
+  <meta name="twitter:title" content="Built to Last">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Josefin+Sans:wght@300;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -492,6 +492,8 @@ production infrastructure.">
       </a>
       <span class="nav-divider">/</span>
       <span class="nav-series">Anchoring AI</span>
+            <span class="nav-divider">/</span>
+      <span class="post-label">Post 06</span>
           </div>
     <a class="nav-gh" href="https://github.com/HendoCode/contact-center-ai" target="_blank" rel="noopener">GitHub ↗</a>
   </div>
@@ -499,121 +501,111 @@ production infrastructure.">
 
 <article>
   <header class="post-header">
-        <div class="series-eyebrow">Anchoring AI</div>
-        <h1>Series Overview</h1>
-    <p class="post-subtitle">Eleven posts on building a production RAG
-system from scratch</p>
+        <div class="series-eyebrow">Anchoring AI &mdash; Post 06</div>
+        <h1>Built to Last</h1>
+    <p class="post-subtitle">Infrastructure as code for AI systems:
+Terraform/OpenTofu, Azure, and the auth-at-infra pattern</p>
         <div class="byline">
-      Stephen Henderson &middot; 2026
+      Stephen Henderson &middot; TBD
     </div>
       </header>
 
   <div class="post-body">
-    <h2 id="what-is-anchoring-ai">What is Anchoring AI?</h2>
-    <p>This is an eleven-post series about building a real AI system —
-    not a demo, not a tutorial with a toy dataset, but the kind of thing
-    you’d actually deploy for a paying client. The codebase is a
-    portfolio mirror of consulting work I did for a credit union. The
-    data is synthetic. The architecture decisions, trade-offs, and
-    lessons are real.</p>
-    <p>The series follows a <strong>build-with-me</strong> arc: each
-    post adds a layer to the system. By the end, we’ll have a RAG
-    pipeline, an MCP server, object storage ingestion, a REST API, Azure
-    infrastructure, a Grafana observability stack, and a validation
-    framework — all grounded in a real use case.</p>
-    <p>The repo lives at <a
-    href="https://github.com/HendoCode/contact-center-ai">github.com/HendoCode/contact-center-ai</a>.</p>
+    <blockquote>
+    <p><strong>Status: Placeholder.</strong> This post is planned. The
+    outline and key concepts below describe what it will cover.</p>
+    </blockquote>
     <hr />
-    <h2 id="the-posts">The Posts</h2>
-    <table>
-    <colgroup>
-    <col style="width: 33%" />
-    <col style="width: 33%" />
-    <col style="width: 33%" />
-    </colgroup>
-    <thead>
-    <tr>
-    <th>#</th>
-    <th>Title</th>
-    <th>What it covers</th>
-    </tr>
-    </thead>
-    <tbody>
-    <tr>
-    <td><a href="./01-the-blueprint/">01</a></td>
-    <td><strong>The Blueprint</strong></td>
-    <td>Series intro, C4 architecture diagrams, MCP query and ingest
-    sequence diagrams</td>
-    </tr>
-    <tr>
-    <td><a href="./02-from-text-to-vectors/">02</a></td>
-    <td><strong>From Text to Vectors</strong></td>
-    <td>Synthetic data generation, the RAG pipeline, pgvector, LangChain
-    embeddings</td>
-    </tr>
-    <tr>
-    <td><a href="./03-the-interface-layer/">03</a></td>
-    <td><strong>The Interface Layer</strong></td>
-    <td>MCP server internals, the 3 tools, routing logic, connecting
-    Claude Desktop</td>
-    </tr>
-    <tr>
-    <td><a href="./04-run-anywhere/">04</a></td>
-    <td><strong>Run Anywhere</strong></td>
-    <td>Provider agnosticism — swap OpenAI for Ollama with one env var;
-    cost and privacy trade-offs</td>
-    </tr>
-    <tr>
-    <td><a href="./05-real-data-in/">05</a></td>
-    <td><strong>Real Data In</strong></td>
-    <td>MinIO, S3-compatible object storage, implementing the S3 ingest
-    stub, deduplication</td>
-    </tr>
-    <tr>
-    <td><a href="./06-built-to-last/">06</a></td>
-    <td><strong>Built to Last</strong></td>
-    <td>Terraform/OpenTofu on Azure, App Service, PostgreSQL Flexible,
-    Entra Easy Auth pattern</td>
-    </tr>
-    <tr>
-    <td><a href="./07-the-developers-toolkit/">07</a></td>
-    <td><strong>The Developer’s Toolkit</strong></td>
-    <td>REST API + OpenAPI/Swagger, PyCharm debugging, Junie for tests
-    and PEP8, HTTP Request files</td>
-    </tr>
-    <tr>
-    <td><a href="./08-what-should-we-measure/">08</a></td>
-    <td><strong>What Should We Measure?</strong></td>
-    <td>LLM and RAG-specific metrics, Grafana + OpenTelemetry landscape,
-    dashboard design</td>
-    </tr>
-    <tr>
-    <td><a href="./09-wiring-it-up/">09</a></td>
-    <td><strong>Wiring It Up</strong></td>
-    <td>OpenTelemetry instrumentation, docker-compose additions, live
-    Grafana dashboards</td>
-    </tr>
-    <tr>
-    <td><a href="./10-trust-but-verify/">10</a></td>
-    <td><strong>Trust, but Verify</strong></td>
-    <td>Validation strategies, drift detection, CSAT as a ground-truth
-    signal, SLOs for AI systems</td>
-    </tr>
-    <tr>
-    <td><a href="./11-whats-next/">11</a></td>
-    <td><strong>What’s Next</strong></td>
-    <td>GitAgent, LangGraph, Azure AI Foundry — comparing what we built
-    with the emerging landscape</td>
-    </tr>
-    </tbody>
-    </table>
+    <h2 id="what-this-post-covers">What This Post Covers</h2>
+    <p>The code works locally. Getting it to production involves
+    infrastructure decisions that compound quickly for AI systems: Where
+    does the model API key live? How is authentication handled? What
+    does the vector database look like at scale? This post walks through
+    <code>infra/terraform/main.tf</code> — the Azure infrastructure for
+    this system — and explores OpenTofu as an open-source Terraform
+    alternative that’s increasingly relevant for enterprises nervous
+    about HashiCorp’s licensing change.</p>
+    <p>The “auth at infra layer” pattern is the most architecturally
+    interesting piece here: Microsoft Entra Easy Auth intercepts every
+    HTTP request before it reaches the Python application. The Python
+    code contains zero authentication logic. That’s a deliberate choice
+    with significant security and maintenance implications.</p>
+    <hr />
+    <h2 id="key-concepts">Key Concepts</h2>
+    <ul>
+    <li><strong>Azure App Service</strong> — why it’s the right host for
+    an MCP server that runs Python; the Linux stack; how stdio becomes
+    HTTP</li>
+    <li><strong>Azure PostgreSQL Flexible Server</strong> — managed
+    pgvector in production; the difference from the local Docker
+    container</li>
+    <li><strong>Terraform <code>azurerm</code> provider</strong> — the
+    main resources, how they relate, what <code>terraform apply</code>
+    actually does</li>
+    <li><strong>Microsoft Entra Easy Auth</strong> — intercepting
+    requests at the infrastructure layer; OAuth 2.0 Bearer token
+    validation without a single line of Python auth code</li>
+    <li><strong>OpenTofu</strong> — the open-source Terraform fork; what
+    changed with HashiCorp’s BSL license; when you’d choose OpenTofu
+    over Terraform</li>
+    <li><strong>Secrets management</strong> — where
+    <code>OPENAI_API_KEY</code> and <code>DATABASE_URL</code> live in
+    App Service; why they’re not in <code>main.tf</code></li>
+    <li><strong>Randomized passwords</strong> — why
+    <code>random_password</code> in Terraform is the right pattern for
+    database credentials</li>
+    </ul>
+    <hr />
+    <h2 id="planned-outline">Planned Outline</h2>
+    <ol type="1">
+    <li><strong>Why IaC matters more for AI systems</strong> —
+    reproducibility, auditability, the API key problem</li>
+    <li><strong>The Azure architecture</strong> — App Service +
+    PostgreSQL Flexible + Entra: how the three services relate</li>
+    <li><strong>Walking <code>main.tf</code></strong> — resource by
+    resource; what each block does and why</li>
+    <li><strong>The Easy Auth pattern</strong> — how Entra intercepts
+    requests before they reach Python; what the Python app sees (and
+    doesn’t see); why this is better than auth middleware in the
+    app</li>
+    <li><strong>Secrets in App Service settings</strong> — how
+    environment variables become App Service configuration; what to
+    never put in Terraform files</li>
+    <li><strong>Running it</strong> — <code>terraform init</code>,
+    <code>terraform plan</code>, <code>terraform apply</code>; what to
+    expect; estimated costs</li>
+    <li><strong>OpenTofu</strong> — what it is, why it exists, how to
+    swap from Terraform with near-zero friction; the <code>tofu</code>
+    CLI</li>
+    <li><strong>What’s missing</strong> — no staging environment, no
+    modules, no tfvars split — acceptable trade-offs for a portfolio
+    project, not for production at scale</li>
+    </ol>
+    <hr />
+    <h2 id="code-changes-for-this-post">Code Changes for This Post</h2>
+    <p>Possibly: add OpenTofu-compatible aliases or a
+    <code>.terraform.lock.hcl</code> comment for OpenTofu users.
+    TBD.</p>
+    <hr />
+    <h2 id="outstanding-questions-tbd">Outstanding Questions / TBD</h2>
+    <ul>
+    <li>Include estimated Azure costs for the deployed
+    configuration?</li>
+    <li>Show <code>terraform plan</code> output?</li>
+    <li>Add a <code>staging.tfvars</code> as an example of environment
+    separation?</li>
+    <li>Explore Azure Container Apps as an alternative to App Service
+    for this workload?</li>
+    </ul>
   </div>
 </article>
 
 <nav class="post-nav">
-    <span></span>
+    <a class="nav-prev" href="../05-real-data-in/">&#8592; Real Data
+In</a>
     <a class="nav-index" href="../">Series Index</a>
-    <span></span>
+    <a class="nav-next" href="../07-the-developers-toolkit/">The
+Developer’s Toolkit &#8594;</a>
   </nav>
 
 <footer class="site-footer">

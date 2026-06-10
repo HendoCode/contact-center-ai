@@ -3,19 +3,19 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>What Should We Measure? | Anchoring AI — HendoCode</title>
-  <meta name="description" content="Post 6 of Anchoring AI: what metrics
-actually matter for LLM and RAG systems, how Grafana and OpenTelemetry
-fit together, and how to design dashboards before you instrument
-anything.">
-  <meta property="og:title" content="What Should We Measure?">
-  <meta property="og:description" content="Post 6 of Anchoring AI: what
-metrics actually matter for LLM and RAG systems, how Grafana and
-OpenTelemetry fit together, and how to design dashboards before you
-instrument anything.">
+  <title>Wiring It Up | Anchoring AI — HendoCode</title>
+  <meta name="description" content="Post 9 of Anchoring AI: implementing
+the observability stack designed in Post 8 — OTel instrumentation in
+Python, adding Grafana + Prometheus to docker-compose, and building live
+dashboards.">
+  <meta property="og:title" content="Wiring It Up">
+  <meta property="og:description" content="Post 9 of Anchoring AI:
+implementing the observability stack designed in Post 8 — OTel
+instrumentation in Python, adding Grafana + Prometheus to
+docker-compose, and building live dashboards.">
   <meta property="og:type" content="article">
   <meta name="twitter:card" content="summary">
-  <meta name="twitter:title" content="What Should We Measure?">
+  <meta name="twitter:title" content="Wiring It Up">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Josefin+Sans:wght@300;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -481,6 +481,75 @@ instrument anything.">
       .post-label { display: none; }
     }
   </style>
+    <style>
+    html { -webkit-text-size-adjust: 100%; }
+    pre > code.sourceCode { white-space: pre; position: relative; }
+    pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+    pre > code.sourceCode > span:empty { height: 1.2em; }
+    .sourceCode { overflow: visible; }
+    code.sourceCode > span { color: inherit; text-decoration: inherit; }
+    div.sourceCode { margin: 1em 0; }
+    pre.sourceCode { margin: 0; }
+    @media screen {
+    div.sourceCode { overflow: auto; }
+    }
+    @media print {
+    pre > code.sourceCode { white-space: pre-wrap; }
+    pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+    }
+    pre.numberSource code
+      { counter-reset: source-line 0; }
+    pre.numberSource code > span
+      { position: relative; left: -4em; counter-increment: source-line; }
+    pre.numberSource code > span > a:first-child::before
+      { content: counter(source-line);
+        position: relative; left: -1em; text-align: right; vertical-align: baseline;
+        border: none; display: inline-block;
+        -webkit-touch-callout: none; -webkit-user-select: none;
+        -khtml-user-select: none; -moz-user-select: none;
+        -ms-user-select: none; user-select: none;
+        padding: 0 4px; width: 4em;
+        background-color: #232629;
+        color: #7a7c7d;
+      }
+    pre.numberSource { margin-left: 3em; border-left: 1px solid #7a7c7d;  padding-left: 4px; }
+    div.sourceCode
+      { color: #cfcfc2; background-color: #232629; }
+    @media screen {
+    pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+    }
+    code span { color: #cfcfc2; } /* Normal */
+    code span.al { color: #95da4c; background-color: #4d1f24; font-weight: bold; } /* Alert */
+    code span.an { color: #3f8058; } /* Annotation */
+    code span.at { color: #2980b9; } /* Attribute */
+    code span.bn { color: #f67400; } /* BaseN */
+    code span.bu { color: #7f8c8d; } /* BuiltIn */
+    code span.cf { color: #fdbc4b; font-weight: bold; } /* ControlFlow */
+    code span.ch { color: #3daee9; } /* Char */
+    code span.cn { color: #27aeae; font-weight: bold; } /* Constant */
+    code span.co { color: #7a7c7d; } /* Comment */
+    code span.cv { color: #7f8c8d; } /* CommentVar */
+    code span.do { color: #a43340; } /* Documentation */
+    code span.dt { color: #2980b9; } /* DataType */
+    code span.dv { color: #f67400; } /* DecVal */
+    code span.er { color: #da4453; text-decoration: underline; } /* Error */
+    code span.ex { color: #0099ff; font-weight: bold; } /* Extension */
+    code span.fl { color: #f67400; } /* Float */
+    code span.fu { color: #8e44ad; } /* Function */
+    code span.im { color: #27ae60; } /* Import */
+    code span.in { color: #c45b00; } /* Information */
+    code span.kw { color: #cfcfc2; font-weight: bold; } /* Keyword */
+    code span.op { color: #cfcfc2; } /* Operator */
+    code span.ot { color: #27ae60; } /* Other */
+    code span.pp { color: #27ae60; } /* Preprocessor */
+    code span.re { color: #2980b9; background-color: #153042; } /* RegionMarker */
+    code span.sc { color: #3daee9; } /* SpecialChar */
+    code span.ss { color: #da4453; } /* SpecialString */
+    code span.st { color: #f44f4f; } /* String */
+    code span.va { color: #27aeae; } /* Variable */
+    code span.vs { color: #da4453; } /* VerbatimString */
+    code span.wa { color: #da4453; } /* Warning */
+  </style>
   </head>
 <body>
 
@@ -493,7 +562,7 @@ instrument anything.">
       <span class="nav-divider">/</span>
       <span class="nav-series">Anchoring AI</span>
             <span class="nav-divider">/</span>
-      <span class="post-label">Post 06</span>
+      <span class="post-label">Post 09</span>
           </div>
     <a class="nav-gh" href="https://github.com/HendoCode/contact-center-ai" target="_blank" rel="noopener">GitHub ↗</a>
   </div>
@@ -501,10 +570,10 @@ instrument anything.">
 
 <article>
   <header class="post-header">
-        <div class="series-eyebrow">Anchoring AI &mdash; Post 06</div>
-        <h1>What Should We Measure?</h1>
-    <p class="post-subtitle">Designing LLM and RAG observability before
-writing a line of instrumentation code</p>
+        <div class="series-eyebrow">Anchoring AI &mdash; Post 09</div>
+        <h1>Wiring It Up</h1>
+    <p class="post-subtitle">OpenTelemetry instrumentation, Grafana in
+docker-compose, and live LLM/RAG dashboards</p>
         <div class="byline">
       Stephen Henderson &middot; TBD
     </div>
@@ -517,150 +586,123 @@ writing a line of instrumentation code</p>
     </blockquote>
     <hr />
     <h2 id="what-this-post-covers">What This Post Covers</h2>
-    <p>Most observability posts start with “add these metrics.” This one
-    starts with “what do you actually need to know?” LLM and RAG systems
-    have failure modes that traditional SRE metrics don’t capture:
-    answer quality degrades silently, retrieval relevance erodes as the
-    corpus grows, and a 200 response code tells you nothing about
-    whether the answer was correct.</p>
-    <p>This is a design post. Post 7 implements it. By the end of this
-    post, you’ll have a clear mental model of what to measure, why each
-    metric matters, and how Grafana + OpenTelemetry fit into the stack —
-    without having written a single <code>meter.record()</code> call
-    yet.</p>
+    <p>Post 6 designed the observability stack. This post builds it.
+    We’ll add OpenTelemetry instrumentation to
+    <code>rag/pipeline.py</code> and <code>mcp/tools.py</code>, extend
+    <code>docker-compose.yml</code> with a Grafana + Prometheus + OTel
+    Collector stack, and wire up the dashboards described in Post 6.</p>
+    <p>By the end, every MCP tool call is a traced span, every RAG query
+    emits latency and retrieval score metrics, and every LLM call
+    reports token counts to Grafana — all visible in a live
+    dashboard.</p>
     <hr />
     <h2 id="key-concepts">Key Concepts</h2>
     <ul>
-    <li><strong>The four observability layers for AI systems</strong> —
-    infrastructure metrics (CPU, memory), API metrics (latency, error
-    rate), LLM metrics (token counts, cost, model version), RAG metrics
-    (retrieval score, result count, context size)</li>
-    <li><strong>Why standard SRE metrics aren’t enough</strong> — a 200
-    OK with a hallucinated answer looks identical to a 200 OK with a
-    correct one</li>
-    <li><strong>OpenTelemetry</strong> — traces, metrics, logs as a
-    unified model; why OTel is the right standard for language-agnostic
-    instrumentation</li>
-    <li><strong>Grafana + Prometheus</strong> — how metrics flow from
-    OTel collector → Prometheus → Grafana; the local docker-compose
-    setup</li>
-    <li><strong>Retrieval quality as a metric</strong> — cosine
-    similarity scores from pgvector as a proxy for answer groundedness;
-    how to emit them as OTel metrics</li>
-    <li><strong>Token cost tracking</strong> — why you want to know how
-    much each MCP query costs; how to compute it from the OpenAI
-    response</li>
-    <li><strong>LLM latency decomposition</strong> — total request time
-    vs. embedding time vs. completion time; where the time actually
-    goes</li>
+    <li><strong><code>opentelemetry-sdk</code></strong> — the Python
+    OTel SDK; <code>tracer</code>, <code>meter</code>,
+    <code>logger</code> providers; how to initialize them in a
+    long-running process</li>
+    <li><strong>Instrumentation points</strong> — where to add
+    <code>tracer.start_as_current_span()</code> and
+    <code>meter.record()</code> in the existing code</li>
+    <li><strong>OTel Collector</strong> — the sidecar that receives OTel
+    data from the Python process and exports to Prometheus; why you want
+    the collector vs. direct Prometheus export</li>
+    <li><strong>Prometheus</strong> — scraping the OTel Collector; the
+    metrics format; retention</li>
+    <li><strong>Grafana</strong> — provisioning datasources and
+    dashboards as YAML/JSON; the panels we’ll build</li>
+    <li><strong><code>docker-compose.yml</code> additions</strong> — the
+    three new services: otel-collector, prometheus, grafana; their
+    interconnections</li>
+    <li><strong>Context propagation</strong> — how trace context flows
+    from MCP server → RAG pipeline → embeddings module so the full call
+    tree is one trace</li>
     </ul>
     <hr />
-    <h2 id="planned-metrics-inventory">Planned Metrics Inventory</h2>
-    <table>
-    <colgroup>
-    <col style="width: 33%" />
-    <col style="width: 33%" />
-    <col style="width: 33%" />
-    </colgroup>
-    <thead>
-    <tr>
-    <th>Metric</th>
-    <th>Type</th>
-    <th>Why it matters</th>
-    </tr>
-    </thead>
-    <tbody>
-    <tr>
-    <td><code>mcp_tool_duration_seconds</code></td>
-    <td>Histogram</td>
-    <td>End-to-end tool latency by tool name</td>
-    </tr>
-    <tr>
-    <td><code>rag_query_duration_seconds</code></td>
-    <td>Histogram</td>
-    <td>RAG pipeline latency (excludes MCP overhead)</td>
-    </tr>
-    <tr>
-    <td><code>embedding_duration_seconds</code></td>
-    <td>Histogram</td>
-    <td>Embedding API call latency</td>
-    </tr>
-    <tr>
-    <td><code>llm_completion_duration_seconds</code></td>
-    <td>Histogram</td>
-    <td>LLM completion latency</td>
-    </tr>
-    <tr>
-    <td><code>llm_tokens_prompt_total</code></td>
-    <td>Counter</td>
-    <td>Cumulative prompt tokens (cost proxy)</td>
-    </tr>
-    <tr>
-    <td><code>llm_tokens_completion_total</code></td>
-    <td>Counter</td>
-    <td>Cumulative completion tokens (cost proxy)</td>
-    </tr>
-    <tr>
-    <td><code>rag_retrieval_score</code></td>
-    <td>Gauge/Histogram</td>
-    <td>Max cosine similarity of returned docs (quality proxy)</td>
-    </tr>
-    <tr>
-    <td><code>rag_documents_retrieved_total</code></td>
-    <td>Histogram</td>
-    <td>Number of docs returned per query</td>
-    </tr>
-    <tr>
-    <td><code>csat_query_results_count</code></td>
-    <td>Histogram</td>
-    <td>Number of CSAT records returned per query</td>
-    </tr>
-    </tbody>
-    </table>
+    <h2 id="planned-new-services-docker-compose-additions">Planned New
+    Services (docker-compose additions)</h2>
+    <div class="sourceCode" id="cb1"><pre
+    class="sourceCode yaml"><code class="sourceCode yaml"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co"># New services to add:</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">otel-collector</span><span class="kw">:</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">image</span><span class="kw">:</span><span class="at"> otel/opentelemetry-collector-contrib</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="co">  # receives from Python app on 4317 (gRPC) / 4318 (HTTP)</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="co">  # exports to Prometheus on 8889</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="fu">prometheus</span><span class="kw">:</span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">image</span><span class="kw">:</span><span class="at"> prom/prometheus</span></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="co">  # scrapes otel-collector on 8889</span></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="fu">grafana</span><span class="kw">:</span></span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">image</span><span class="kw">:</span><span class="at"> grafana/grafana</span></span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a><span class="co">  # provisioned datasource: Prometheus</span></span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a><span class="co">  # provisioned dashboard: Anchoring AI LLM/RAG Metrics</span></span></code></pre></div>
     <hr />
     <h2 id="planned-outline">Planned Outline</h2>
     <ol type="1">
-    <li><strong>The problem with AI observability</strong> — why p95
-    latency and error rate aren’t enough; the silent failure modes
-    unique to LLM systems</li>
-    <li><strong>A mental model for AI system observability</strong> —
-    four layers: infra, API, LLM, RAG; what breaks at each layer</li>
-    <li><strong>The OpenTelemetry basics</strong> — traces, metrics,
-    logs; why OTel; the collector as the central router</li>
-    <li><strong>Grafana + Prometheus architecture</strong> — how metrics
-    flow; the docker-compose additions we’ll add in Post 7</li>
-    <li><strong>Metrics that matter for RAG</strong> — retrieval score,
-    context window utilization, document staleness</li>
-    <li><strong>Metrics that matter for LLM</strong> — token counts,
-    cost per query, model version tracking, latency decomposition</li>
-    <li><strong>Dashboard design</strong> — what panels to build; alert
-    thresholds that make sense; the CSAT panel idea</li>
-    <li><strong>What we’ll build in Post 7</strong> — a preview of the
-    implementation: OTel instrumentation points, the docker-compose
-    additions, the Grafana dashboard JSON</li>
+    <li><strong>The plan</strong> — what we’re adding, where it goes,
+    how it connects</li>
+    <li><strong>Installing OTel</strong> —
+    <code>opentelemetry-sdk</code>,
+    <code>opentelemetry-exporter-otlp</code>, the Python package
+    list</li>
+    <li><strong>Initializing the SDK</strong> — where to call
+    <code>TracerProvider</code>, <code>MeterProvider</code>,
+    <code>LoggerProvider</code>; the <code>Resource</code> that
+    identifies this service</li>
+    <li><strong>Instrumenting <code>mcp/tools.py</code></strong> — spans
+    for each tool call; tagging with tool name and input parameters</li>
+    <li><strong>Instrumenting <code>rag/pipeline.py</code></strong> —
+    spans for <code>rag_query()</code> and <code>retrieve()</code>;
+    emitting <code>rag_retrieval_score</code>, token counts, document
+    counts</li>
+    <li><strong>Instrumenting <code>rag/embeddings.py</code></strong> —
+    timing the embedding API call; emitting
+    <code>embedding_duration_seconds</code></li>
+    <li><strong>Docker Compose additions</strong> — the three new
+    service definitions; the OTel Collector config YAML; Prometheus
+    scrape config</li>
+    <li><strong>Grafana setup</strong> — provisioning the datasource;
+    importing the dashboard JSON; walking through each panel</li>
+    <li><strong>Firing a query and watching it land</strong> — live
+    trace in Grafana Explore; metrics updating on the dashboard</li>
+    <li><strong>What’s missing</strong> — alerting rules (teased for
+    Post 8); log correlation; distributed traces across service
+    boundaries</li>
     </ol>
     <hr />
     <h2 id="code-changes-for-this-post">Code Changes for This Post</h2>
-    <p>None — this is a design post. The next post (Post 7) implements
-    the instrumentation.</p>
+    <ul>
+    <li>Add OTel SDK to <code>pyproject.toml</code> dependencies</li>
+    <li>Add OTel initialization module (e.g.,
+    <code>rag/telemetry.py</code>)</li>
+    <li>Instrument <code>mcp/tools.py</code>,
+    <code>rag/pipeline.py</code>, <code>rag/embeddings.py</code></li>
+    <li>Extend <code>docker-compose.yml</code> with otel-collector,
+    prometheus, grafana services</li>
+    <li>Add <code>infra/otel/collector-config.yaml</code>,
+    <code>infra/prometheus/prometheus.yml</code></li>
+    <li>Add <code>infra/grafana/dashboards/anchoring-ai.json</code>
+    (provisioned dashboard)</li>
+    </ul>
     <hr />
     <h2 id="outstanding-questions-tbd">Outstanding Questions / TBD</h2>
     <ul>
-    <li>Include Langfuse as an alternative to Prometheus/Grafana for
-    LLM-specific observability?</li>
-    <li>Show a mockup of the Grafana dashboard layout?</li>
-    <li>Compare OTel vs. OpenLLMetry vs. Langfuse in a trade-off
-    table?</li>
+    <li>Use <code>opentelemetry-instrumentation-langchain</code> for
+    automatic LangChain spans vs. manual instrumentation?</li>
+    <li>Include Grafana alerting rule configuration?</li>
+    <li>Show how to export the OTel data to a cloud provider (Honeycomb,
+    Datadog, etc.) instead of local Prometheus?</li>
     </ul>
   </div>
 </article>
 
 <nav class="post-nav">
-    <a class="nav-prev" href="../05-built-to-last/">&#8592; Built to
-Last</a>
+    <a class="nav-prev" href="../08-what-should-we-measure/">&#8592; What
+Should We Measure?</a>
     <a class="nav-index" href="../">Series Index</a>
-    <a class="nav-next" href="../07-wiring-it-up/">Wiring It
-Up &#8594;</a>
+    <a class="nav-next" href="../10-trust-but-verify/">Trust, but
+Verify &#8594;</a>
   </nav>
 
 <footer class="site-footer">

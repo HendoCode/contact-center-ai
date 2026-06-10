@@ -7,8 +7,8 @@ post_number: "04"
 description: "Post 4 of Anchoring AI: how the LLM_PROVIDER pattern works, running the full stack locally with Ollama, the embedding dimension constraint, and when local models are good enough."
 prev_url: "../03-the-interface-layer/"
 prev_title: "The Interface Layer"
-next_url: "../05-built-to-last/"
-next_title: "Built to Last"
+next_url: "../05-real-data-in/"
+next_title: "Real Data In"
 ---
 
 Early in the engagement, a question came up that shaped a lot of the architecture: *what happens if the client decides to stop using OpenAI?*

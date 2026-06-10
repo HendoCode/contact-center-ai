@@ -3,19 +3,19 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Built to Last | Anchoring AI — HendoCode</title>
-  <meta name="description" content="Post 5 of Anchoring AI: walking
-through the Terraform configuration for Azure App Service + PostgreSQL
-Flexible Server, the Entra Easy Auth pattern, and OpenTofu as an
-open-source Terraform alternative.">
-  <meta property="og:title" content="Built to Last">
+  <title>Real Data In | Anchoring AI — HendoCode</title>
+  <meta name="description" content="Post 5 of Anchoring AI: implementing
+the S3 ingestion stub in pipeline.py using MinIO as a local
+S3-compatible Docker service — connecting real object storage to the
+vector store.">
+  <meta property="og:title" content="Real Data In">
   <meta property="og:description" content="Post 5 of Anchoring AI:
-walking through the Terraform configuration for Azure App Service +
-PostgreSQL Flexible Server, the Entra Easy Auth pattern, and OpenTofu as
-an open-source Terraform alternative.">
+implementing the S3 ingestion stub in pipeline.py using MinIO as a local
+S3-compatible Docker service — connecting real object storage to the
+vector store.">
   <meta property="og:type" content="article">
   <meta name="twitter:card" content="summary">
-  <meta name="twitter:title" content="Built to Last">
+  <meta name="twitter:title" content="Real Data In">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Josefin+Sans:wght@300;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -481,6 +481,75 @@ an open-source Terraform alternative.">
       .post-label { display: none; }
     }
   </style>
+    <style>
+    html { -webkit-text-size-adjust: 100%; }
+    pre > code.sourceCode { white-space: pre; position: relative; }
+    pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+    pre > code.sourceCode > span:empty { height: 1.2em; }
+    .sourceCode { overflow: visible; }
+    code.sourceCode > span { color: inherit; text-decoration: inherit; }
+    div.sourceCode { margin: 1em 0; }
+    pre.sourceCode { margin: 0; }
+    @media screen {
+    div.sourceCode { overflow: auto; }
+    }
+    @media print {
+    pre > code.sourceCode { white-space: pre-wrap; }
+    pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+    }
+    pre.numberSource code
+      { counter-reset: source-line 0; }
+    pre.numberSource code > span
+      { position: relative; left: -4em; counter-increment: source-line; }
+    pre.numberSource code > span > a:first-child::before
+      { content: counter(source-line);
+        position: relative; left: -1em; text-align: right; vertical-align: baseline;
+        border: none; display: inline-block;
+        -webkit-touch-callout: none; -webkit-user-select: none;
+        -khtml-user-select: none; -moz-user-select: none;
+        -ms-user-select: none; user-select: none;
+        padding: 0 4px; width: 4em;
+        background-color: #232629;
+        color: #7a7c7d;
+      }
+    pre.numberSource { margin-left: 3em; border-left: 1px solid #7a7c7d;  padding-left: 4px; }
+    div.sourceCode
+      { color: #cfcfc2; background-color: #232629; }
+    @media screen {
+    pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+    }
+    code span { color: #cfcfc2; } /* Normal */
+    code span.al { color: #95da4c; background-color: #4d1f24; font-weight: bold; } /* Alert */
+    code span.an { color: #3f8058; } /* Annotation */
+    code span.at { color: #2980b9; } /* Attribute */
+    code span.bn { color: #f67400; } /* BaseN */
+    code span.bu { color: #7f8c8d; } /* BuiltIn */
+    code span.cf { color: #fdbc4b; font-weight: bold; } /* ControlFlow */
+    code span.ch { color: #3daee9; } /* Char */
+    code span.cn { color: #27aeae; font-weight: bold; } /* Constant */
+    code span.co { color: #7a7c7d; } /* Comment */
+    code span.cv { color: #7f8c8d; } /* CommentVar */
+    code span.do { color: #a43340; } /* Documentation */
+    code span.dt { color: #2980b9; } /* DataType */
+    code span.dv { color: #f67400; } /* DecVal */
+    code span.er { color: #da4453; text-decoration: underline; } /* Error */
+    code span.ex { color: #0099ff; font-weight: bold; } /* Extension */
+    code span.fl { color: #f67400; } /* Float */
+    code span.fu { color: #8e44ad; } /* Function */
+    code span.im { color: #27ae60; } /* Import */
+    code span.in { color: #c45b00; } /* Information */
+    code span.kw { color: #cfcfc2; font-weight: bold; } /* Keyword */
+    code span.op { color: #cfcfc2; } /* Operator */
+    code span.ot { color: #27ae60; } /* Other */
+    code span.pp { color: #27ae60; } /* Preprocessor */
+    code span.re { color: #2980b9; background-color: #153042; } /* RegionMarker */
+    code span.sc { color: #3daee9; } /* SpecialChar */
+    code span.ss { color: #da4453; } /* SpecialString */
+    code span.st { color: #f44f4f; } /* String */
+    code span.va { color: #27aeae; } /* Variable */
+    code span.vs { color: #da4453; } /* VerbatimString */
+    code span.wa { color: #da4453; } /* Warning */
+  </style>
   </head>
 <body>
 
@@ -502,9 +571,9 @@ an open-source Terraform alternative.">
 <article>
   <header class="post-header">
         <div class="series-eyebrow">Anchoring AI &mdash; Post 05</div>
-        <h1>Built to Last</h1>
-    <p class="post-subtitle">Infrastructure as code for AI systems:
-Terraform/OpenTofu, Azure, and the auth-at-infra pattern</p>
+        <h1>Real Data In</h1>
+    <p class="post-subtitle">MinIO, S3-compatible object storage, and
+completing the ingest pipeline</p>
         <div class="byline">
       Stephen Henderson &middot; TBD
     </div>
@@ -517,85 +586,128 @@ Terraform/OpenTofu, Azure, and the auth-at-infra pattern</p>
     </blockquote>
     <hr />
     <h2 id="what-this-post-covers">What This Post Covers</h2>
-    <p>The code works locally. Getting it to production involves
-    infrastructure decisions that compound quickly for AI systems: Where
-    does the model API key live? How is authentication handled? What
-    does the vector database look like at scale? This post walks through
-    <code>infra/terraform/main.tf</code> — the Azure infrastructure for
-    this system — and explores OpenTofu as an open-source Terraform
-    alternative that’s increasingly relevant for enterprises nervous
-    about HashiCorp’s licensing change.</p>
-    <p>The “auth at infra layer” pattern is the most architecturally
-    interesting piece here: Microsoft Entra Easy Auth intercepts every
-    HTTP request before it reaches the Python application. The Python
-    code contains zero authentication logic. That’s a deliberate choice
-    with significant security and maintenance implications.</p>
+    <p>There’s a <code>NotImplementedError</code> in
+    <code>rag/pipeline.py</code> — the S3 ingestion path has always been
+    a stub. Transcripts have been loaded directly from a JSON file
+    during development. In production, they’ll come from blob storage:
+    S3 in the fictional credit union’s case, Azure Blob in the
+    deployment environment.</p>
+    <p>This post implements the stub using MinIO — a local, Docker-based
+    S3-compatible object storage service. The goal is to complete the
+    ingestion pipeline in a way you can run entirely locally (continuing
+    the “no external APIs required” theme from Post 4), then show how
+    the same code connects to a real S3 bucket or Azure Blob Storage
+    container with an environment variable change.</p>
     <hr />
     <h2 id="key-concepts">Key Concepts</h2>
     <ul>
-    <li><strong>Azure App Service</strong> — why it’s the right host for
-    an MCP server that runs Python; the Linux stack; how stdio becomes
-    HTTP</li>
-    <li><strong>Azure PostgreSQL Flexible Server</strong> — managed
-    pgvector in production; the difference from the local Docker
-    container</li>
-    <li><strong>Terraform <code>azurerm</code> provider</strong> — the
-    main resources, how they relate, what <code>terraform apply</code>
-    actually does</li>
-    <li><strong>Microsoft Entra Easy Auth</strong> — intercepting
-    requests at the infrastructure layer; OAuth 2.0 Bearer token
-    validation without a single line of Python auth code</li>
-    <li><strong>OpenTofu</strong> — the open-source Terraform fork; what
-    changed with HashiCorp’s BSL license; when you’d choose OpenTofu
-    over Terraform</li>
-    <li><strong>Secrets management</strong> — where
-    <code>OPENAI_API_KEY</code> and <code>DATABASE_URL</code> live in
-    App Service; why they’re not in <code>main.tf</code></li>
-    <li><strong>Randomized passwords</strong> — why
-    <code>random_password</code> in Terraform is the right pattern for
-    database credentials</li>
+    <li><strong>MinIO</strong> — an open-source, S3-API-compatible
+    object storage server; runs in Docker; <code>aws</code> CLI and
+    <code>boto3</code> work against it unchanged</li>
+    <li><strong>S3-compatible API</strong> — why “S3-compatible”
+    matters: the same <code>boto3</code> calls work against AWS S3,
+    MinIO, Azure Blob (via compatibility layer), and GCS; object storage
+    is a commodity interface</li>
+    <li><strong><code>boto3</code> for ingestion</strong> — listing
+    objects with a prefix, streaming object content, handling large
+    files without loading them fully into memory</li>
+    <li><strong>Chunking strategies</strong> — transcripts can exceed
+    LLM context windows; splitting on sentence boundaries vs. fixed
+    token counts vs. paragraph breaks; what LangChain’s text splitters
+    provide</li>
+    <li><strong>Deduplication</strong> — the existing
+    <code>pipeline.py --ingest</code> has no deduplication: running it
+    twice creates duplicate documents in pgvector; object storage
+    ingestion makes this worse (every re-run re-reads every object);
+    tracking ingested object ETags or S3 version IDs as a simple dedup
+    guard</li>
+    <li><strong>Source flexibility</strong> — how
+    <code>pipeline.py</code> will support <code>--source json</code>
+    (current) and <code>--source s3</code> (new) with the same
+    downstream embedding and storage logic</li>
     </ul>
+    <hr />
+    <h2 id="minio-in-docker-compose">MinIO in Docker Compose</h2>
+    <div class="sourceCode" id="cb1"><pre
+    class="sourceCode yaml"><code class="sourceCode yaml"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">minio</span><span class="kw">:</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">image</span><span class="kw">:</span><span class="at"> minio/minio:latest</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">container_name</span><span class="kw">:</span><span class="at"> minio</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">ports</span><span class="kw">:</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="kw">-</span><span class="at"> </span><span class="st">&quot;9000:9000&quot;</span><span class="co">   # S3 API</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="kw">-</span><span class="at"> </span><span class="st">&quot;9001:9001&quot;</span><span class="co">   # MinIO Console UI</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">environment</span><span class="kw">:</span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">MINIO_ROOT_USER</span><span class="kw">:</span><span class="at"> minioadmin</span></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">MINIO_ROOT_PASSWORD</span><span class="kw">:</span><span class="at"> minioadmin</span></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">command</span><span class="kw">:</span><span class="at"> server /data --console-address &quot;:9001&quot;</span></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">volumes</span><span class="kw">:</span></span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="kw">-</span><span class="at"> minio:/data</span></span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a><span class="fu">createbuckets</span><span class="kw">:</span></span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">image</span><span class="kw">:</span><span class="at"> minio/mc:latest</span></span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">depends_on</span><span class="kw">:</span></span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="kw">-</span><span class="at"> minio</span></span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a><span class="fu">  entrypoint</span><span class="kw">: </span><span class="ch">&gt;</span></span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a>    /bin/sh -c &quot;</span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a>    mc alias set local http://minio:9000 minioadmin minioadmin &amp;&amp;</span>
+<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a>    mc mb --ignore-existing local/call-data &amp;&amp;</span>
+<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a>    mc cp /tmp/transcripts.json local/call-data/transcripts.json</span>
+<span id="cb1-23"><a href="#cb1-23" aria-hidden="true" tabindex="-1"></a>    &quot;</span></code></pre></div>
     <hr />
     <h2 id="planned-outline">Planned Outline</h2>
     <ol type="1">
-    <li><strong>Why IaC matters more for AI systems</strong> —
-    reproducibility, auditability, the API key problem</li>
-    <li><strong>The Azure architecture</strong> — App Service +
-    PostgreSQL Flexible + Entra: how the three services relate</li>
-    <li><strong>Walking <code>main.tf</code></strong> — resource by
-    resource; what each block does and why</li>
-    <li><strong>The Easy Auth pattern</strong> — how Entra intercepts
-    requests before they reach Python; what the Python app sees (and
-    doesn’t see); why this is better than auth middleware in the
-    app</li>
-    <li><strong>Secrets in App Service settings</strong> — how
-    environment variables become App Service configuration; what to
-    never put in Terraform files</li>
-    <li><strong>Running it</strong> — <code>terraform init</code>,
-    <code>terraform plan</code>, <code>terraform apply</code>; what to
-    expect; estimated costs</li>
-    <li><strong>OpenTofu</strong> — what it is, why it exists, how to
-    swap from Terraform with near-zero friction; the <code>tofu</code>
-    CLI</li>
-    <li><strong>What’s missing</strong> — no staging environment, no
-    modules, no tfvars split — acceptable trade-offs for a portfolio
-    project, not for production at scale</li>
+    <li><strong>The stub and why it exists</strong> — look at
+    <code>pipeline.py</code> lines where
+    <code>NotImplementedError</code> is raised; trace back to why
+    ingestion was JSON-first during prototyping</li>
+    <li><strong>What object storage actually is</strong> — blobs,
+    prefixes, ETags, eventual consistency; how it’s different from a
+    filesystem</li>
+    <li><strong>MinIO setup</strong> — docker-compose additions; the
+    MinIO Console at <code>localhost:9001</code>; uploading the
+    synthetic transcripts</li>
+    <li><strong>Implementing <code>ingest_from_s3()</code></strong> —
+    listing objects, streaming content, building LangChain Documents;
+    handling metadata from S3 object tags</li>
+    <li><strong>Deduplication</strong> — the existing dedup gap;
+    tracking ingested ETags in a simple state store or a
+    <code>ingested_objects</code> table in PostgreSQL</li>
+    <li><strong>Chunking</strong> — when transcripts are too long;
+    LangChain’s <code>RecursiveCharacterTextSplitter</code>; choosing
+    chunk size for call center transcripts</li>
+    <li><strong>Connecting to real S3 or Azure Blob</strong> —
+    environment variable changes only; the
+    <code>BOTO_ENDPOINT_URL</code> pattern for endpoint override</li>
+    <li><strong>Running it</strong> —
+    <code>python -m rag.pipeline --ingest --source s3</code>; verifying
+    the documents landed in pgvector</li>
     </ol>
     <hr />
     <h2 id="code-changes-for-this-post">Code Changes for This Post</h2>
-    <p>Possibly: add OpenTofu-compatible aliases or a
-    <code>.terraform.lock.hcl</code> comment for OpenTofu users.
-    TBD.</p>
+    <ul>
+    <li>Implement <code>ingest_from_s3()</code> in
+    <code>rag/pipeline.py</code> (replaces
+    <code>NotImplementedError</code>)</li>
+    <li>Add MinIO + <code>createbuckets</code> services to
+    <code>docker-compose.yml</code></li>
+    <li>Add <code>boto3</code> to <code>pyproject.toml</code>
+    dependencies</li>
+    <li>Add <code>S3_ENDPOINT_URL</code> env var support to
+    <code>.env.example</code> (for MinIO override)</li>
+    <li>Optionally: add a simple <code>ingested_objects</code> tracking
+    table for deduplication</li>
+    </ul>
     <hr />
     <h2 id="outstanding-questions-tbd">Outstanding Questions / TBD</h2>
     <ul>
-    <li>Include estimated Azure costs for the deployed
-    configuration?</li>
-    <li>Show <code>terraform plan</code> output?</li>
-    <li>Add a <code>staging.tfvars</code> as an example of environment
-    separation?</li>
-    <li>Explore Azure Container Apps as an alternative to App Service
-    for this workload?</li>
+    <li>Use <code>RecursiveCharacterTextSplitter</code> or a simpler
+    fixed-character split for this post? (Full splitter comparison may
+    belong in a separate section)</li>
+    <li>Show Azure Blob Storage connection via S3-compatible endpoint,
+    or treat that separately?</li>
+    <li>Address the dedup problem fully here or defer to Post 10 (Trust,
+    but Verify)?</li>
+    <li>Include a section on IAM/access policy for MinIO buckets vs. AWS
+    S3 bucket policies?</li>
     </ul>
   </div>
 </article>
@@ -604,8 +716,8 @@ Terraform/OpenTofu, Azure, and the auth-at-infra pattern</p>
     <a class="nav-prev" href="../04-run-anywhere/">&#8592; Run
 Anywhere</a>
     <a class="nav-index" href="../">Series Index</a>
-    <a class="nav-next" href="../06-what-should-we-measure/">What Should
-We Measure? &#8594;</a>
+    <a class="nav-next" href="../06-built-to-last/">Built to
+Last &#8594;</a>
   </nav>
 
 <footer class="site-footer">

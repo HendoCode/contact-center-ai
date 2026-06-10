@@ -3,18 +3,21 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Trust, but Verify | Anchoring AI — HendoCode</title>
-  <meta name="description" content="Post 8 of Anchoring AI: validation
-strategies for RAG systems — embedding drift, retrieval quality signals,
-CSAT as a ground-truth signal, LLM-as-judge, and SLOs for AI systems.">
-  <meta property="og:title" content="Trust, but Verify">
-  <meta property="og:description" content="Post 8 of Anchoring AI:
-validation strategies for RAG systems — embedding drift, retrieval
-quality signals, CSAT as a ground-truth signal, LLM-as-judge, and SLOs
-for AI systems.">
+  <title>The Developer’s Toolkit | Anchoring AI — HendoCode</title>
+  <meta name="description" content="Post 7 of Anchoring AI: adding an
+HTTP REST API layer alongside the MCP server, documenting it with
+OpenAPI/Swagger, and exploring the JetBrains developer workflow —
+PyCharm debugging with Docker services, Junie for unit test generation
+and PEP8 cleanup, and HTTP Request files for live API testing.">
+  <meta property="og:title" content="The Developer’s Toolkit">
+  <meta property="og:description" content="Post 7 of Anchoring AI:
+adding an HTTP REST API layer alongside the MCP server, documenting it
+with OpenAPI/Swagger, and exploring the JetBrains developer workflow —
+PyCharm debugging with Docker services, Junie for unit test generation
+and PEP8 cleanup, and HTTP Request files for live API testing.">
   <meta property="og:type" content="article">
   <meta name="twitter:card" content="summary">
-  <meta name="twitter:title" content="Trust, but Verify">
+  <meta name="twitter:title" content="The Developer’s Toolkit">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Josefin+Sans:wght@300;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -492,7 +495,7 @@ for AI systems.">
       <span class="nav-divider">/</span>
       <span class="nav-series">Anchoring AI</span>
             <span class="nav-divider">/</span>
-      <span class="post-label">Post 08</span>
+      <span class="post-label">Post 07</span>
           </div>
     <a class="nav-gh" href="https://github.com/HendoCode/contact-center-ai" target="_blank" rel="noopener">GitHub ↗</a>
   </div>
@@ -500,10 +503,10 @@ for AI systems.">
 
 <article>
   <header class="post-header">
-        <div class="series-eyebrow">Anchoring AI &mdash; Post 08</div>
-        <h1>Trust, but Verify</h1>
-    <p class="post-subtitle">Detecting RAG degradation before your users
-do</p>
+        <div class="series-eyebrow">Anchoring AI &mdash; Post 07</div>
+        <h1>The Developer’s Toolkit</h1>
+    <p class="post-subtitle">REST API, OpenAPI/Swagger, PyCharm
+debugging, and JetBrains AI in the same workflow</p>
         <div class="byline">
       Stephen Henderson &middot; TBD
     </div>
@@ -511,196 +514,144 @@ do</p>
 
   <div class="post-body">
     <blockquote>
-    <p><strong>Status: Structured draft.</strong> This post has a
-    detailed outline and will be written after Posts 02–07 are
-    complete.</p>
+    <p><strong>Status: Placeholder.</strong> This post is planned. The
+    outline and key concepts below describe what it will cover.</p>
     </blockquote>
     <hr />
-    <h2 id="thesis">Thesis</h2>
-    <p>RAG systems degrade silently. Embeddings drift as language
-    evolves, retrieval quality erodes as the corpus grows, and LLM
-    behavior shifts between model versions. By the time users complain,
-    the damage is done. A 200 OK response with a confidently stated
-    wrong answer is worse than an error — at least an error is
-    visible.</p>
-    <p>This post shows how to use the telemetry from Post 7 to detect
-    degradation early — and how the CSAT scores we already collect
-    become a lagging ground-truth signal for answer quality. The goal is
-    to move from “we hope it’s working” to “we know when it’s not.”</p>
+    <h2 id="what-this-post-covers">What This Post Covers</h2>
+    <p>The MCP server is stdio-only. That’s the right transport for
+    Claude Desktop and agent integrations, but it’s not how you test a
+    backend in practice. You can’t <code>curl</code> it. You can’t wire
+    it to a browser frontend. And you can’t connect it to teams that
+    aren’t running an MCP-capable client.</p>
+    <p>This post adds an HTTP REST API layer alongside the existing MCP
+    server — not replacing it, just adding a second surface. FastAPI
+    handles the routing and generates an OpenAPI spec for free; Swagger
+    UI gives you a browser-accessible test interface. Then we step back
+    from the code and look at the tooling that made all of this
+    possible: PyCharm’s Docker-aware debugger, Junie for generating unit
+    tests and enforcing idiomatic Python, and the HTTP Request feature
+    for testing the new API without leaving the IDE.</p>
+    <p>There’s also something worth saying about authoring all of this —
+    including these blog posts — from inside the same JetBrains
+    workspace as the code.</p>
     <hr />
     <h2 id="key-concepts">Key Concepts</h2>
     <ul>
-    <li><strong>Three failure modes to watch</strong>
-    <ul>
-    <li><em>Data drift</em>: new call categories appear that weren’t in
-    the original corpus; the model has no good neighbors to
-    retrieve</li>
-    <li><em>Concept drift</em>: the meaning of “fraud” or “escalation”
-    changes as call center language evolves; old embeddings become
-    stale</li>
-    <li><em>Retrieval drift</em>: top-k results become less relevant as
-    the corpus grows and the ANN index quality degrades</li>
-    </ul></li>
-    <li><strong>Embedding drift</strong> — cosine similarity
-    distributions shift over time; how to detect it using the
-    <code>rag_retrieval_score</code> metric from Post 7</li>
-    <li><strong>Retrieval quality metrics</strong> — MRR, NDCG, top-k
-    relevance; how to estimate these without human labels using
-    LLM-as-judge</li>
-    <li><strong>CSAT as a lagging ground-truth signal</strong> — when
-    call center agents rate calls poorly <em>after</em> using the AI
-    tool, that’s signal; correlating CSAT scores with MCP query volume
-    by category reveals where the system is failing</li>
-    <li><strong>LLM-as-judge</strong> — a lightweight evaluation
-    pattern: periodically sample recent query/answer pairs and ask a
-    cheap model to rate answer quality; emit scores as OTel metrics</li>
-    <li><strong>SLOs for AI systems</strong> — what “good enough” looks
-    like expressed as thresholds, not just dashboards</li>
-    <li><strong>Shadow mode evaluation</strong> — running a new
-    embedding model in parallel to compare retrieval quality before
-    promoting it</li>
-    <li><strong>Human-in-the-loop checkpoints</strong> — when to trigger
-    a human review: retrieval score below threshold, new call category
-    detected, embedding distribution shift</li>
+    <li><strong>FastAPI</strong> — async Python web framework; automatic
+    OpenAPI 3.1 spec generation; Pydantic models as request/response
+    schemas; why it’s a natural fit alongside a LangChain-based
+    backend</li>
+    <li><strong>OpenAPI/Swagger</strong> — what the spec actually
+    contains; the <code>/docs</code> and <code>/redoc</code> endpoints
+    FastAPI generates automatically; using the spec as a contract for
+    frontend or third-party integration</li>
+    <li><strong>Sharing tool logic</strong> — the three MCP tools in
+    <code>mcp/tools.py</code> become the same three REST endpoints; no
+    duplication of business logic, just a new transport</li>
+    <li><strong>PyCharm + Docker debugging</strong> — attaching
+    PyCharm’s debugger to a running Docker container; setting
+    breakpoints in <code>pipeline.py</code> during a live query; the
+    Docker Compose service configuration for remote debugging</li>
+    <li><strong>JetBrains Junie</strong> — AI-assisted unit test
+    generation; PEP8 and idiomatic Python suggestions; the difference
+    between “AI writes the test” and “AI writes a test worth keeping”;
+    code review workflow inside the IDE</li>
+    <li><strong>HTTP Request files (<code>.http</code>)</strong> —
+    JetBrains’ built-in HTTP client; <code>.http</code> files as living
+    API documentation checked into the repo; running requests against
+    local and production environments with environment variables</li>
+    <li><strong>Writing blog posts in JetBrains</strong> — Markdown
+    preview, Git integration, running build.sh from the terminal — all
+    from the same workspace as the Python source code; the case for not
+    switching contexts</li>
     </ul>
+    <hr />
+    <h2 id="the-new-architecture">The New Architecture</h2>
+    <pre><code>Claude Desktop ──(stdio)──► MCP Server (mcp/server.py)
+                                │
+HTTP Client ────(HTTP)───► REST API (api/server.py)  ─────► mcp/tools.py ──► rag_query()
+                                                                          └──► csat (JSON)
+
+Both surfaces share the same tool implementations.</code></pre>
     <hr />
     <h2 id="planned-outline">Planned Outline</h2>
     <ol type="1">
-    <li><p><strong>The silent failure problem</strong> — a wrong answer
-    delivered confidently is worse than no answer; why 200 OK means
-    nothing for AI systems</p></li>
-    <li><p><strong>Three failure modes, diagnosed</strong></p>
-    <ul>
-    <li><em>Data drift</em>: detecting new categories that weren’t in
-    the corpus at ingest time; how to surface this from query logs</li>
-    <li><em>Concept drift</em>: embedding the same phrase from 2023
-    vs. 2026 produces different vectors; when to re-embed the
-    corpus</li>
-    <li><em>Retrieval drift</em>: how ANN index quality degrades as a
-    pgvector collection grows; HNSW vs. IVFFlat behavior; when to
-    rebuild the index</li>
-    </ul></li>
-    <li><p><strong>The telemetry we have (from Post 7)</strong> — what
-    <code>rag_retrieval_score</code>,
-    <code>rag_documents_retrieved_total</code>, and
-    <code>llm_tokens_prompt_total</code> tell us; what’s still
-    missing</p></li>
-    <li><p><strong>Adding the missing retrieval quality
-    signal</strong></p>
-    <ul>
-    <li>Emit max cosine similarity from <code>retrieve()</code> as a
-    Prometheus histogram</li>
-    <li>A Grafana alert rule: fire when p50 retrieval score drops below
-    0.70 for 30 minutes</li>
-    </ul></li>
-    <li><p><strong>CSAT as ground truth</strong></p>
-    <ul>
-    <li>Revisit <code>query_csat()</code> — correlating low CSAT weeks
-    with MCP query patterns from Post 7 telemetry</li>
-    <li>New Grafana panel: CSAT score distribution vs. RAG query volume
-    by category (time series overlay)</li>
-    <li>What a correlated drop looks like; how to investigate</li>
-    </ul></li>
-    <li><p><strong>LLM-as-judge for answer quality</strong></p>
-    <ul>
-    <li>A lightweight <code>scripts/eval_sample.py</code>: sample N
-    recent query/answer pairs from logs, ask a cheap model to rate 1–5,
-    emit scores as a metric</li>
-    <li>How to automate this as a nightly job (cron or GitHub
-    Actions)</li>
-    <li>The limits of LLM-as-judge: what it catches and what it
-    misses</li>
-    </ul></li>
-    <li><p><strong>Drift detection in practice</strong> — Grafana alert
-    rules for:</p>
-    <ul>
-    <li>Retrieval score p50 degradation</li>
-    <li>Embedding latency spikes (OpenAI model API changes)</li>
-    <li>New category labels not seen at original ingest time</li>
-    </ul></li>
-    <li><p><strong>SLOs for this system</strong> — proposed thresholds
-    that make sense for the Northgate Federal use case:</p>
-    <table>
-    <thead>
-    <tr>
-    <th>SLO</th>
-    <th>Threshold</th>
-    <th>Window</th>
-    </tr>
-    </thead>
-    <tbody>
-    <tr>
-    <td>Retrieval score p50</td>
-    <td>&gt; 0.70</td>
-    <td>Rolling 7-day</td>
-    </tr>
-    <tr>
-    <td>Query latency p95</td>
-    <td>&lt; 4 seconds</td>
-    <td>Rolling 24-hour</td>
-    </tr>
-    <tr>
-    <td>CSAT trend</td>
-    <td>≥ 4.0 average</td>
-    <td>Rolling 30-day</td>
-    </tr>
-    <tr>
-    <td>LLM-as-judge score p50</td>
-    <td>&gt; 3.5 / 5</td>
-    <td>Rolling 7-day</td>
-    </tr>
-    </tbody>
-    </table></li>
-    <li><p><strong>Runbook sketch: what to do when alerts
-    fire</strong></p>
-    <ul>
-    <li>Retrieval score drops → check for corpus skew; consider
-    re-ingest or index rebuild</li>
-    <li>Latency spike → check OpenAI status; consider Ollama
-    fallback</li>
-    <li>CSAT drop → trigger LLM-as-judge eval; review flagged
-    query/answer pairs with a human</li>
-    <li>New category detected → add representative calls; re-embed
-    corpus; update retrieval tests</li>
-    </ul></li>
-    <li><p><strong>Shadow mode evaluation</strong> — running a new
-    embedding model (<code>text-embedding-3-large</code> or a future
-    Ollama model) in a shadow collection; comparing retrieval scores
-    before promoting</p></li>
+    <li><strong>Why add REST alongside MCP</strong> — the audiences that
+    can’t use stdio; testing and developer experience; frontend
+    integration paths</li>
+    <li><strong>FastAPI in 30 lines</strong> — a
+    <code>api/server.py</code> that exposes the three tools as POST
+    endpoints; Pydantic request/response models; <code>uvicorn</code> as
+    the runner</li>
+    <li><strong>OpenAPI for free</strong> — what FastAPI generates;
+    navigating the Swagger UI; how the spec doubles as integration
+    documentation for other teams</li>
+    <li><strong>Adding to docker-compose</strong> — the <code>api</code>
+    service; port exposure; shared environment variables with the MCP
+    server</li>
+    <li><strong>PyCharm debugging with Docker</strong> — configuring a
+    remote interpreter; attaching to the API container; stepping through
+    <code>rag_query()</code> during a live request; what changes when
+    you debug through a Docker boundary vs. locally</li>
+    <li><strong>Junie: unit tests from the AI assistant</strong> —
+    generating tests for <code>query_csat()</code> and
+    <code>search_transcripts()</code>; evaluating what Junie produces;
+    fixing the category filter bug (known bug from Post 3) and watching
+    the test catch it</li>
+    <li><strong>Junie: PEP8 and idiomatic cleanup</strong> — what
+    suggestions come out; which ones to accept; which ones are style
+    preferences vs. correctness improvements</li>
+    <li><strong>HTTP Request files</strong> — creating
+    <code>api/requests.http</code>; environment variables for local
+    vs. production; checking <code>.http</code> files into the repo as
+    executable documentation</li>
+    <li><strong>Authoring in JetBrains</strong> — the blog post you’re
+    reading was written in the same IDE; Markdown preview, terminal, Git
+    — one window</li>
     </ol>
     <hr />
     <h2 id="code-changes-for-this-post">Code Changes for This Post</h2>
     <ul>
-    <li>Add <code>retrieval_score</code> metric to
-    <code>rag/pipeline.py</code> (emit highest cosine score from
-    pgvector results as OTel metric)</li>
-    <li>Add <code>scripts/eval_sample.py</code> — samples N recent
-    queries from logs, rates quality with LLM-as-judge, prints report
-    and optionally emits as metrics</li>
-    <li>New Grafana panel: CSAT score vs. RAG query volume (time series,
-    JSON committed to <code>infra/grafana/</code>)</li>
-    <li>Grafana alert rule for retrieval score degradation (provisioned
-    alert YAML)</li>
+    <li>New <code>api/server.py</code> — FastAPI application with three
+    endpoints mirroring the MCP tools</li>
+    <li>New <code>api/models.py</code> — Pydantic request/response
+    models</li>
+    <li>Add <code>fastapi</code>, <code>uvicorn</code> to
+    <code>pyproject.toml</code> dependencies</li>
+    <li>Add <code>api</code> service to
+    <code>docker-compose.yml</code></li>
+    <li>New <code>api/requests.http</code> — HTTP Request file for all
+    three endpoints (checked into repo)</li>
+    <li>Unit tests for <code>mcp/tools.py</code> (generated with Junie,
+    then reviewed + fixed)</li>
+    <li>Fix the <code>query_csat</code> category filter bug (Bug 2 from
+    Post 3, tested by new test)</li>
     </ul>
     <hr />
     <h2 id="outstanding-questions-tbd">Outstanding Questions / TBD</h2>
     <ul>
-    <li>How to log query/answer pairs for the LLM-as-judge eval? Need a
-    structured log format from Post 7 instrumentation.</li>
-    <li>Include Ragas (the open-source RAG eval framework) as an
-    alternative to hand-rolled LLM-as-judge?</li>
-    <li>Show the HNSW index rebuild command for pgvector?</li>
-    <li>Discuss the annotation / human feedback loop as a path toward
-    true supervised eval?</li>
+    <li>Use FastAPI or Flask? (FastAPI is the clear choice for OpenAPI
+    generation; Flask if simplicity is the argument)</li>
+    <li>Add authentication to the REST API? (The MCP server relies on
+    Entra Easy Auth at the infra layer — the REST API needs its own auth
+    strategy if exposed beyond localhost)</li>
+    <li>Include a section on the difference between the Swagger spec
+    FastAPI generates and writing an OpenAPI spec by hand?</li>
+    <li>Show Junie generating tests for the known bug in
+    <code>get_call_summary()</code> as well?</li>
+    <li><code>debugpy</code> for Docker debugging or PyCharm’s built-in
+    Docker interpreter?</li>
     </ul>
   </div>
 </article>
 
 <nav class="post-nav">
-    <a class="nav-prev" href="../07-wiring-it-up/">&#8592; Wiring It
-Up</a>
+    <a class="nav-prev" href="../06-built-to-last/">&#8592; Built to
+Last</a>
     <a class="nav-index" href="../">Series Index</a>
-    <a class="nav-next" href="../09-whats-next/">What’s Next &#8594;</a>
+    <a class="nav-next" href="../08-what-should-we-measure/">What Should
+We Measure? &#8594;</a>
   </nav>
 
 <footer class="site-footer">

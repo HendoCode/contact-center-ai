@@ -95,18 +95,32 @@ See `.env.example` for the full list including AWS credentials and MCP server ho
 
 ## Blog series
 
-A nine-post "Anchoring AI" series lives in `blogs/`. Posts use this codebase as a live playground.
+An eleven-post "Anchoring AI" series lives in `blogs/`. Posts use this codebase as a live playground.
 
 ```bash
 # Build all HTML from Markdown (requires pandoc: brew install pandoc)
 bash blogs/build.sh
 
 # Build a single post
-bash blogs/build.sh 01
+bash blogs/build.sh 05
 ```
 
-Posts 1–4 are fully drafted. Posts 5–9 are structured placeholders/drafts.
+Posts 1–4 are fully drafted. Posts 5–11 are structured placeholders/drafts.
 Deployed via GitHub Actions → GitHub Pages at https://hendocode.github.io/contact-center-ai/
+
+| Post | Slug | Title | Status |
+|---|---|---|---|
+| 01 | `01-the-blueprint` | The Blueprint | Published |
+| 02 | `02-from-text-to-vectors` | From Text to Vectors | Published |
+| 03 | `03-the-interface-layer` | The Interface Layer | Published |
+| 04 | `04-run-anywhere` | Run Anywhere | Published |
+| 05 | `05-real-data-in` | Real Data In | Placeholder |
+| 06 | `06-built-to-last` | Built to Last | Placeholder |
+| 07 | `07-the-developers-toolkit` | The Developer's Toolkit | Placeholder |
+| 08 | `08-what-should-we-measure` | What Should We Measure? | Placeholder |
+| 09 | `09-wiring-it-up` | Wiring It Up | Placeholder |
+| 10 | `10-trust-but-verify` | Trust, but Verify | Structured draft |
+| 11 | `11-whats-next` | What's Next | Structured draft |
 
 **Known bugs documented in the series (not yet fixed in code):**
 - `mcp/tools.py` `get_call_summary()`: retrieved document is never passed to the LLM — a second `rag_query()` call re-retrieves independently, so the specific call may not be summarized

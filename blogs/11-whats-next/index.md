@@ -3,9 +3,9 @@ title: "What's Next"
 subtitle: "GitAgent, LangGraph, Azure AI Foundry — and why the MCP-first approach stays durable"
 author: Stephen Henderson
 date: "TBD"
-post_number: "09"
-description: "Post 9 of Anchoring AI: comparing the handcrafted MCP approach with the emerging landscape of AI agent frameworks — GitAgent, LangGraph, Azure AI Agents, GitHub Copilot Workspace — and what to look for when choosing."
-prev_url: "../08-trust-but-verify/"
+post_number: "11"
+description: "Post 11 of Anchoring AI: comparing the handcrafted MCP approach with the emerging landscape of AI agent frameworks — GitAgent, LangGraph, Azure AI Agents, GitHub Copilot Workspace — and what to look for when choosing."
+prev_url: "../10-trust-but-verify/"
 prev_title: "Trust, but Verify"
 next_url: ""
 next_title: ""
@@ -77,7 +77,7 @@ The short answer: yes. Here's why.
    - *Revisit CSAT integration* once the 3rd-party provider transition unblocks; a SQL-backed approach (not in-memory JSON) is the right upgrade
    - *Add the S3 ingestion path* once the data pipeline is productionized; the stub in `pipeline.py` is ready to fill in
 
-8. **The nine-post arc, complete**
+8. **The eleven-post arc, complete**
 
    | Post | What we built | What we learned |
    |---|---|---|
@@ -85,11 +85,13 @@ The short answer: yes. Here's why.
    | 02 | RAG pipeline + pgvector | Embeddings are powerful; dimensions matter; no free dedup |
    | 03 | MCP server and tools | Protocols beat APIs for multi-team AI platforms |
    | 04 | Ollama provider swap | Env-var abstraction is worth the upfront design cost |
-   | 05 | Terraform / Azure / Entra | Auth at the infra layer beats auth in the app |
-   | 06 | Observability design | What to measure matters more than how to measure it |
-   | 07 | OTel + Grafana | Instrumentation is cheap; the hard part is defining good thresholds |
-   | 08 | Validation + drift detection | RAG systems need ongoing validation, not just initial testing |
-   | 09 | Landscape comparison | MCP-first ages well; the interface standard outlives the implementation |
+   | 05 | S3 ingestion + MinIO | Object storage ingestion is worth completing before you go to production |
+   | 06 | Terraform / Azure / Entra | Auth at the infra layer beats auth in the app |
+   | 07 | REST API + JetBrains toolkit | The right IDE makes the whole stack more debuggable |
+   | 08 | Observability design | What to measure matters more than how to measure it |
+   | 09 | OTel + Grafana | Instrumentation is cheap; the hard part is defining good thresholds |
+   | 10 | Validation + drift detection | RAG systems need ongoing validation, not just initial testing |
+   | 11 | Landscape comparison | MCP-first ages well; the interface standard outlives the implementation |
 
 9. **What to read next** — links to: LangGraph documentation, MCP spec, Ragas (RAG evaluation), Azure AI Foundry overview, OpenTelemetry Python SDK
 

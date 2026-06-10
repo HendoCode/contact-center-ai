@@ -3,19 +3,19 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Wiring It Up | Anchoring AI — HendoCode</title>
-  <meta name="description" content="Post 7 of Anchoring AI: implementing
-the observability stack designed in Post 6 — OTel instrumentation in
-Python, adding Grafana + Prometheus to docker-compose, and building live
-dashboards.">
-  <meta property="og:title" content="Wiring It Up">
-  <meta property="og:description" content="Post 7 of Anchoring AI:
-implementing the observability stack designed in Post 6 — OTel
-instrumentation in Python, adding Grafana + Prometheus to
-docker-compose, and building live dashboards.">
+  <title>What’s Next | Anchoring AI — HendoCode</title>
+  <meta name="description" content="Post 11 of Anchoring AI: comparing
+the handcrafted MCP approach with the emerging landscape of AI agent
+frameworks — GitAgent, LangGraph, Azure AI Agents, GitHub Copilot
+Workspace — and what to look for when choosing.">
+  <meta property="og:title" content="What’s Next">
+  <meta property="og:description" content="Post 11 of Anchoring AI:
+comparing the handcrafted MCP approach with the emerging landscape of AI
+agent frameworks — GitAgent, LangGraph, Azure AI Agents, GitHub Copilot
+Workspace — and what to look for when choosing.">
   <meta property="og:type" content="article">
   <meta name="twitter:card" content="summary">
-  <meta name="twitter:title" content="Wiring It Up">
+  <meta name="twitter:title" content="What’s Next">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Josefin+Sans:wght@300;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -481,75 +481,6 @@ docker-compose, and building live dashboards.">
       .post-label { display: none; }
     }
   </style>
-    <style>
-    html { -webkit-text-size-adjust: 100%; }
-    pre > code.sourceCode { white-space: pre; position: relative; }
-    pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
-    pre > code.sourceCode > span:empty { height: 1.2em; }
-    .sourceCode { overflow: visible; }
-    code.sourceCode > span { color: inherit; text-decoration: inherit; }
-    div.sourceCode { margin: 1em 0; }
-    pre.sourceCode { margin: 0; }
-    @media screen {
-    div.sourceCode { overflow: auto; }
-    }
-    @media print {
-    pre > code.sourceCode { white-space: pre-wrap; }
-    pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
-    }
-    pre.numberSource code
-      { counter-reset: source-line 0; }
-    pre.numberSource code > span
-      { position: relative; left: -4em; counter-increment: source-line; }
-    pre.numberSource code > span > a:first-child::before
-      { content: counter(source-line);
-        position: relative; left: -1em; text-align: right; vertical-align: baseline;
-        border: none; display: inline-block;
-        -webkit-touch-callout: none; -webkit-user-select: none;
-        -khtml-user-select: none; -moz-user-select: none;
-        -ms-user-select: none; user-select: none;
-        padding: 0 4px; width: 4em;
-        background-color: #232629;
-        color: #7a7c7d;
-      }
-    pre.numberSource { margin-left: 3em; border-left: 1px solid #7a7c7d;  padding-left: 4px; }
-    div.sourceCode
-      { color: #cfcfc2; background-color: #232629; }
-    @media screen {
-    pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
-    }
-    code span { color: #cfcfc2; } /* Normal */
-    code span.al { color: #95da4c; background-color: #4d1f24; font-weight: bold; } /* Alert */
-    code span.an { color: #3f8058; } /* Annotation */
-    code span.at { color: #2980b9; } /* Attribute */
-    code span.bn { color: #f67400; } /* BaseN */
-    code span.bu { color: #7f8c8d; } /* BuiltIn */
-    code span.cf { color: #fdbc4b; font-weight: bold; } /* ControlFlow */
-    code span.ch { color: #3daee9; } /* Char */
-    code span.cn { color: #27aeae; font-weight: bold; } /* Constant */
-    code span.co { color: #7a7c7d; } /* Comment */
-    code span.cv { color: #7f8c8d; } /* CommentVar */
-    code span.do { color: #a43340; } /* Documentation */
-    code span.dt { color: #2980b9; } /* DataType */
-    code span.dv { color: #f67400; } /* DecVal */
-    code span.er { color: #da4453; text-decoration: underline; } /* Error */
-    code span.ex { color: #0099ff; font-weight: bold; } /* Extension */
-    code span.fl { color: #f67400; } /* Float */
-    code span.fu { color: #8e44ad; } /* Function */
-    code span.im { color: #27ae60; } /* Import */
-    code span.in { color: #c45b00; } /* Information */
-    code span.kw { color: #cfcfc2; font-weight: bold; } /* Keyword */
-    code span.op { color: #cfcfc2; } /* Operator */
-    code span.ot { color: #27ae60; } /* Other */
-    code span.pp { color: #27ae60; } /* Preprocessor */
-    code span.re { color: #2980b9; background-color: #153042; } /* RegionMarker */
-    code span.sc { color: #3daee9; } /* SpecialChar */
-    code span.ss { color: #da4453; } /* SpecialString */
-    code span.st { color: #f44f4f; } /* String */
-    code span.va { color: #27aeae; } /* Variable */
-    code span.vs { color: #da4453; } /* VerbatimString */
-    code span.wa { color: #da4453; } /* Warning */
-  </style>
   </head>
 <body>
 
@@ -562,7 +493,7 @@ docker-compose, and building live dashboards.">
       <span class="nav-divider">/</span>
       <span class="nav-series">Anchoring AI</span>
             <span class="nav-divider">/</span>
-      <span class="post-label">Post 07</span>
+      <span class="post-label">Post 11</span>
           </div>
     <a class="nav-gh" href="https://github.com/HendoCode/contact-center-ai" target="_blank" rel="noopener">GitHub ↗</a>
   </div>
@@ -570,10 +501,10 @@ docker-compose, and building live dashboards.">
 
 <article>
   <header class="post-header">
-        <div class="series-eyebrow">Anchoring AI &mdash; Post 07</div>
-        <h1>Wiring It Up</h1>
-    <p class="post-subtitle">OpenTelemetry instrumentation, Grafana in
-docker-compose, and live LLM/RAG dashboards</p>
+        <div class="series-eyebrow">Anchoring AI &mdash; Post 11</div>
+        <h1>What’s Next</h1>
+    <p class="post-subtitle">GitAgent, LangGraph, Azure AI Foundry — and
+why the MCP-first approach stays durable</p>
         <div class="byline">
       Stephen Henderson &middot; TBD
     </div>
@@ -581,128 +512,271 @@ docker-compose, and live LLM/RAG dashboards</p>
 
   <div class="post-body">
     <blockquote>
-    <p><strong>Status: Placeholder.</strong> This post is planned. The
-    outline and key concepts below describe what it will cover.</p>
+    <p><strong>Status: Structured draft.</strong> This post has a
+    detailed outline and will be written after Posts 02–08 are
+    complete.</p>
     </blockquote>
     <hr />
-    <h2 id="what-this-post-covers">What This Post Covers</h2>
-    <p>Post 6 designed the observability stack. This post builds it.
-    We’ll add OpenTelemetry instrumentation to
-    <code>rag/pipeline.py</code> and <code>mcp/tools.py</code>, extend
-    <code>docker-compose.yml</code> with a Grafana + Prometheus + OTel
-    Collector stack, and wire up the dashboards described in Post 6.</p>
-    <p>By the end, every MCP tool call is a traced span, every RAG query
-    emits latency and retrieval score metrics, and every LLM call
-    reports token counts to Grafana — all visible in a live
-    dashboard.</p>
+    <h2 id="thesis">Thesis</h2>
+    <p>The system we built — a handcrafted MCP tool server with a RAG
+    pipeline — is a deliberate choice for a specific context: multiple
+    teams, multiple LLM vendors, a need for reuse across use cases, and
+    a client not yet ready to standardize. Every design decision in this
+    series has been shaped by those constraints.</p>
+    <p>But the landscape is shifting fast. GitAgent-style coding agents,
+    managed agent runtimes from Microsoft and OpenAI, and stateful
+    orchestration frameworks like LangGraph are changing what “build
+    your own” looks like — and what it competes with. This final post
+    maps the next horizon: what these tools are, where they fit, and
+    whether the nine posts of work you just read still make sense.</p>
+    <p>The short answer: yes. Here’s why.</p>
     <hr />
     <h2 id="key-concepts">Key Concepts</h2>
     <ul>
-    <li><strong><code>opentelemetry-sdk</code></strong> — the Python
-    OTel SDK; <code>tracer</code>, <code>meter</code>,
-    <code>logger</code> providers; how to initialize them in a
-    long-running process</li>
-    <li><strong>Instrumentation points</strong> — where to add
-    <code>tracer.start_as_current_span()</code> and
-    <code>meter.record()</code> in the existing code</li>
-    <li><strong>OTel Collector</strong> — the sidecar that receives OTel
-    data from the Python process and exports to Prometheus; why you want
-    the collector vs. direct Prometheus export</li>
-    <li><strong>Prometheus</strong> — scraping the OTel Collector; the
-    metrics format; retention</li>
-    <li><strong>Grafana</strong> — provisioning datasources and
-    dashboards as YAML/JSON; the panels we’ll build</li>
-    <li><strong><code>docker-compose.yml</code> additions</strong> — the
-    three new services: otel-collector, prometheus, grafana; their
-    interconnections</li>
-    <li><strong>Context propagation</strong> — how trace context flows
-    from MCP server → RAG pipeline → embeddings module so the full call
-    tree is one trace</li>
+    <li><strong>Agentic AI vs. RAG tools</strong> — the shift from
+    “query a tool and get an answer” to “agent plans and executes
+    multi-step tasks autonomously”</li>
+    <li><strong>GitAgent / GitHub Copilot Workspace</strong> — AI agents
+    that operate on repositories: read code, write PRs, run tests,
+    respond to issues; how they could use the MCP server as a data
+    source <em>or</em> how a coding agent could evolve this codebase
+    autonomously</li>
+    <li><strong>LangGraph</strong> — stateful, multi-step agent
+    orchestration built on LangChain (already a dependency); when a
+    graph of steps is the right abstraction over a simple RAG chain</li>
+    <li><strong>Azure AI Foundry Agents</strong> — Microsoft’s managed
+    agent runtime; how it compares to self-hosted MCP; what “managed”
+    gets you and what it costs</li>
+    <li><strong>OpenAI Assistants API</strong> — the OpenAI-native
+    alternative to MCP; threads, runs, and tool calls; trade-offs
+    vs. the protocol-based approach</li>
+    <li><strong>MCP as the stable adapter layer</strong> — regardless of
+    which agent framework wins, MCP tools remain the interface; the work
+    in this series doesn’t get thrown away when the orchestration layer
+    changes</li>
+    <li><strong>The consolidation question</strong> — Northgate Federal
+    Credit Union was going to consolidate GenAI efforts in 3–6 months;
+    what criteria should drive that decision?</li>
     </ul>
-    <hr />
-    <h2 id="planned-new-services-docker-compose-additions">Planned New
-    Services (docker-compose additions)</h2>
-    <div class="sourceCode" id="cb1"><pre
-    class="sourceCode yaml"><code class="sourceCode yaml"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co"># New services to add:</span></span>
-<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">otel-collector</span><span class="kw">:</span></span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">image</span><span class="kw">:</span><span class="at"> otel/opentelemetry-collector-contrib</span></span>
-<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="co">  # receives from Python app on 4317 (gRPC) / 4318 (HTTP)</span></span>
-<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="co">  # exports to Prometheus on 8889</span></span>
-<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="fu">prometheus</span><span class="kw">:</span></span>
-<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">image</span><span class="kw">:</span><span class="at"> prom/prometheus</span></span>
-<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="co">  # scrapes otel-collector on 8889</span></span>
-<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="fu">grafana</span><span class="kw">:</span></span>
-<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">image</span><span class="kw">:</span><span class="at"> grafana/grafana</span></span>
-<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a><span class="co">  # provisioned datasource: Prometheus</span></span>
-<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a><span class="co">  # provisioned dashboard: Anchoring AI LLM/RAG Metrics</span></span></code></pre></div>
     <hr />
     <h2 id="planned-outline">Planned Outline</h2>
     <ol type="1">
-    <li><strong>The plan</strong> — what we’re adding, where it goes,
-    how it connects</li>
-    <li><strong>Installing OTel</strong> —
-    <code>opentelemetry-sdk</code>,
-    <code>opentelemetry-exporter-otlp</code>, the Python package
-    list</li>
-    <li><strong>Initializing the SDK</strong> — where to call
-    <code>TracerProvider</code>, <code>MeterProvider</code>,
-    <code>LoggerProvider</code>; the <code>Resource</code> that
-    identifies this service</li>
-    <li><strong>Instrumenting <code>mcp/tools.py</code></strong> — spans
-    for each tool call; tagging with tool name and input parameters</li>
-    <li><strong>Instrumenting <code>rag/pipeline.py</code></strong> —
-    spans for <code>rag_query()</code> and <code>retrieve()</code>;
-    emitting <code>rag_retrieval_score</code>, token counts, document
-    counts</li>
-    <li><strong>Instrumenting <code>rag/embeddings.py</code></strong> —
-    timing the embedding API call; emitting
-    <code>embedding_duration_seconds</code></li>
-    <li><strong>Docker Compose additions</strong> — the three new
-    service definitions; the OTel Collector config YAML; Prometheus
-    scrape config</li>
-    <li><strong>Grafana setup</strong> — provisioning the datasource;
-    importing the dashboard JSON; walking through each panel</li>
-    <li><strong>Firing a query and watching it land</strong> — live
-    trace in Grafana Explore; metrics updating on the dashboard</li>
-    <li><strong>What’s missing</strong> — alerting rules (teased for
-    Post 8); log correlation; distributed traces across service
-    boundaries</li>
+    <li><p><strong>Where we started and where we are</strong> — recap
+    the nine-post arc; what was built, what it cost in time and API
+    calls, what it taught about RAG system design</p></li>
+    <li><p><strong>The agentic shift</strong> — RAG tools answer
+    questions; agents take actions. The call center supervisor use case
+    has natural next steps:</p>
+    <ul>
+    <li><em>“Find all fraud calls from last month and draft a summary
+    report”</em> — multi-step task, not a query</li>
+    <li><em>“Flag any call where an agent promised something outside
+    policy”</em> — needs reasoning across multiple retrieved
+    documents</li>
+    <li>These tasks require an agent that can plan, retrieve, reason,
+    and act — not just <code>rag_query()</code></li>
+    </ul></li>
+    <li><p><strong>GitAgent and coding agents</strong></p>
+    <ul>
+    <li>What GitAgent-style tools do: repo-aware, code-gen, PR
+    automation, issue triage</li>
+    <li>How they could integrate with this MCP server: a coding agent
+    queries call data to understand what’s failing before opening a fix
+    PR</li>
+    <li>The meta case: using Claude Code (or a similar coding agent) to
+    evolve this codebase autonomously — we already did this during
+    development</li>
+    <li>The implication: the MCP server is not just for call center
+    supervisors; it’s a data source for any AI agent that needs call
+    center context</li>
+    </ul></li>
+    <li><p><strong>Framework comparison</strong></p>
+    <table>
+    <colgroup>
+    <col style="width: 25%" />
+    <col style="width: 25%" />
+    <col style="width: 25%" />
+    <col style="width: 25%" />
+    </colgroup>
+    <thead>
+    <tr>
+    <th>Framework</th>
+    <th>Strengths</th>
+    <th>Weaknesses</th>
+    <th>Fit for this project</th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr>
+    <td>Custom MCP (built here)</td>
+    <td>Maximum control, reusable, protocol-standard</td>
+    <td>You own the ops; stateless by default</td>
+    <td>✅ Right for multi-team shared access</td>
+    </tr>
+    <tr>
+    <td>LangGraph</td>
+    <td>Stateful, graph-based agents; built on LangChain (already a
+    dep)</td>
+    <td>Adds complexity; opinionated</td>
+    <td>✅ Right next step for multi-step agent tasks</td>
+    </tr>
+    <tr>
+    <td>Azure AI Foundry Agents</td>
+    <td>Managed, Azure-native; built-in persistence</td>
+    <td>Vendor lock-in; cost; less flexibility</td>
+    <td>⚠️ Evaluate in 6 months</td>
+    </tr>
+    <tr>
+    <td>OpenAI Assistants</td>
+    <td>Mature API, good tooling; threads &amp; runs</td>
+    <td>No Ollama fallback; OpenAI-only</td>
+    <td>⚠️ If committing to OpenAI</td>
+    </tr>
+    <tr>
+    <td>GitHub Copilot Workspace</td>
+    <td>Excellent for code-centric tasks</td>
+    <td>Not designed for domain data query</td>
+    <td>❌ Wrong tool for call center RAG</td>
+    </tr>
+    </tbody>
+    </table></li>
+    <li><p><strong>The MCP advantage</strong> — MCP is an interface
+    standard, not an implementation. Whichever orchestration layer wins
+    in 12 months, the three tools defined in <code>mcp/tools.py</code>
+    remain the stable API surface. The investment is durable in a way
+    that rewriting to a specific framework’s native tool format is
+    not.</p></li>
+    <li><p><strong>Criteria for the consolidation decision</strong> — a
+    decision matrix for Northgate Federal Credit Union (and any similar
+    organization):</p>
+    <ul>
+    <li>Team size and AI expertise (small team → managed &gt;
+    self-hosted)</li>
+    <li>Data sensitivity (PII, regulated data → local Ollama or private
+    cloud &gt; external API)</li>
+    <li>Vendor contracts already in place (Azure EA → Azure AI Foundry
+    becomes cheaper at the margin)</li>
+    <li>Time-to-market pressure (six weeks to demo → build on existing
+    MCP &gt; rewrite to new framework)</li>
+    <li>Consolidation timeline (&lt; 6 months → don’t optimize for the
+    future state; &gt; 12 months → design for it)</li>
+    </ul></li>
+    <li><p><strong>Our recommendation for Northgate Federal</strong></p>
+    <ul>
+    <li><em>Stay on MCP + add LangGraph for multi-step agent tasks</em>
+    — the existing tools become nodes in a LangGraph workflow; no
+    rewrite required</li>
+    <li><em>Evaluate Azure AI Foundry in 6 months</em> after the
+    provider consolidation decision is final; don’t pre-optimize</li>
+    <li><em>Revisit CSAT integration</em> once the 3rd-party provider
+    transition unblocks; a SQL-backed approach (not in-memory JSON) is
+    the right upgrade</li>
+    <li><em>Add the S3 ingestion path</em> once the data pipeline is
+    productionized; the stub in <code>pipeline.py</code> is ready to
+    fill in</li>
+    </ul></li>
+    <li><p><strong>The eleven-post arc, complete</strong></p>
+    <table>
+    <colgroup>
+    <col style="width: 33%" />
+    <col style="width: 33%" />
+    <col style="width: 33%" />
+    </colgroup>
+    <thead>
+    <tr>
+    <th>Post</th>
+    <th>What we built</th>
+    <th>What we learned</th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr>
+    <td>01</td>
+    <td>Architecture and diagrams</td>
+    <td>The value of a clear system context before writing code</td>
+    </tr>
+    <tr>
+    <td>02</td>
+    <td>RAG pipeline + pgvector</td>
+    <td>Embeddings are powerful; dimensions matter; no free dedup</td>
+    </tr>
+    <tr>
+    <td>03</td>
+    <td>MCP server and tools</td>
+    <td>Protocols beat APIs for multi-team AI platforms</td>
+    </tr>
+    <tr>
+    <td>04</td>
+    <td>Ollama provider swap</td>
+    <td>Env-var abstraction is worth the upfront design cost</td>
+    </tr>
+    <tr>
+    <td>05</td>
+    <td>S3 ingestion + MinIO</td>
+    <td>Object storage ingestion is worth completing before you go to
+    production</td>
+    </tr>
+    <tr>
+    <td>06</td>
+    <td>Terraform / Azure / Entra</td>
+    <td>Auth at the infra layer beats auth in the app</td>
+    </tr>
+    <tr>
+    <td>07</td>
+    <td>REST API + JetBrains toolkit</td>
+    <td>The right IDE makes the whole stack more debuggable</td>
+    </tr>
+    <tr>
+    <td>08</td>
+    <td>Observability design</td>
+    <td>What to measure matters more than how to measure it</td>
+    </tr>
+    <tr>
+    <td>09</td>
+    <td>OTel + Grafana</td>
+    <td>Instrumentation is cheap; the hard part is defining good
+    thresholds</td>
+    </tr>
+    <tr>
+    <td>10</td>
+    <td>Validation + drift detection</td>
+    <td>RAG systems need ongoing validation, not just initial
+    testing</td>
+    </tr>
+    <tr>
+    <td>11</td>
+    <td>Landscape comparison</td>
+    <td>MCP-first ages well; the interface standard outlives the
+    implementation</td>
+    </tr>
+    </tbody>
+    </table></li>
+    <li><p><strong>What to read next</strong> — links to: LangGraph
+    documentation, MCP spec, Ragas (RAG evaluation), Azure AI Foundry
+    overview, OpenTelemetry Python SDK</p></li>
     </ol>
     <hr />
     <h2 id="code-changes-for-this-post">Code Changes for This Post</h2>
-    <ul>
-    <li>Add OTel SDK to <code>pyproject.toml</code> dependencies</li>
-    <li>Add OTel initialization module (e.g.,
-    <code>rag/telemetry.py</code>)</li>
-    <li>Instrument <code>mcp/tools.py</code>,
-    <code>rag/pipeline.py</code>, <code>rag/embeddings.py</code></li>
-    <li>Extend <code>docker-compose.yml</code> with otel-collector,
-    prometheus, grafana services</li>
-    <li>Add <code>infra/otel/collector-config.yaml</code>,
-    <code>infra/prometheus/prometheus.yml</code></li>
-    <li>Add <code>infra/grafana/dashboards/anchoring-ai.json</code>
-    (provisioned dashboard)</li>
-    </ul>
+    <p>None — this is a retrospective and forward-looking design post.
+    No new code added.</p>
     <hr />
     <h2 id="outstanding-questions-tbd">Outstanding Questions / TBD</h2>
     <ul>
-    <li>Use <code>opentelemetry-instrumentation-langchain</code> for
-    automatic LangChain spans vs. manual instrumentation?</li>
-    <li>Include Grafana alerting rule configuration?</li>
-    <li>Show how to export the OTel data to a cloud provider (Honeycomb,
-    Datadog, etc.) instead of local Prometheus?</li>
+    <li>Include a live demo of adding a LangGraph workflow on top of the
+    existing MCP tools?</li>
+    <li>Compare response quality: single RAG query vs. LangGraph
+    multi-step agent on the same question?</li>
+    <li>Discuss Claude Code specifically as a GitAgent-style tool and
+    how it was used to build this very codebase?</li>
     </ul>
   </div>
 </article>
 
 <nav class="post-nav">
-    <a class="nav-prev" href="../06-what-should-we-measure/">&#8592; What
-Should We Measure?</a>
+    <a class="nav-prev" href="../10-trust-but-verify/">&#8592; Trust,
+but Verify</a>
     <a class="nav-index" href="../">Series Index</a>
-    <a class="nav-next" href="../08-trust-but-verify/">Trust, but
-Verify &#8594;</a>
+    <span></span>
   </nav>
 
 <footer class="site-footer">

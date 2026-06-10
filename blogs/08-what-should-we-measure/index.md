@@ -3,11 +3,11 @@ title: "What Should We Measure?"
 subtitle: "Designing LLM and RAG observability before writing a line of instrumentation code"
 author: Stephen Henderson
 date: "TBD"
-post_number: "06"
-description: "Post 6 of Anchoring AI: what metrics actually matter for LLM and RAG systems, how Grafana and OpenTelemetry fit together, and how to design dashboards before you instrument anything."
-prev_url: "../05-built-to-last/"
-prev_title: "Built to Last"
-next_url: "../07-wiring-it-up/"
+post_number: "08"
+description: "Post 8 of Anchoring AI: what metrics actually matter for LLM and RAG systems, how Grafana and OpenTelemetry fit together, and how to design dashboards before you instrument anything."
+prev_url: "../07-the-developers-toolkit/"
+prev_title: "The Developer's Toolkit"
+next_url: "../09-wiring-it-up/"
 next_title: "Wiring It Up"
 ---
 

@@ -3,11 +3,11 @@ title: "Trust, but Verify"
 subtitle: "Detecting RAG degradation before your users do"
 author: Stephen Henderson
 date: "TBD"
-post_number: "08"
-description: "Post 8 of Anchoring AI: validation strategies for RAG systems — embedding drift, retrieval quality signals, CSAT as a ground-truth signal, LLM-as-judge, and SLOs for AI systems."
-prev_url: "../07-wiring-it-up/"
+post_number: "10"
+description: "Post 10 of Anchoring AI: validation strategies for RAG systems — embedding drift, retrieval quality signals, CSAT as a ground-truth signal, LLM-as-judge, and SLOs for AI systems."
+prev_url: "../09-wiring-it-up/"
 prev_title: "Wiring It Up"
-next_url: "../09-whats-next/"
+next_url: "../11-whats-next/"
 next_title: "What's Next"
 ---
 
