@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Series Overview | Anchoring AI</title>
+  <meta name="description" content="Anchoring AI is a nine-part blog
+series about building a real RAG pipeline, MCP server, and observability
+stack for a call center — from synthetic data to production
+infrastructure.">
+  <meta property="og:title" content="Series Overview">
+  <meta property="og:description" content="Anchoring AI is a nine-part
+blog series about building a real RAG pipeline, MCP server, and
+observability stack for a call center — from synthetic data to
+production infrastructure.">
+  <meta property="og:type" content="article">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Series Overview">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    /* ── Reset ─────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    /* ── Design tokens ─────────────────────────────────── */
+    :root {
+      --nav:          #0f1923;
+      --accent:       #00b4d8;
+      --accent-dark:  #0090ad;
+      --text:         #1a202c;
+      --text-muted:   #4a5568;
+      --bg:           #ffffff;
+      --code-bg:      #1e2a3a;
+      --code-text:    #e2e8f0;
+      --border:       #e2e8f0;
+      --surface:      #f8fafc;
+      --tag-bg:       #ebf8ff;
+      --tag-text:     #2b6cb0;
+      --font-ui:      -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      --font-body:    Georgia, "Times New Roman", Times, serif;
+      --font-mono:    "JetBrains Mono", "Fira Code", "Cascadia Code", "Courier New", monospace;
+      --width:        720px;
+    }
+
+    /* ── Base ──────────────────────────────────────────── */
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: var(--font-body);
+      font-size: 1.125rem;
+      line-height: 1.8;
+      color: var(--text);
+      background: var(--bg);
+    }
+
+    /* ── Top navigation bar ────────────────────────────── */
+    nav.top-nav {
+      background: var(--nav);
+      padding: 0 2rem;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .nav-inner {
+      max-width: var(--width);
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 56px;
+    }
+
+    .series-brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .series-link {
+      color: var(--accent);
+      text-decoration: none;
+      font-family: var(--font-ui);
+      font-weight: 800;
+      font-size: 1rem;
+      letter-spacing: -0.01em;
+      transition: color 0.15s;
+    }
+    .series-link:hover { color: #ffffff; }
+
+    .nav-divider {
+      color: rgba(255,255,255,0.2);
+      font-family: var(--font-ui);
+    }
+
+    .post-label {
+      color: rgba(255,255,255,0.45);
+      font-family: var(--font-ui);
+      font-size: 0.8125rem;
+    }
+
+    .nav-gh {
+      color: rgba(255,255,255,0.4);
+      text-decoration: none;
+      font-family: var(--font-ui);
+      font-size: 0.8125rem;
+      transition: color 0.15s;
+    }
+    .nav-gh:hover { color: var(--accent); }
+
+    /* ── Article container ─────────────────────────────── */
+    article {
+      max-width: var(--width);
+      margin: 0 auto;
+      padding: 3.5rem 2rem 4rem;
+    }
+
+    /* ── Post header ───────────────────────────────────── */
+    .post-header {
+      margin-bottom: 3rem;
+      padding-bottom: 2.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .series-eyebrow {
+      font-family: var(--font-ui);
+      font-size: 0.6875rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 1rem;
+    }
+
+    .post-header h1 {
+      font-family: var(--font-ui);
+      font-size: 2.75rem;
+      font-weight: 800;
+      line-height: 1.1;
+      letter-spacing: -0.03em;
+      color: var(--nav);
+      margin-bottom: 1.25rem;
+    }
+
+    .post-subtitle {
+      font-size: 1.25rem;
+      color: var(--text-muted);
+      margin-bottom: 1.25rem;
+      font-style: italic;
+    }
+
+    .byline {
+      font-family: var(--font-ui);
+      font-size: 0.875rem;
+      color: var(--text-muted);
+    }
+
+    /* ── Post body ─────────────────────────────────────── */
+    .post-body h2 {
+      font-family: var(--font-ui);
+      font-size: 1.625rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: var(--nav);
+      margin: 3rem 0 1rem;
+      padding-top: 0.5rem;
+    }
+
+    .post-body h3 {
+      font-family: var(--font-ui);
+      font-size: 1.125rem;
+      font-weight: 600;
+      color: var(--nav);
+      margin: 2rem 0 0.75rem;
+    }
+
+    .post-body h4 {
+      font-family: var(--font-ui);
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--text);
+      margin: 1.5rem 0 0.5rem;
+    }
+
+    .post-body p {
+      margin-bottom: 1.5rem;
+    }
+
+    .post-body a {
+      color: var(--accent-dark);
+      text-decoration: underline;
+      text-underline-offset: 3px;
+      transition: color 0.15s;
+    }
+    .post-body a:hover { color: var(--nav); }
+
+    /* ── Inline code ───────────────────────────────────── */
+    .post-body :not(pre) > code {
+      font-family: var(--font-mono);
+      font-size: 0.85em;
+      background: var(--tag-bg);
+      color: var(--tag-text);
+      padding: 0.1em 0.35em;
+      border-radius: 3px;
+      border: 1px solid rgba(43,108,176,0.12);
+    }
+
+    /* ── Code blocks ───────────────────────────────────── */
+    .post-body pre {
+      background: var(--code-bg);
+      border-radius: 8px;
+      padding: 1.25rem 1.5rem;
+      overflow-x: auto;
+      margin: 1.75rem 0;
+      border: 1px solid rgba(255,255,255,0.05);
+    }
+
+    .post-body pre code {
+      font-family: var(--font-mono);
+      font-size: 0.875rem;
+      background: none;
+      color: var(--code-text);
+      padding: 0;
+      border: none;
+    }
+
+    /* Pandoc syntax highlighting wrapper */
+    .post-body div.sourceCode {
+      background: var(--code-bg);
+      border-radius: 8px;
+      margin: 1.75rem 0;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.05);
+    }
+
+    .post-body div.sourceCode pre {
+      background: transparent;
+      margin: 0;
+      border: none;
+      border-radius: 0;
+      padding: 1.25rem 1.5rem;
+    }
+
+    /* ── Mermaid diagrams ──────────────────────────────── */
+    .mermaid {
+      margin: 2.25rem 0;
+      background: var(--surface);
+      border-radius: 10px;
+      padding: 2rem 1.5rem;
+      border: 1px solid var(--border);
+      overflow-x: auto;
+      text-align: center;
+    }
+
+    .mermaid svg {
+      max-width: 100%;
+    }
+
+    .diagram-label {
+      font-family: var(--font-ui);
+      font-size: 0.8125rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-align: center;
+      margin-top: -1rem;
+      margin-bottom: 2rem;
+      letter-spacing: 0.02em;
+    }
+
+    /* ── Tables ────────────────────────────────────────── */
+    .post-body table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1.75rem 0;
+      font-family: var(--font-ui);
+      font-size: 0.875rem;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+
+    .post-body th {
+      background: var(--nav);
+      color: white;
+      padding: 0.75rem 1rem;
+      text-align: left;
+      font-weight: 600;
+      font-size: 0.8125rem;
+      letter-spacing: 0.02em;
+    }
+
+    .post-body td {
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+
+    .post-body tr:last-child td { border-bottom: none; }
+    .post-body tr:nth-child(even) td { background: var(--surface); }
+
+    /* ── Blockquotes ───────────────────────────────────── */
+    .post-body blockquote {
+      border-left: 3px solid var(--accent);
+      padding: 0.5rem 0 0.5rem 1.5rem;
+      margin: 2rem 0;
+      color: var(--text-muted);
+      font-style: italic;
+    }
+
+    .post-body blockquote p { margin-bottom: 0; }
+
+    /* ── Lists ─────────────────────────────────────────── */
+    .post-body ul, .post-body ol {
+      margin: 0.75rem 0 1.5rem 1.75rem;
+    }
+
+    .post-body li {
+      margin-bottom: 0.4rem;
+    }
+
+    .post-body li > ul, .post-body li > ol {
+      margin-top: 0.4rem;
+      margin-bottom: 0.4rem;
+    }
+
+    /* ── HR ────────────────────────────────────────────── */
+    .post-body hr {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 3.5rem 0;
+    }
+
+    /* ── Strong ────────────────────────────────────────── */
+    .post-body strong { color: var(--nav); font-weight: 700; }
+
+    /* ── Post navigation ───────────────────────────────── */
+    nav.post-nav {
+      max-width: var(--width);
+      margin: 0 auto;
+      padding: 2rem;
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      gap: 1rem;
+      align-items: center;
+      border-top: 1px solid var(--border);
+    }
+
+    .nav-prev {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-family: var(--font-ui);
+      font-size: 0.875rem;
+      transition: color 0.15s;
+    }
+    .nav-prev:hover { color: var(--accent-dark); }
+
+    .nav-index {
+      color: var(--accent-dark);
+      text-decoration: none;
+      font-family: var(--font-ui);
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      text-align: center;
+      padding: 0.4rem 0.75rem;
+      border: 1px solid var(--accent-dark);
+      border-radius: 4px;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+    .nav-index:hover {
+      background: var(--accent-dark);
+      color: white;
+    }
+
+    .nav-next {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-family: var(--font-ui);
+      font-size: 0.875rem;
+      text-align: right;
+      display: block;
+      transition: color 0.15s;
+    }
+    .nav-next:hover { color: var(--accent-dark); }
+
+    /* ── Footer ────────────────────────────────────────── */
+    footer.site-footer {
+      background: var(--nav);
+      color: rgba(255,255,255,0.5);
+      padding: 2.5rem 2rem;
+      text-align: center;
+      font-family: var(--font-ui);
+      font-size: 0.875rem;
+      margin-top: 1rem;
+    }
+
+    footer.site-footer p { margin-bottom: 0.5rem; }
+    footer.site-footer strong { color: var(--accent); }
+
+    footer.site-footer a {
+      color: rgba(255,255,255,0.5);
+      text-decoration: underline;
+      transition: color 0.15s;
+    }
+    footer.site-footer a:hover { color: var(--accent); }
+
+    /* ── Responsive ────────────────────────────────────── */
+    @media (max-width: 640px) {
+      article { padding: 2rem 1.25rem 3rem; }
+      .post-header h1 { font-size: 2rem; }
+      nav.post-nav {
+        grid-template-columns: 1fr;
+        text-align: center;
+      }
+      .nav-next { text-align: center; }
+      .nav-prev { text-align: center; }
+      .post-label { display: none; }
+    }
+  </style>
+    <style>
+    html { -webkit-text-size-adjust: 100%; }
+    pre > code.sourceCode { white-space: pre; position: relative; }
+    pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+    pre > code.sourceCode > span:empty { height: 1.2em; }
+    .sourceCode { overflow: visible; }
+    code.sourceCode > span { color: inherit; text-decoration: inherit; }
+    div.sourceCode { margin: 1em 0; }
+    pre.sourceCode { margin: 0; }
+    @media screen {
+    div.sourceCode { overflow: auto; }
+    }
+    @media print {
+    pre > code.sourceCode { white-space: pre-wrap; }
+    pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+    }
+    pre.numberSource code
+      { counter-reset: source-line 0; }
+    pre.numberSource code > span
+      { position: relative; left: -4em; counter-increment: source-line; }
+    pre.numberSource code > span > a:first-child::before
+      { content: counter(source-line);
+        position: relative; left: -1em; text-align: right; vertical-align: baseline;
+        border: none; display: inline-block;
+        -webkit-touch-callout: none; -webkit-user-select: none;
+        -khtml-user-select: none; -moz-user-select: none;
+        -ms-user-select: none; user-select: none;
+        padding: 0 4px; width: 4em;
+        background-color: #232629;
+        color: #7a7c7d;
+      }
+    pre.numberSource { margin-left: 3em; border-left: 1px solid #7a7c7d;  padding-left: 4px; }
+    div.sourceCode
+      { color: #cfcfc2; background-color: #232629; }
+    @media screen {
+    pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+    }
+    code span { color: #cfcfc2; } /* Normal */
+    code span.al { color: #95da4c; background-color: #4d1f24; font-weight: bold; } /* Alert */
+    code span.an { color: #3f8058; } /* Annotation */
+    code span.at { color: #2980b9; } /* Attribute */
+    code span.bn { color: #f67400; } /* BaseN */
+    code span.bu { color: #7f8c8d; } /* BuiltIn */
+    code span.cf { color: #fdbc4b; font-weight: bold; } /* ControlFlow */
+    code span.ch { color: #3daee9; } /* Char */
+    code span.cn { color: #27aeae; font-weight: bold; } /* Constant */
+    code span.co { color: #7a7c7d; } /* Comment */
+    code span.cv { color: #7f8c8d; } /* CommentVar */
+    code span.do { color: #a43340; } /* Documentation */
+    code span.dt { color: #2980b9; } /* DataType */
+    code span.dv { color: #f67400; } /* DecVal */
+    code span.er { color: #da4453; text-decoration: underline; } /* Error */
+    code span.ex { color: #0099ff; font-weight: bold; } /* Extension */
+    code span.fl { color: #f67400; } /* Float */
+    code span.fu { color: #8e44ad; } /* Function */
+    code span.im { color: #27ae60; } /* Import */
+    code span.in { color: #c45b00; } /* Information */
+    code span.kw { color: #cfcfc2; font-weight: bold; } /* Keyword */
+    code span.op { color: #cfcfc2; } /* Operator */
+    code span.ot { color: #27ae60; } /* Other */
+    code span.pp { color: #27ae60; } /* Preprocessor */
+    code span.re { color: #2980b9; background-color: #153042; } /* RegionMarker */
+    code span.sc { color: #3daee9; } /* SpecialChar */
+    code span.ss { color: #da4453; } /* SpecialString */
+    code span.st { color: #f44f4f; } /* String */
+    code span.va { color: #27aeae; } /* Variable */
+    code span.vs { color: #da4453; } /* VerbatimString */
+    code span.wa { color: #da4453; } /* Warning */
+  </style>
+  </head>
+<body>
+
+<nav class="top-nav">
+  <div class="nav-inner">
+    <div class="series-brand">
+      <a class="series-link" href="../">Anchoring AI</a>
+          </div>
+    <a class="nav-gh" href="https://github.com/HendoCode/contact-center-ai" target="_blank" rel="noopener">GitHub ↗</a>
+  </div>
+</nav>
+
+<article>
+  <header class="post-header">
+        <div class="series-eyebrow">Anchoring AI</div>
+        <h1>Series Overview</h1>
+    <p class="post-subtitle">Nine posts on building a production RAG
+system from scratch</p>
+        <div class="byline">
+      By Stephen Henderson &middot; 2026
+    </div>
+      </header>
+
+  <div class="post-body">
+    <h2 id="what-is-anchoring-ai">What is Anchoring AI?</h2>
+    <p>This is a nine-post series about building a real AI system — not
+    a demo, not a tutorial with a toy dataset, but the kind of thing
+    you’d actually deploy for a paying client. The codebase is a
+    portfolio mirror of consulting work I did for a credit union. The
+    data is synthetic. The architecture decisions, trade-offs, and
+    lessons are real.</p>
+    <p>The series follows a <strong>build-with-me</strong> arc: each
+    post adds a layer to the system. By the end, we’ll have a RAG
+    pipeline, an MCP server, Azure infrastructure, a Grafana
+    observability stack, and a validation framework — all grounded in a
+    real use case.</p>
+    <p>The repo lives at <a
+    href="https://github.com/HendoCode/contact-center-ai">github.com/HendoCode/contact-center-ai</a>.</p>
+    <hr />
+    <h2 id="the-posts">The Posts</h2>
+    <table>
+    <colgroup>
+    <col style="width: 33%" />
+    <col style="width: 33%" />
+    <col style="width: 33%" />
+    </colgroup>
+    <thead>
+    <tr>
+    <th>#</th>
+    <th>Title</th>
+    <th>What it covers</th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr>
+    <td><a href="./01-the-blueprint/">01</a></td>
+    <td><strong>The Blueprint</strong></td>
+    <td>Series intro, C4 architecture diagrams, MCP query and ingest
+    sequence diagrams</td>
+    </tr>
+    <tr>
+    <td><a href="./02-from-text-to-vectors/">02</a></td>
+    <td><strong>From Text to Vectors</strong></td>
+    <td>Synthetic data generation, the RAG pipeline, pgvector, LangChain
+    embeddings</td>
+    </tr>
+    <tr>
+    <td><a href="./03-the-interface-layer/">03</a></td>
+    <td><strong>The Interface Layer</strong></td>
+    <td>MCP server internals, the 3 tools, routing logic, connecting
+    Claude Desktop</td>
+    </tr>
+    <tr>
+    <td><a href="./04-run-anywhere/">04</a></td>
+    <td><strong>Run Anywhere</strong></td>
+    <td>Provider agnosticism — swap OpenAI for Ollama with one env var;
+    cost and privacy trade-offs</td>
+    </tr>
+    <tr>
+    <td><a href="./05-built-to-last/">05</a></td>
+    <td><strong>Built to Last</strong></td>
+    <td>Terraform/OpenTofu on Azure, App Service, PostgreSQL Flexible,
+    Entra Easy Auth pattern</td>
+    </tr>
+    <tr>
+    <td><a href="./06-what-should-we-measure/">06</a></td>
+    <td><strong>What Should We Measure?</strong></td>
+    <td>LLM and RAG-specific metrics, Grafana + OpenTelemetry landscape,
+    dashboard design</td>
+    </tr>
+    <tr>
+    <td><a href="./07-wiring-it-up/">07</a></td>
+    <td><strong>Wiring It Up</strong></td>
+    <td>OpenTelemetry instrumentation, docker-compose additions, live
+    Grafana dashboards</td>
+    </tr>
+    <tr>
+    <td><a href="./08-trust-but-verify/">08</a></td>
+    <td><strong>Trust, but Verify</strong></td>
+    <td>Validation strategies, drift detection, CSAT as a ground-truth
+    signal, SLOs for AI systems</td>
+    </tr>
+    <tr>
+    <td><a href="./09-whats-next/">09</a></td>
+    <td><strong>What’s Next</strong></td>
+    <td>GitAgent, LangGraph, Azure AI Foundry — comparing what we built
+    with the emerging landscape</td>
+    </tr>
+    </tbody>
+    </table>
+    <hr />
+    <h2 id="how-to-build-the-html">How to Build the HTML</h2>
+    <p>The posts are authored in Markdown and compiled to standalone
+    HTML with <a href="https://pandoc.org">pandoc</a>.</p>
+    <div class="sourceCode" id="cb1"><pre
+    class="sourceCode bash"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="ex">brew</span> install pandoc          <span class="co"># one-time setup</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="ex">./blogs/build.sh</span>             <span class="co"># build all posts</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="ex">./blogs/build.sh</span> 01          <span class="co"># build a specific post</span></span></code></pre></div>
+    <p>Output files are <code>index.html</code> alongside each
+    <code>index.md</code>.</p>
+  </div>
+</article>
+
+<nav class="post-nav">
+    <span></span>
+    <a class="nav-index" href="../">Series Index</a>
+    <span></span>
+  </nav>
+
+<footer class="site-footer">
+  <p>Part of the <strong>Anchoring AI</strong> series by Stephen Henderson</p>
+  <p><a href="https://github.com/HendoCode/contact-center-ai" target="_blank" rel="noopener">View the code on GitHub</a></p>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    // Pandoc emits mermaid blocks as <pre><code class="language-mermaid">.
+    // Mermaid.js needs <div class="mermaid">. Convert before initialising.
+    document.querySelectorAll('pre code.language-mermaid').forEach(function (el) {
+      var div = document.createElement('div');
+      div.className = 'mermaid';
+      div.textContent = el.textContent;
+      el.parentNode.parentNode.replaceChild(div, el.parentNode);
+    });
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'neutral',
+      securityLevel: 'loose',
+      fontFamily: 'var(--font-ui)',
+    });
+  });
+</script>
+
+</body>
+</html>
