@@ -581,7 +581,7 @@ ground up</p>
     touches.</p>
     <pre class="mermaid"><code>flowchart LR
     supervisor([&quot;Call Center Supervisor&quot;])
-    teams([&quot;Other Teams (future)&quot;])
+    teams([&quot;Other Teams&quot;])
 
     subgraph ccai [&quot;Contact Center AI&quot;]
         mcp[&quot;MCP Server&quot;]
@@ -590,10 +590,10 @@ ground up</p>
     end
 
     openai[&quot;OpenAI API&quot;]
-    ollama[&quot;Ollama - local&quot;]
+    ollama[&quot;Ollama local&quot;]
     azure[&quot;Azure App Service&quot;]
-    entra[&quot;Microsoft Entra\nEasy Auth&quot;]
-    s3[&quot;AWS S3\n(planned)&quot;]
+    entra[&quot;Microsoft Entra Easy Auth&quot;]
+    s3[&quot;AWS S3 planned&quot;]
 
     supervisor --&gt;|&quot;MCP queries&quot;| mcp
     teams --&gt;|&quot;MCP queries&quot;| mcp
@@ -617,14 +617,14 @@ ground up</p>
     supervisor([&quot;Supervisor&quot;])
 
     subgraph ccai [&quot;Contact Center AI&quot;]
-        mcpServer[&quot;MCP Server\nPython / MCP SDK 1.0\nmcp/server.py + tools.py&quot;]
-        ragPipeline[&quot;RAG Pipeline\nPython / LangChain 0.3\nrag/pipeline.py&quot;]
-        embedModule[&quot;Embeddings Module\nPython / LangChain\nrag/embeddings.py&quot;]
-        pgvector[(&quot;PostgreSQL + pgvector\n1536-dim embeddings&quot;)]
-        dataFiles[/&quot;Data Files\ntranscripts.json + csat.json&quot;/]
+        mcpServer[&quot;MCP Server&quot;]
+        ragPipeline[&quot;RAG Pipeline&quot;]
+        embedModule[&quot;Embeddings Module&quot;]
+        pgvector[(&quot;PostgreSQL + pgvector&quot;)]
+        dataFiles[/&quot;transcripts.json + csat.json&quot;/]
     end
 
-    llmProvider[&quot;LLM Provider\nOpenAI API or Ollama\nswap via LLM_PROVIDER env var&quot;]
+    llmProvider[&quot;LLM Provider — OpenAI or Ollama&quot;]
 
     supervisor --&gt;|&quot;MCP stdio / HTTPS&quot;| mcpServer
     mcpServer --&gt;|&quot;rag_query()&quot;| ragPipeline
@@ -649,24 +649,24 @@ ground up</p>
     work happens.</p>
     <pre class="mermaid"><code>flowchart LR
     subgraph server [&quot;mcp/server.py&quot;]
-        listTools[&quot;list_tools handler\nregisters 3 tool schemas&quot;]
-        callTool[&quot;call_tool handler\nroutes by tool name&quot;]
+        listTools[&quot;list_tools handler&quot;]
+        callTool[&quot;call_tool handler&quot;]
     end
 
     subgraph tools [&quot;mcp/tools.py&quot;]
-        searchTool[&quot;search_transcripts\nquery + k via rag_query()&quot;]
-        summaryTool[&quot;get_call_summary\ncall_id via retrieve + rag_query()&quot;]
-        csatTool[&quot;query_csat\nload csat.json, filter in-memory&quot;]
+        searchTool[&quot;search_transcripts&quot;]
+        summaryTool[&quot;get_call_summary&quot;]
+        csatTool[&quot;query_csat&quot;]
     end
 
-    ragPipeline[&quot;RAG Pipeline\nrag_query() + retrieve()&quot;]
+    ragPipeline[&quot;RAG Pipeline&quot;]
     dataFiles[/&quot;csat.json&quot;/]
 
-    callTool --&gt;|&quot;search_transcripts call&quot;| searchTool
-    callTool --&gt;|&quot;get_call_summary call&quot;| summaryTool
-    callTool --&gt;|&quot;query_csat call&quot;| csatTool
+    callTool --&gt;|&quot;search_transcripts&quot;| searchTool
+    callTool --&gt;|&quot;get_call_summary&quot;| summaryTool
+    callTool --&gt;|&quot;query_csat&quot;| csatTool
     searchTool --&gt;|&quot;rag_query(query, k)&quot;| ragPipeline
-    summaryTool --&gt;|&quot;retrieve() then rag_query()&quot;| ragPipeline
+    summaryTool --&gt;|&quot;retrieve then rag_query&quot;| ragPipeline
     csatTool --&gt;|&quot;bypasses RAG entirely&quot;| dataFiles</code></pre>
     <p><em>Figure 3 — The tool dispatch layer. <code>query_csat</code>
     is the outlier: it’s the only tool that doesn’t go through the
@@ -862,22 +862,16 @@ Vectors &#8594;</a>
 
 <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
 <script>
-  document.addEventListener('DOMContentLoaded', function () {
-    // Pandoc emits mermaid blocks as <pre><code class="language-mermaid">.
-    // Mermaid.js needs <div class="mermaid">. Convert before initialising.
-    document.querySelectorAll('pre code.language-mermaid').forEach(function (el) {
-      var div = document.createElement('div');
-      div.className = 'mermaid';
-      div.textContent = el.textContent;
-      el.parentNode.parentNode.replaceChild(div, el.parentNode);
-    });
-    mermaid.initialize({
-      startOnLoad: true,
-      theme: 'neutral',
-      securityLevel: 'loose',
-      fontFamily: 'var(--font-ui)',
-    });
+  // Scripts are at bottom of <body> — DOM is fully parsed, no DOMContentLoaded needed.
+  // Pandoc outputs <pre class="mermaid"><code>...</code></pre>; Mermaid needs <div class="mermaid">.
+  document.querySelectorAll('pre.mermaid').forEach(function (el) {
+    var div = document.createElement('div');
+    div.className = 'mermaid';
+    div.textContent = el.textContent;
+    el.parentNode.replaceChild(div, el);
   });
+  mermaid.initialize({ startOnLoad: false, theme: 'neutral', securityLevel: 'loose' });
+  mermaid.run();
 </script>
 
 </body>

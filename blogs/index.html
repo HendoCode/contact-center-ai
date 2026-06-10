@@ -626,22 +626,16 @@ system from scratch</p>
 
 <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
 <script>
-  document.addEventListener('DOMContentLoaded', function () {
-    // Pandoc emits mermaid blocks as <pre><code class="language-mermaid">.
-    // Mermaid.js needs <div class="mermaid">. Convert before initialising.
-    document.querySelectorAll('pre code.language-mermaid').forEach(function (el) {
-      var div = document.createElement('div');
-      div.className = 'mermaid';
-      div.textContent = el.textContent;
-      el.parentNode.parentNode.replaceChild(div, el.parentNode);
-    });
-    mermaid.initialize({
-      startOnLoad: true,
-      theme: 'neutral',
-      securityLevel: 'loose',
-      fontFamily: 'var(--font-ui)',
-    });
+  // Scripts are at bottom of <body> — DOM is fully parsed, no DOMContentLoaded needed.
+  // Pandoc outputs <pre class="mermaid"><code>...</code></pre>; Mermaid needs <div class="mermaid">.
+  document.querySelectorAll('pre.mermaid').forEach(function (el) {
+    var div = document.createElement('div');
+    div.className = 'mermaid';
+    div.textContent = el.textContent;
+    el.parentNode.replaceChild(div, el);
   });
+  mermaid.initialize({ startOnLoad: false, theme: 'neutral', securityLevel: 'loose' });
+  mermaid.run();
 </script>
 
 </body>
