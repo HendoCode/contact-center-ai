@@ -1,611 +1,689 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>From Text to Vectors | Anchoring AI — HendoCode</title>
-  <meta name="description" content="Post 2 of Anchoring AI: how 150
-synthetic call transcripts go from a Python script to searchable
-embeddings in PostgreSQL, and what LangChain is actually doing along the
-way.">
-  <meta property="og:title" content="From Text to Vectors">
-  <meta property="og:description" content="Post 2 of Anchoring AI: how
-150 synthetic call transcripts go from a Python script to searchable
-embeddings in PostgreSQL, and what LangChain is actually doing along the
-way.">
-  <meta property="og:type" content="article">
-  <meta name="twitter:card" content="summary">
-  <meta name="twitter:title" content="From Text to Vectors">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Josefin+Sans:wght@300;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <style>
-    /* ── HendoCode brand palette (from logo explorations tile 12) ── */
-    :root {
-      --slate:       #2E4A5F;
-      --slate-d:     #1e3245;
-      --slate-l:     #3d5f78;
-      --slate-ll:    #4a7090;
-      --cream:       #F0EDCF;
-      --amber:       #E8A44A;
-      --amber-d:     #c4852a;
-      --amber-l:     #f0bb72;
-      --muted:       #7FA8C0;
-      --bg-warm:     #f5f2ea;
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-7GZJFLG07M"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
 
-      /* semantic roles */
-      --nav:         var(--slate);
-      --accent:      var(--amber);
-      --accent-dark: var(--amber-d);
-      --text:        var(--slate-d);
-      --text-muted:  var(--slate-ll);
-      --bg:          #ffffff;
-      --code-bg:     var(--slate-d);
-      --code-text:   var(--cream);
-      --border:      #ddd9cc;
-      --surface:     #f8f6f0;
-      --tag-bg:      #fef7e8;
-      --tag-text:    var(--amber-d);
+        function gtag() {
+            dataLayer.push(arguments);
+        }
 
-      --font-brand:  'Josefin Sans', sans-serif;
-      --font-ui:     'Josefin Sans', sans-serif;
-      --font-body:   Georgia, 'Times New Roman', Times, serif;
-      --font-mono:   'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Courier New', monospace;
-      --width:       720px;
-    }
+        gtag('js', new Date());
 
-    /* ── Reset ── */
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    html { scroll-behavior: smooth; }
-
-    body {
-      font-family: var(--font-body);
-      font-size: 1.125rem;
-      line-height: 1.8;
-      color: var(--text);
-      background: var(--bg);
-    }
-
-    /* ── Top navigation bar ── */
-    nav.top-nav {
-      background: var(--nav);
-      padding: 0 2rem;
-      position: sticky;
-      top: 0;
-      z-index: 100;
-      border-bottom: 1px solid rgba(255,255,255,0.06);
-    }
-
-    .nav-inner {
-      max-width: var(--width);
-      margin: 0 auto;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      height: 56px;
-    }
-
-    .nav-brand {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      text-decoration: none;
-    }
-
-    /* Tile-12 hairline/bold treatment at nav scale */
-    .brand-hendo {
-      font-family: var(--font-brand);
-      font-weight: 300;
-      font-size: 1.1rem;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      color: var(--cream);
-      line-height: 1;
-    }
-
-    .brand-code {
-      font-family: var(--font-brand);
-      font-weight: 700;
-      font-size: 1.1rem;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-      color: var(--accent);
-      line-height: 1;
-    }
-
-    .nav-divider {
-      color: rgba(255,255,255,0.2);
-      font-family: var(--font-brand);
-      font-weight: 300;
-      font-size: 0.9rem;
-    }
-
-    .nav-series {
-      font-family: var(--font-brand);
-      font-weight: 300;
-      font-size: 0.75rem;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      color: var(--muted);
-    }
-
-    .post-label {
-      font-family: var(--font-brand);
-      font-weight: 300;
-      font-size: 0.75rem;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      color: rgba(255,255,255,0.3);
-    }
-
-    .nav-gh {
-      color: rgba(255,255,255,0.35);
-      text-decoration: none;
-      font-family: var(--font-brand);
-      font-weight: 300;
-      font-size: 0.75rem;
-      letter-spacing: 0.06em;
-      transition: color 0.15s;
-    }
-    .nav-gh:hover { color: var(--accent); }
-
-    /* ── Article container ── */
-    article {
-      max-width: var(--width);
-      margin: 0 auto;
-      padding: 3.5rem 2rem 4rem;
-    }
-
-    /* ── Post header ── */
-    .post-header {
-      margin-bottom: 3rem;
-      padding-bottom: 2.5rem;
-      border-bottom: 1px solid var(--border);
-    }
-
-    .series-eyebrow {
-      font-family: var(--font-brand);
-      font-weight: 300;
-      font-size: 0.6875rem;
-      letter-spacing: 0.18em;
-      text-transform: uppercase;
-      color: var(--accent);
-      margin-bottom: 1rem;
-    }
-
-    .post-header h1 {
-      font-family: var(--font-brand);
-      font-weight: 700;
-      font-size: 2.75rem;
-      line-height: 1.05;
-      letter-spacing: 0.01em;
-      text-transform: uppercase;
-      color: var(--slate);
-      margin-bottom: 0.75rem;
-    }
-
-    .post-subtitle {
-      font-family: var(--font-body);
-      font-size: 1.2rem;
-      color: var(--text-muted);
-      font-style: italic;
-      margin-bottom: 1.25rem;
-    }
-
-    .byline {
-      font-family: var(--font-brand);
-      font-weight: 300;
-      font-size: 0.8rem;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--text-muted);
-    }
-
-    /* ── Amber rule under eyebrow ── */
-    .post-header::after {
-      content: '';
-      display: block;
-      width: 48px;
-      height: 2px;
-      background: var(--accent);
-      border-radius: 1px;
-      margin-top: 2.5rem;
-    }
-
-    /* ── Body content ── */
-    .post-body h2 {
-      font-family: var(--font-brand);
-      font-weight: 700;
-      font-size: 1.125rem;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      color: var(--slate);
-      margin: 3rem 0 1rem;
-      padding-top: 0.25rem;
-    }
-
-    .post-body h3 {
-      font-family: var(--font-brand);
-      font-weight: 700;
-      font-size: 0.875rem;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      color: var(--slate-l);
-      margin: 2rem 0 0.75rem;
-    }
-
-    .post-body h4 {
-      font-family: var(--font-brand);
-      font-weight: 700;
-      font-size: 0.8rem;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--text-muted);
-      margin: 1.5rem 0 0.5rem;
-    }
-
-    .post-body p { margin-bottom: 1.5rem; }
-
-    .post-body a {
-      color: var(--amber-d);
-      text-decoration: underline;
-      text-underline-offset: 3px;
-      transition: color 0.15s;
-    }
-    .post-body a:hover { color: var(--slate); }
-
-    /* ── Inline code ── */
-    .post-body :not(pre) > code {
-      font-family: var(--font-mono);
-      font-size: 0.85em;
-      background: var(--tag-bg);
-      color: var(--tag-text);
-      padding: 0.1em 0.35em;
-      border-radius: 3px;
-      border: 1px solid rgba(196,133,42,0.15);
-    }
-
-    /* ── Code blocks ── */
-    .post-body pre {
-      background: var(--code-bg);
-      border-radius: 8px;
-      padding: 1.25rem 1.5rem;
-      overflow-x: auto;
-      margin: 1.75rem 0;
-      border: 1px solid rgba(255,255,255,0.04);
-    }
-
-    .post-body pre code {
-      font-family: var(--font-mono);
-      font-size: 0.875rem;
-      background: none;
-      color: var(--cream);
-      padding: 0;
-      border: none;
-    }
-
-    .post-body div.sourceCode {
-      background: var(--code-bg);
-      border-radius: 8px;
-      margin: 1.75rem 0;
-      overflow: hidden;
-      border: 1px solid rgba(255,255,255,0.04);
-    }
-
-    .post-body div.sourceCode pre {
-      background: transparent;
-      margin: 0;
-      border: none;
-      border-radius: 0;
-      padding: 1.25rem 1.5rem;
-    }
-
-    /* ── Mermaid diagrams ── */
-    .mermaid {
-      margin: 2.25rem 0;
-      background: var(--surface);
-      border-radius: 8px;
-      padding: 2rem 1.5rem;
-      border: 1px solid var(--border);
-      overflow-x: auto;
-      text-align: center;
-    }
-
-    .mermaid svg { max-width: 100%; }
-
-    /* ── Tables ── */
-    .post-body table {
-      width: 100%;
-      border-collapse: collapse;
-      margin: 1.75rem 0;
-      font-family: var(--font-brand);
-      font-weight: 300;
-      font-size: 0.875rem;
-      border-radius: 8px;
-      overflow: hidden;
-      border: 1px solid var(--border);
-    }
-
-    .post-body th {
-      background: var(--slate);
-      color: var(--cream);
-      padding: 0.75rem 1rem;
-      text-align: left;
-      font-weight: 700;
-      font-size: 0.75rem;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-    }
-
-    .post-body td {
-      padding: 0.75rem 1rem;
-      border-bottom: 1px solid var(--border);
-      vertical-align: top;
-      font-family: var(--font-body);
-      font-size: 0.95rem;
-    }
-
-    .post-body tr:last-child td { border-bottom: none; }
-    .post-body tr:nth-child(even) td { background: var(--surface); }
-
-    /* ── Blockquotes ── */
-    .post-body blockquote {
-      border-left: 3px solid var(--accent);
-      padding: 0.5rem 0 0.5rem 1.5rem;
-      margin: 2rem 0;
-      color: var(--text-muted);
-      font-style: italic;
-    }
-    .post-body blockquote p { margin-bottom: 0; }
-
-    /* ── Lists ── */
-    .post-body ul, .post-body ol {
-      margin: 0.75rem 0 1.5rem 1.75rem;
-    }
-    .post-body li { margin-bottom: 0.4rem; }
-    .post-body li > ul, .post-body li > ol {
-      margin-top: 0.4rem;
-      margin-bottom: 0.4rem;
-    }
-
-    /* ── HR ── */
-    .post-body hr {
-      border: none;
-      border-top: 1px solid var(--border);
-      margin: 3.5rem 0;
-    }
-
-    /* ── Strong ── */
-    .post-body strong { color: var(--slate); font-weight: 700; }
-
-    /* ── Post navigation ── */
-    nav.post-nav {
-      max-width: var(--width);
-      margin: 0 auto;
-      padding: 2rem;
-      display: grid;
-      grid-template-columns: 1fr auto 1fr;
-      gap: 1rem;
-      align-items: center;
-      border-top: 1px solid var(--border);
-    }
-
-    .nav-prev {
-      color: var(--text-muted);
-      text-decoration: none;
-      font-family: var(--font-brand);
-      font-weight: 300;
-      font-size: 0.8rem;
-      letter-spacing: 0.05em;
-      text-transform: uppercase;
-      transition: color 0.15s;
-    }
-    .nav-prev:hover { color: var(--accent-dark); }
-
-    .nav-index {
-      color: var(--slate);
-      text-decoration: none;
-      font-family: var(--font-brand);
-      font-weight: 700;
-      font-size: 0.7rem;
-      text-transform: uppercase;
-      letter-spacing: 0.12em;
-      text-align: center;
-      padding: 0.4rem 0.9rem;
-      border: 1px solid var(--slate);
-      border-radius: 3px;
-      transition: all 0.15s;
-      white-space: nowrap;
-    }
-    .nav-index:hover {
-      background: var(--slate);
-      color: var(--cream);
-    }
-
-    .nav-next {
-      color: var(--text-muted);
-      text-decoration: none;
-      font-family: var(--font-brand);
-      font-weight: 300;
-      font-size: 0.8rem;
-      letter-spacing: 0.05em;
-      text-transform: uppercase;
-      text-align: right;
-      display: block;
-      transition: color 0.15s;
-    }
-    .nav-next:hover { color: var(--accent-dark); }
-
-    /* ── Footer ── */
-    footer.site-footer {
-      background: var(--slate);
-      color: rgba(255,255,255,0.4);
-      padding: 2.5rem 2rem;
-      text-align: center;
-      font-family: var(--font-brand);
-      font-weight: 300;
-      font-size: 0.8rem;
-      letter-spacing: 0.06em;
-      margin-top: 1rem;
-    }
-
-    footer.site-footer p { margin-bottom: 0.5rem; }
-
-    footer.site-footer .footer-brand { margin-bottom: 1rem; }
-    footer.site-footer .footer-brand .brand-hendo {
-      font-size: 1.4rem;
-      letter-spacing: 0.12em;
-    }
-    footer.site-footer .footer-brand .brand-code {
-      font-size: 1.4rem;
-      letter-spacing: 0.06em;
-    }
-
-    footer.site-footer a {
-      color: rgba(255,255,255,0.4);
-      text-decoration: underline;
-      transition: color 0.15s;
-    }
-    footer.site-footer a:hover { color: var(--accent); }
-
-    /* ── Responsive ── */
-    @media (max-width: 640px) {
-      article { padding: 2rem 1.25rem 3rem; }
-      .post-header h1 { font-size: 2rem; }
-      nav.post-nav {
-        grid-template-columns: 1fr;
-        text-align: center;
-      }
-      .nav-next { text-align: center; }
-      .nav-prev { text-align: center; }
-      .post-label { display: none; }
-    }
-  </style>
+        gtag('config', 'G-7GZJFLG07M');
+    </script>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>From Text to Vectors | Anchoring AI — HendoCode</title>
+    <meta name="description"
+          content="Post 2 of Anchoring AI: how 150 synthetic call
+transcripts go from a Python script to searchable embeddings in
+PostgreSQL, and what LangChain is actually doing along the way.">
+    <meta property="og:title" content="From Text to Vectors">
+    <meta property="og:description"
+          content="Post 2 of Anchoring AI: how 150 synthetic call
+transcripts go from a Python script to searchable embeddings in
+PostgreSQL, and what LangChain is actually doing along the way.">
+    <meta property="og:type" content="article">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="From Text to Vectors">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Josefin+Sans:wght@300;700&family=JetBrains+Mono:wght@400;500&display=swap"
+          rel="stylesheet">
     <style>
-    html { -webkit-text-size-adjust: 100%; }
-    pre > code.sourceCode { white-space: pre; position: relative; }
-    pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
-    pre > code.sourceCode > span:empty { height: 1.2em; }
-    .sourceCode { overflow: visible; }
-    code.sourceCode > span { color: inherit; text-decoration: inherit; }
-    div.sourceCode { margin: 1em 0; }
-    pre.sourceCode { margin: 0; }
-    @media screen {
-    div.sourceCode { overflow: auto; }
-    }
-    @media print {
-    pre > code.sourceCode { white-space: pre-wrap; }
-    pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
-    }
-    pre.numberSource code
-      { counter-reset: source-line 0; }
-    pre.numberSource code > span
-      { position: relative; left: -4em; counter-increment: source-line; }
-    pre.numberSource code > span > a:first-child::before
-      { content: counter(source-line);
-        position: relative; left: -1em; text-align: right; vertical-align: baseline;
-        border: none; display: inline-block;
-        -webkit-touch-callout: none; -webkit-user-select: none;
-        -khtml-user-select: none; -moz-user-select: none;
-        -ms-user-select: none; user-select: none;
-        padding: 0 4px; width: 4em;
-        background-color: #232629;
-        color: #7a7c7d;
-      }
-    pre.numberSource { margin-left: 3em; border-left: 1px solid #7a7c7d;  padding-left: 4px; }
-    div.sourceCode
-      { color: #cfcfc2; background-color: #232629; }
-    @media screen {
-    pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
-    }
-    code span { color: #cfcfc2; } /* Normal */
-    code span.al { color: #95da4c; background-color: #4d1f24; font-weight: bold; } /* Alert */
-    code span.an { color: #3f8058; } /* Annotation */
-    code span.at { color: #2980b9; } /* Attribute */
-    code span.bn { color: #f67400; } /* BaseN */
-    code span.bu { color: #7f8c8d; } /* BuiltIn */
-    code span.cf { color: #fdbc4b; font-weight: bold; } /* ControlFlow */
-    code span.ch { color: #3daee9; } /* Char */
-    code span.cn { color: #27aeae; font-weight: bold; } /* Constant */
-    code span.co { color: #7a7c7d; } /* Comment */
-    code span.cv { color: #7f8c8d; } /* CommentVar */
-    code span.do { color: #a43340; } /* Documentation */
-    code span.dt { color: #2980b9; } /* DataType */
-    code span.dv { color: #f67400; } /* DecVal */
-    code span.er { color: #da4453; text-decoration: underline; } /* Error */
-    code span.ex { color: #0099ff; font-weight: bold; } /* Extension */
-    code span.fl { color: #f67400; } /* Float */
-    code span.fu { color: #8e44ad; } /* Function */
-    code span.im { color: #27ae60; } /* Import */
-    code span.in { color: #c45b00; } /* Information */
-    code span.kw { color: #cfcfc2; font-weight: bold; } /* Keyword */
-    code span.op { color: #cfcfc2; } /* Operator */
-    code span.ot { color: #27ae60; } /* Other */
-    code span.pp { color: #27ae60; } /* Preprocessor */
-    code span.re { color: #2980b9; background-color: #153042; } /* RegionMarker */
-    code span.sc { color: #3daee9; } /* SpecialChar */
-    code span.ss { color: #da4453; } /* SpecialString */
-    code span.st { color: #f44f4f; } /* String */
-    code span.va { color: #27aeae; } /* Variable */
-    code span.vs { color: #da4453; } /* VerbatimString */
-    code span.wa { color: #da4453; } /* Warning */
-  </style>
-  </head>
+        /* ── HendoCode brand palette (from logo explorations tile 12) ── */
+        :root {
+            --slate: #2E4A5F;
+            --slate-d: #1e3245;
+            --slate-l: #3d5f78;
+            --slate-ll: #4a7090;
+            --cream: #F0EDCF;
+            --amber: #E8A44A;
+            --amber-d: #c4852a;
+            --amber-l: #f0bb72;
+            --muted: #7FA8C0;
+            --bg-warm: #f5f2ea;
+
+            /* semantic roles */
+            --nav: var(--slate);
+            --accent: var(--amber);
+            --accent-dark: var(--amber-d);
+            --text: var(--slate-d);
+            --text-muted: var(--slate-ll);
+            --bg: #ffffff;
+            --code-bg: var(--slate-d);
+            --code-text: var(--cream);
+            --border: #ddd9cc;
+            --surface: #f8f6f0;
+            --tag-bg: #fef7e8;
+            --tag-text: var(--amber-d);
+
+            --font-brand: 'Josefin Sans', sans-serif;
+            --font-ui: 'Josefin Sans', sans-serif;
+            --font-body: Georgia, 'Times New Roman', Times, serif;
+            --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Courier New', monospace;
+            --width: 720px;
+        }
+
+        /* ── Reset ── */
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: var(--font-body);
+            font-size: 1.125rem;
+            line-height: 1.8;
+            color: var(--text);
+            background: var(--bg);
+        }
+
+        /* ── Top navigation bar ── */
+        nav.top-nav {
+            background: var(--nav);
+            padding: 0 2rem;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .nav-inner {
+            max-width: var(--width);
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 56px;
+        }
+
+        .nav-brand {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            text-decoration: none;
+        }
+
+        /* Tile-12 hairline/bold treatment at nav scale */
+        .brand-hendo {
+            font-family: var(--font-brand);
+            font-weight: 300;
+            font-size: 1.1rem;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--cream);
+            line-height: 1;
+        }
+
+        .brand-code {
+            font-family: var(--font-brand);
+            font-weight: 700;
+            font-size: 1.1rem;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: var(--accent);
+            line-height: 1;
+        }
+
+        .nav-divider {
+            color: rgba(255, 255, 255, 0.2);
+            font-family: var(--font-brand);
+            font-weight: 300;
+            font-size: 0.9rem;
+        }
+
+        .nav-series {
+            font-family: var(--font-brand);
+            font-weight: 300;
+            font-size: 0.75rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--muted);
+        }
+
+        .post-label {
+            font-family: var(--font-brand);
+            font-weight: 300;
+            font-size: 0.75rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: rgba(255, 255, 255, 0.3);
+        }
+
+        .nav-gh {
+            color: rgba(255, 255, 255, 0.35);
+            text-decoration: none;
+            font-family: var(--font-brand);
+            font-weight: 300;
+            font-size: 0.75rem;
+            letter-spacing: 0.06em;
+            transition: color 0.15s;
+        }
+
+        .nav-gh:hover {
+            color: var(--accent);
+        }
+
+        /* ── Article container ── */
+        article {
+            max-width: var(--width);
+            margin: 0 auto;
+            padding: 3.5rem 2rem 4rem;
+        }
+
+        /* ── Post header ── */
+        .post-header {
+            margin-bottom: 3rem;
+            padding-bottom: 2.5rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .series-eyebrow {
+            font-family: var(--font-brand);
+            font-weight: 300;
+            font-size: 0.6875rem;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            color: var(--accent);
+            margin-bottom: 1rem;
+        }
+
+        .post-header h1 {
+            font-family: var(--font-brand);
+            font-weight: 700;
+            font-size: 2.75rem;
+            line-height: 1.05;
+            letter-spacing: 0.01em;
+            text-transform: uppercase;
+            color: var(--slate);
+            margin-bottom: 0.75rem;
+        }
+
+        .post-subtitle {
+            font-family: var(--font-body);
+            font-size: 1.2rem;
+            color: var(--text-muted);
+            font-style: italic;
+            margin-bottom: 1.25rem;
+        }
+
+        .byline {
+            font-family: var(--font-brand);
+            font-weight: 300;
+            font-size: 0.8rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--text-muted);
+        }
+
+        /* ── Amber rule under eyebrow ── */
+        .post-header::after {
+            content: '';
+            display: block;
+            width: 48px;
+            height: 2px;
+            background: var(--accent);
+            border-radius: 1px;
+            margin-top: 2.5rem;
+        }
+
+        /* ── Body content ── */
+        .post-body h2 {
+            font-family: var(--font-brand);
+            font-weight: 700;
+            font-size: 1.125rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--slate);
+            margin: 3rem 0 1rem;
+            padding-top: 0.25rem;
+        }
+
+        .post-body h3 {
+            font-family: var(--font-brand);
+            font-weight: 700;
+            font-size: 0.875rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--slate-l);
+            margin: 2rem 0 0.75rem;
+        }
+
+        .post-body h4 {
+            font-family: var(--font-brand);
+            font-weight: 700;
+            font-size: 0.8rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            margin: 1.5rem 0 0.5rem;
+        }
+
+        .post-body p {
+            margin-bottom: 1.5rem;
+        }
+
+        .post-body a {
+            color: var(--amber-d);
+            text-decoration: underline;
+            text-underline-offset: 3px;
+            transition: color 0.15s;
+        }
+
+        .post-body a:hover {
+            color: var(--slate);
+        }
+
+        /* ── Inline code ── */
+        .post-body :not(pre) > code {
+            font-family: var(--font-mono);
+            font-size: 0.85em;
+            background: var(--tag-bg);
+            color: var(--tag-text);
+            padding: 0.1em 0.35em;
+            border-radius: 3px;
+            border: 1px solid rgba(196, 133, 42, 0.15);
+        }
+
+        /* ── Code blocks ── */
+        .post-body pre {
+            background: var(--code-bg);
+            border-radius: 8px;
+            padding: 1.25rem 1.5rem;
+            overflow-x: auto;
+            margin: 1.75rem 0;
+            border: 1px solid rgba(255, 255, 255, 0.04);
+        }
+
+        .post-body pre code {
+            font-family: var(--font-mono);
+            font-size: 0.875rem;
+            background: none;
+            color: var(--cream);
+            padding: 0;
+            border: none;
+        }
+
+        .post-body div.sourceCode {
+            background: var(--code-bg);
+            border-radius: 8px;
+            margin: 1.75rem 0;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.04);
+        }
+
+        .post-body div.sourceCode pre {
+            background: transparent;
+            margin: 0;
+            border: none;
+            border-radius: 0;
+            padding: 1.25rem 1.5rem;
+        }
+
+        /* ── Mermaid diagrams ── */
+        .mermaid {
+            margin: 2.25rem 0;
+            background: var(--surface);
+            border-radius: 8px;
+            padding: 2rem 1.5rem;
+            border: 1px solid var(--border);
+            overflow-x: auto;
+            text-align: center;
+        }
+
+        .mermaid svg {
+            max-width: 100%;
+        }
+
+        /* ── Tables ── */
+        .post-body table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1.75rem 0;
+            font-family: var(--font-brand);
+            font-weight: 300;
+            font-size: 0.875rem;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+        }
+
+        .post-body th {
+            background: var(--slate);
+            color: var(--cream);
+            padding: 0.75rem 1rem;
+            text-align: left;
+            font-weight: 700;
+            font-size: 0.75rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .post-body td {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--border);
+            vertical-align: top;
+            font-family: var(--font-body);
+            font-size: 0.95rem;
+        }
+
+        .post-body tr:last-child td {
+            border-bottom: none;
+        }
+
+        .post-body tr:nth-child(even) td {
+            background: var(--surface);
+        }
+
+        /* ── Blockquotes ── */
+        .post-body blockquote {
+            border-left: 3px solid var(--accent);
+            padding: 0.5rem 0 0.5rem 1.5rem;
+            margin: 2rem 0;
+            color: var(--text-muted);
+            font-style: italic;
+        }
+
+        .post-body blockquote p {
+            margin-bottom: 0;
+        }
+
+        /* ── Lists ── */
+        .post-body ul, .post-body ol {
+            margin: 0.75rem 0 1.5rem 1.75rem;
+        }
+
+        .post-body li {
+            margin-bottom: 0.4rem;
+        }
+
+        .post-body li > ul, .post-body li > ol {
+            margin-top: 0.4rem;
+            margin-bottom: 0.4rem;
+        }
+
+        /* ── HR ── */
+        .post-body hr {
+            border: none;
+            border-top: 1px solid var(--border);
+            margin: 3.5rem 0;
+        }
+
+        /* ── Strong ── */
+        .post-body strong {
+            color: var(--slate);
+            font-weight: 700;
+        }
+
+        /* ── Post navigation ── */
+        nav.post-nav {
+            max-width: var(--width);
+            margin: 0 auto;
+            padding: 2rem;
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            gap: 1rem;
+            align-items: center;
+            border-top: 1px solid var(--border);
+        }
+
+        .nav-prev {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-family: var(--font-brand);
+            font-weight: 300;
+            font-size: 0.8rem;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            transition: color 0.15s;
+        }
+
+        .nav-prev:hover {
+            color: var(--accent-dark);
+        }
+
+        .nav-index {
+            color: var(--slate);
+            text-decoration: none;
+            font-family: var(--font-brand);
+            font-weight: 700;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            text-align: center;
+            padding: 0.4rem 0.9rem;
+            border: 1px solid var(--slate);
+            border-radius: 3px;
+            transition: all 0.15s;
+            white-space: nowrap;
+        }
+
+        .nav-index:hover {
+            background: var(--slate);
+            color: var(--cream);
+        }
+
+        .nav-next {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-family: var(--font-brand);
+            font-weight: 300;
+            font-size: 0.8rem;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            text-align: right;
+            display: block;
+            transition: color 0.15s;
+        }
+
+        .nav-next:hover {
+            color: var(--accent-dark);
+        }
+
+        /* ── Footer ── */
+        footer.site-footer {
+            background: var(--slate);
+            color: rgba(255, 255, 255, 0.4);
+            padding: 2.5rem 2rem;
+            text-align: center;
+            font-family: var(--font-brand);
+            font-weight: 300;
+            font-size: 0.8rem;
+            letter-spacing: 0.06em;
+            margin-top: 1rem;
+        }
+
+        footer.site-footer p {
+            margin-bottom: 0.5rem;
+        }
+
+        footer.site-footer .footer-brand {
+            margin-bottom: 1rem;
+        }
+
+        footer.site-footer .footer-brand .brand-hendo {
+            font-size: 1.4rem;
+            letter-spacing: 0.12em;
+        }
+
+        footer.site-footer .footer-brand .brand-code {
+            font-size: 1.4rem;
+            letter-spacing: 0.06em;
+        }
+
+        footer.site-footer a {
+            color: rgba(255, 255, 255, 0.4);
+            text-decoration: underline;
+            transition: color 0.15s;
+        }
+
+        footer.site-footer a:hover {
+            color: var(--accent);
+        }
+
+        /* ── Responsive ── */
+        @media (max-width: 640px) {
+            article {
+                padding: 2rem 1.25rem 3rem;
+            }
+
+            .post-header h1 {
+                font-size: 2rem;
+            }
+
+            nav.post-nav {
+                grid-template-columns: 1fr;
+                text-align: center;
+            }
+
+            .nav-next {
+                text-align: center;
+            }
+
+            .nav-prev {
+                text-align: center;
+            }
+
+            .post-label {
+                display: none;
+            }
+        }
+    </style>
+        <style>
+        html { -webkit-text-size-adjust: 100%; }
+        pre > code.sourceCode { white-space: pre; position: relative; }
+        pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+        pre > code.sourceCode > span:empty { height: 1.2em; }
+        .sourceCode { overflow: visible; }
+        code.sourceCode > span { color: inherit; text-decoration: inherit; }
+        div.sourceCode { margin: 1em 0; }
+        pre.sourceCode { margin: 0; }
+        @media screen {
+        div.sourceCode { overflow: auto; }
+        }
+        @media print {
+        pre > code.sourceCode { white-space: pre-wrap; }
+        pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+        }
+        pre.numberSource code
+          { counter-reset: source-line 0; }
+        pre.numberSource code > span
+          { position: relative; left: -4em; counter-increment: source-line; }
+        pre.numberSource code > span > a:first-child::before
+          { content: counter(source-line);
+            position: relative; left: -1em; text-align: right; vertical-align: baseline;
+            border: none; display: inline-block;
+            -webkit-touch-callout: none; -webkit-user-select: none;
+            -khtml-user-select: none; -moz-user-select: none;
+            -ms-user-select: none; user-select: none;
+            padding: 0 4px; width: 4em;
+            background-color: #232629;
+            color: #7a7c7d;
+          }
+        pre.numberSource { margin-left: 3em; border-left: 1px solid #7a7c7d;  padding-left: 4px; }
+        div.sourceCode
+          { color: #cfcfc2; background-color: #232629; }
+        @media screen {
+        pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+        }
+        code span { color: #cfcfc2; } /* Normal */
+        code span.al { color: #95da4c; background-color: #4d1f24; font-weight: bold; } /* Alert */
+        code span.an { color: #3f8058; } /* Annotation */
+        code span.at { color: #2980b9; } /* Attribute */
+        code span.bn { color: #f67400; } /* BaseN */
+        code span.bu { color: #7f8c8d; } /* BuiltIn */
+        code span.cf { color: #fdbc4b; font-weight: bold; } /* ControlFlow */
+        code span.ch { color: #3daee9; } /* Char */
+        code span.cn { color: #27aeae; font-weight: bold; } /* Constant */
+        code span.co { color: #7a7c7d; } /* Comment */
+        code span.cv { color: #7f8c8d; } /* CommentVar */
+        code span.do { color: #a43340; } /* Documentation */
+        code span.dt { color: #2980b9; } /* DataType */
+        code span.dv { color: #f67400; } /* DecVal */
+        code span.er { color: #da4453; text-decoration: underline; } /* Error */
+        code span.ex { color: #0099ff; font-weight: bold; } /* Extension */
+        code span.fl { color: #f67400; } /* Float */
+        code span.fu { color: #8e44ad; } /* Function */
+        code span.im { color: #27ae60; } /* Import */
+        code span.in { color: #c45b00; } /* Information */
+        code span.kw { color: #cfcfc2; font-weight: bold; } /* Keyword */
+        code span.op { color: #cfcfc2; } /* Operator */
+        code span.ot { color: #27ae60; } /* Other */
+        code span.pp { color: #27ae60; } /* Preprocessor */
+        code span.re { color: #2980b9; background-color: #153042; } /* RegionMarker */
+        code span.sc { color: #3daee9; } /* SpecialChar */
+        code span.ss { color: #da4453; } /* SpecialString */
+        code span.st { color: #f44f4f; } /* String */
+        code span.va { color: #27aeae; } /* Variable */
+        code span.vs { color: #da4453; } /* VerbatimString */
+        code span.wa { color: #da4453; } /* Warning */
+    </style>
+    </head>
 <body>
 
 <nav class="top-nav">
-  <div class="nav-inner">
-    <div style="display:flex;align-items:center;gap:0.65rem;">
-      <a class="nav-brand" href="../">
-        <span class="brand-hendo">Hendo</span><span class="brand-code">Code</span>
-      </a>
-      <span class="nav-divider">/</span>
-      <span class="nav-series">Anchoring AI</span>
+    <div class="nav-inner">
+        <div style="display:flex;align-items:center;gap:0.65rem;">
+            <a class="nav-brand" href="../">
+                <span class="brand-hendo">Hendo</span><span class="brand-code">Code</span>
+            </a>
             <span class="nav-divider">/</span>
-      <span class="post-label">Post 02</span>
-          </div>
-    <a class="nav-gh" href="https://github.com/HendoCode/contact-center-ai" target="_blank" rel="noopener">GitHub ↗</a>
-  </div>
+            <span class="nav-series">Anchoring AI</span>
+                        <span class="nav-divider">/</span>
+            <span class="post-label">Post 02</span>
+                    </div>
+        <a class="nav-gh" href="https://github.com/HendoCode/contact-center-ai" target="_blank" rel="noopener">GitHub
+            ↗</a>
+    </div>
 </nav>
 
 <article>
-  <header class="post-header">
-        <div class="series-eyebrow">Anchoring AI &mdash; Post 02</div>
-        <h1>From Text to Vectors</h1>
-    <p class="post-subtitle">Building the RAG data pipeline: synthetic
-transcripts, embeddings, and pgvector</p>
-        <div class="byline">
-      Stephen Henderson &middot; June 2026
-    </div>
-      </header>
+    <header class="post-header">
+                <div class="series-eyebrow">Anchoring AI &mdash; Post 02</div>
+                <h1>From Text to Vectors</h1>
+        <p class="post-subtitle">Building the RAG data pipeline:
+synthetic transcripts, embeddings, and pgvector</p>
+                <div class="byline">
+            Stephen Henderson &middot; June 2026
+        </div>
+            </header>
 
-  <div class="post-body">
-    <p>Here’s the core claim of any RAG system: <em>the right
-    information is already in your data — you just need a better way to
-    find it.</em></p>
-    <p>The “better way” is semantic search. Instead of looking for the
-    exact words a user typed, semantic search looks for meaning. A
-    supervisor who asks “show me calls where members were angry about
-    fees” won’t necessarily get results containing those exact words.
-    They’ll get results where the <em>meaning</em> matches — members
-    complaining about unexpected charges, expressing frustration with
-    maintenance fees, threatening to close their accounts. The system
-    understands the <em>intent</em> of the query and finds conceptually
-    similar content.</p>
-    <p>This post explains how that works from the ground up, starting
-    with raw data and ending with a vector store ready to answer
-    natural-language questions.</p>
-    <hr />
-    <h2 id="the-data">The Data</h2>
-    <p>Everything starts with
-    <code>data/synthetic/generate_data.py</code>. In a real deployment,
-    this would be replaced by an actual call recording pipeline — S3, a
-    transcription service, some ingestion scheduler. For this portfolio
-    project, we generate 150 fake but structurally realistic calls with
-    Faker.</p>
-    <p>Each call is assigned one of eight categories:</p>
-    <div class="sourceCode" id="cb1"><pre
-    class="sourceCode python"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>CATEGORIES <span class="op">=</span> [</span>
+    <div class="post-body">
+        <p>Here’s the core claim of any RAG system: <em>the right
+        information is already in your data — you just need a better way
+        to find it.</em></p>
+        <p>The “better way” is semantic search. Instead of looking for
+        the exact words a user typed, semantic search looks for meaning.
+        A supervisor who asks “show me calls where members were angry
+        about fees” won’t necessarily get results containing those exact
+        words. They’ll get results where the <em>meaning</em> matches —
+        members complaining about unexpected charges, expressing
+        frustration with maintenance fees, threatening to close their
+        accounts. The system understands the <em>intent</em> of the
+        query and finds conceptually similar content.</p>
+        <p>This post explains how that works from the ground up,
+        starting with raw data and ending with a vector store ready to
+        answer natural-language questions.</p>
+        <hr />
+        <h2 id="the-data">The Data</h2>
+        <p>Everything starts with
+        <code>data/synthetic/generate_data.py</code>. In a real
+        deployment, this would be replaced by an actual call recording
+        pipeline — S3, a transcription service, some ingestion
+        scheduler. For this portfolio project, we generate 150 fake but
+        structurally realistic calls with Faker.</p>
+        <p>Each call is assigned one of eight categories:</p>
+        <div class="sourceCode" id="cb1"><pre
+        class="sourceCode python"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>CATEGORIES <span class="op">=</span> [</span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>    <span class="st">&quot;loan_inquiry&quot;</span>,</span>
 <span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>    <span class="st">&quot;account_balance&quot;</span>,</span>
 <span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>    <span class="st">&quot;fraud_dispute&quot;</span>,</span>
@@ -615,39 +693,40 @@ transcripts, embeddings, and pgvector</p>
 <span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>    <span class="st">&quot;mortgage_inquiry&quot;</span>,</span>
 <span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>    <span class="st">&quot;account_opening&quot;</span>,</span>
 <span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>]</span></code></pre></div>
-    <p>And one of four outcomes: <code>resolved</code>,
-    <code>escalated</code>, <code>callback_scheduled</code>,
-    <code>unresolved</code>. The outcome matters because it’s used to
-    weight the CSAT scores — a resolved call skews toward 4-5 stars, an
-    unresolved one toward 1-2. That correlation is intentional: it makes
-    the CSAT data analytically interesting, and later (Post 8) we’ll use
-    it as a ground-truth signal for evaluating whether the AI system’s
-    answers are actually useful.</p>
-    <p>The generator builds a <code>full_text</code> field by joining
-    the dialogue turns:</p>
-    <div class="sourceCode" id="cb2"><pre
-    class="sourceCode python"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co">&quot;full_text&quot;</span>: <span class="st">&quot; &quot;</span>.join(</span>
+        <p>And one of four outcomes: <code>resolved</code>,
+        <code>escalated</code>, <code>callback_scheduled</code>,
+        <code>unresolved</code>. The outcome matters because it’s used
+        to weight the CSAT scores — a resolved call skews toward 4-5
+        stars, an unresolved one toward 1-2. That correlation is
+        intentional: it makes the CSAT data analytically interesting,
+        and later (Post 8) we’ll use it as a ground-truth signal for
+        evaluating whether the AI system’s answers are actually
+        useful.</p>
+        <p>The generator builds a <code>full_text</code> field by
+        joining the dialogue turns:</p>
+        <div class="sourceCode" id="cb2"><pre
+        class="sourceCode python"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co">&quot;full_text&quot;</span>: <span class="st">&quot; &quot;</span>.join(</span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>    <span class="ss">f&quot;</span><span class="sc">{</span>t[<span class="st">&#39;speaker&#39;</span>]<span class="sc">.</span>upper()<span class="sc">}</span><span class="ss">: </span><span class="sc">{</span>t[<span class="st">&#39;text&#39;</span>]<span class="sc">}</span><span class="ss">&quot;</span> <span class="cf">for</span> t <span class="kw">in</span> turns</span>
 <span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div>
-    <p>A fraud dispute call ends up looking like this:</p>
-    <pre><code>MEMBER: I&#39;m seeing a charge on my account I don&#39;t recognize.
+        <p>A fraud dispute call ends up looking like this:</p>
+        <pre><code>MEMBER: I&#39;m seeing a charge on my account I don&#39;t recognize.
 It&#39;s for $84.50 from somewhere called TechMerch Online.
 AGENT: I understand how concerning that can be. Let me pull up
 your account and look at that transaction.
 MEMBER: I definitely didn&#39;t make that purchase.
 AGENT: I can see the transaction from yesterday. I&#39;m going to go
 ahead and initiate a dispute for you and issue a replacement card...</code></pre>
-    <p>This is the text that gets embedded. Not the metadata — the
-    actual conversation. That distinction matters more than it might
-    seem, and we’ll get to it shortly.</p>
-    <hr />
-    <h2 id="the-structure-that-makes-search-possible">The Structure That
-    Makes Search Possible</h2>
-    <p>Before any text can be embedded, it needs to be wrapped in a
-    structure that carries both content and context. LangChain uses a
-    <code>Document</code> object for this:</p>
-    <div class="sourceCode" id="cb4"><pre
-    class="sourceCode python"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> transcripts_to_documents(transcripts: <span class="bu">list</span>[<span class="bu">dict</span>]) <span class="op">-&gt;</span> <span class="bu">list</span>[Document]:</span>
+        <p>This is the text that gets embedded. Not the metadata — the
+        actual conversation. That distinction matters more than it might
+        seem, and we’ll get to it shortly.</p>
+        <hr />
+        <h2 id="the-structure-that-makes-search-possible">The Structure
+        That Makes Search Possible</h2>
+        <p>Before any text can be embedded, it needs to be wrapped in a
+        structure that carries both content and context. LangChain uses
+        a <code>Document</code> object for this:</p>
+        <div class="sourceCode" id="cb4"><pre
+        class="sourceCode python"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> transcripts_to_documents(transcripts: <span class="bu">list</span>[<span class="bu">dict</span>]) <span class="op">-&gt;</span> <span class="bu">list</span>[Document]:</span>
 <span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>    docs <span class="op">=</span> []</span>
 <span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> t <span class="kw">in</span> transcripts:</span>
 <span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>        docs.append(Document(</span>
@@ -663,64 +742,67 @@ ahead and initiate a dispute for you and issue a replacement card...</code></pre
 <span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a>            }</span>
 <span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a>        ))</span>
 <span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> docs</span></code></pre></div>
-    <p>The split between <code>page_content</code> and
-    <code>metadata</code> is load-bearing.</p>
-    <p><strong><code>page_content</code></strong> is what gets embedded.
-    It’s the text the model converts to a vector. This needs to be
-    semantically rich — the actual conversation, not just identifiers.
-    You wouldn’t embed
-    <code>"CALL-00042, fraud_dispute, resolved"</code> and expect useful
-    similarity search results.</p>
-    <p><strong><code>metadata</code></strong> is structured data that
-    travels alongside the embedding but isn’t embedded itself. It’s
-    stored as JSONB in PostgreSQL. When a query retrieves the top-5
-    similar calls, each returned Document still carries its
-    <code>call_id</code>, <code>category</code>, <code>outcome</code>,
-    and so on. The LLM prompt we build later uses this structured
-    metadata to give the model more context than just the raw transcript
-    text.</p>
-    <p>One detail worth noticing: <code>member_name</code> is
-    deliberately absent from the metadata. The full name is used during
-    generation (Faker generates it), but it’s not stored in the vector
-    database. In the real engagement, the member’s identity is
-    irrelevant to pattern analysis — we care about categories, outcomes,
-    and call content, not which specific member was on the line.</p>
-    <hr />
-    <h2 id="what-are-embeddings-actually">What Are Embeddings,
-    Actually?</h2>
-    <p>An embedding is a list of floating-point numbers that encodes the
-    <em>meaning</em> of a piece of text. OpenAI’s
-    <code>text-embedding-3-small</code> converts any text into a list of
-    1,536 numbers. Two pieces of text with similar meaning produce
-    vectors that are close together in that 1,536-dimensional space.</p>
-    <p>The similarity measure we use is cosine similarity — it measures
-    the angle between two vectors, not the distance. Two vectors
-    pointing in roughly the same direction are semantically similar,
-    regardless of their length.</p>
-    <p>Why does this matter? Consider two transcript excerpts:</p>
-    <ul>
-    <li>“I’m disputing a charge I don’t recognize on my debit
-    card.”</li>
-    <li>“There’s a transaction on my account that I didn’t make.”</li>
-    </ul>
-    <p>Keyword search finds neither when you search for “unauthorized
-    transaction.” Cosine similarity between their embeddings and the
-    query embedding is high, because the <em>meaning</em> overlaps
-    significantly. The model has learned that “charge I don’t
-    recognize,” “transaction I didn’t make,” and “unauthorized
-    transaction” are semantically equivalent.</p>
-    <p>This is what makes the call center use case work. Supervisors
-    don’t search for specific phrases. They ask questions like “what
-    drove our escalations last week?” — and the system needs to
-    understand that <code>escalated</code> outcomes, frustrated
-    dialogue, and phrases like “I need to speak to a manager” all point
-    to the same underlying concept.</p>
-    <hr />
-    <h2 id="the-provider-abstraction">The Provider Abstraction</h2>
-    <p>Embedding model selection lives in exactly one place —
-    <code>rag/embeddings.py</code>:</p>
-    <div class="sourceCode" id="cb5"><pre
-    class="sourceCode python"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> get_embeddings():</span>
+        <p>The split between <code>page_content</code> and
+        <code>metadata</code> is load-bearing.</p>
+        <p><strong><code>page_content</code></strong> is what gets
+        embedded. It’s the text the model converts to a vector. This
+        needs to be semantically rich — the actual conversation, not
+        just identifiers. You wouldn’t embed
+        <code>"CALL-00042, fraud_dispute, resolved"</code> and expect
+        useful similarity search results.</p>
+        <p><strong><code>metadata</code></strong> is structured data
+        that travels alongside the embedding but isn’t embedded itself.
+        It’s stored as JSONB in PostgreSQL. When a query retrieves the
+        top-5 similar calls, each returned Document still carries its
+        <code>call_id</code>, <code>category</code>,
+        <code>outcome</code>, and so on. The LLM prompt we build later
+        uses this structured metadata to give the model more context
+        than just the raw transcript text.</p>
+        <p>One detail worth noticing: <code>member_name</code> is
+        deliberately absent from the metadata. The full name is used
+        during generation (Faker generates it), but it’s not stored in
+        the vector database. In the real engagement, the member’s
+        identity is irrelevant to pattern analysis — we care about
+        categories, outcomes, and call content, not which specific
+        member was on the line.</p>
+        <hr />
+        <h2 id="what-are-embeddings-actually">What Are Embeddings,
+        Actually?</h2>
+        <p>An embedding is a list of floating-point numbers that encodes
+        the <em>meaning</em> of a piece of text. OpenAI’s
+        <code>text-embedding-3-small</code> converts any text into a
+        list of 1,536 numbers. Two pieces of text with similar meaning
+        produce vectors that are close together in that
+        1,536-dimensional space.</p>
+        <p>The similarity measure we use is cosine similarity — it
+        measures the angle between two vectors, not the distance. Two
+        vectors pointing in roughly the same direction are semantically
+        similar, regardless of their length.</p>
+        <p>Why does this matter? Consider two transcript excerpts:</p>
+        <ul>
+        <li>“I’m disputing a charge I don’t recognize on my debit
+        card.”</li>
+        <li>“There’s a transaction on my account that I didn’t
+        make.”</li>
+        </ul>
+        <p>Keyword search finds neither when you search for
+        “unauthorized transaction.” Cosine similarity between their
+        embeddings and the query embedding is high, because the
+        <em>meaning</em> overlaps significantly. The model has learned
+        that “charge I don’t recognize,” “transaction I didn’t make,”
+        and “unauthorized transaction” are semantically equivalent.</p>
+        <p>This is what makes the call center use case work. Supervisors
+        don’t search for specific phrases. They ask questions like “what
+        drove our escalations last week?” — and the system needs to
+        understand that <code>escalated</code> outcomes, frustrated
+        dialogue, and phrases like “I need to speak to a manager” all
+        point to the same underlying concept.</p>
+        <hr />
+        <h2 id="the-provider-abstraction">The Provider Abstraction</h2>
+        <p>Embedding model selection lives in exactly one place —
+        <code>rag/embeddings.py</code>:</p>
+        <div class="sourceCode" id="cb5"><pre
+        class="sourceCode python"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> get_embeddings():</span>
 <span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>    provider <span class="op">=</span> os.getenv(<span class="st">&quot;LLM_PROVIDER&quot;</span>, <span class="st">&quot;openai&quot;</span>).lower()</span>
 <span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> provider <span class="op">==</span> <span class="st">&quot;ollama&quot;</span>:</span>
@@ -735,39 +817,42 @@ ahead and initiate a dispute for you and issue a replacement card...</code></pre
 <span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a>        model<span class="op">=</span><span class="st">&quot;text-embedding-3-small&quot;</span>,</span>
 <span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a>        api_key<span class="op">=</span>os.getenv(<span class="st">&quot;OPENAI_API_KEY&quot;</span>),</span>
 <span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a>    )</span></code></pre></div>
-    <p>That’s 15 lines. It’s the only place in the entire codebase that
-    knows which embedding model is in use. Everything else — the
-    ingestion pipeline, the retrieval step, the MCP tools — calls
-    <code>get_embeddings()</code> and gets whatever it returns. Swap
-    <code>LLM_PROVIDER=ollama</code> into your environment and the whole
-    system switches to running locally without a single line of code
-    changing.</p>
-    <p>There’s a catch, though, and it’s important: <strong>you can’t
-    swap embedding models on an existing collection without re-ingesting
-    everything.</strong> <code>text-embedding-3-small</code> produces
-    1,536-dimensional vectors. Ollama’s <code>nomic-embed-text</code>
-    produces 768-dimensional vectors. If you embed your transcripts with
-    OpenAI and then try to query with Ollama embeddings, you’re
-    comparing apples to oranges — the dimensions don’t even match. The
-    pgvector index would reject the query outright.</p>
-    <p>The practical consequence: pick your embedding model before you
-    ingest, and treat a provider change as a full re-ingest event. We’ll
-    cover this more in Post 4 when we walk through the Ollama setup.</p>
-    <hr />
-    <h2 id="pgvector-why-postgresql">pgvector: Why PostgreSQL?</h2>
-    <p>The vector store is PostgreSQL with the <code>pgvector</code>
-    extension. The choice warrants a sentence: why not a dedicated
-    vector database like Pinecone, Weaviate, or Chroma?</p>
-    <p>For this use case, the answer is operational simplicity. The
-    system already needs PostgreSQL for the App Service deployment on
-    Azure (Azure Database for PostgreSQL Flexible Server). Adding a
-    separate vector database would mean another managed service, another
-    connection string, another thing to monitor. pgvector gives us
-    vector similarity search as an extension on top of a database we’d
-    need anyway.</p>
-    <p>The <code>get_vector_store()</code> function wires this up:</p>
-    <div class="sourceCode" id="cb6"><pre
-    class="sourceCode python"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> get_vector_store(embeddings<span class="op">=</span><span class="va">None</span>) <span class="op">-&gt;</span> PGVector:</span>
+        <p>That’s 15 lines. It’s the only place in the entire codebase
+        that knows which embedding model is in use. Everything else —
+        the ingestion pipeline, the retrieval step, the MCP tools —
+        calls <code>get_embeddings()</code> and gets whatever it
+        returns. Swap <code>LLM_PROVIDER=ollama</code> into your
+        environment and the whole system switches to running locally
+        without a single line of code changing.</p>
+        <p>There’s a catch, though, and it’s important: <strong>you
+        can’t swap embedding models on an existing collection without
+        re-ingesting everything.</strong>
+        <code>text-embedding-3-small</code> produces 1,536-dimensional
+        vectors. Ollama’s <code>nomic-embed-text</code> produces
+        768-dimensional vectors. If you embed your transcripts with
+        OpenAI and then try to query with Ollama embeddings, you’re
+        comparing apples to oranges — the dimensions don’t even match.
+        The pgvector index would reject the query outright.</p>
+        <p>The practical consequence: pick your embedding model before
+        you ingest, and treat a provider change as a full re-ingest
+        event. We’ll cover this more in Post 4 when we walk through the
+        Ollama setup.</p>
+        <hr />
+        <h2 id="pgvector-why-postgresql">pgvector: Why PostgreSQL?</h2>
+        <p>The vector store is PostgreSQL with the <code>pgvector</code>
+        extension. The choice warrants a sentence: why not a dedicated
+        vector database like Pinecone, Weaviate, or Chroma?</p>
+        <p>For this use case, the answer is operational simplicity. The
+        system already needs PostgreSQL for the App Service deployment
+        on Azure (Azure Database for PostgreSQL Flexible Server). Adding
+        a separate vector database would mean another managed service,
+        another connection string, another thing to monitor. pgvector
+        gives us vector similarity search as an extension on top of a
+        database we’d need anyway.</p>
+        <p>The <code>get_vector_store()</code> function wires this
+        up:</p>
+        <div class="sourceCode" id="cb6"><pre
+        class="sourceCode python"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> get_vector_store(embeddings<span class="op">=</span><span class="va">None</span>) <span class="op">-&gt;</span> PGVector:</span>
 <span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> embeddings <span class="kw">is</span> <span class="va">None</span>:</span>
 <span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>        embeddings <span class="op">=</span> get_embeddings()</span>
 <span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a></span>
@@ -777,148 +862,153 @@ ahead and initiate a dispute for you and issue a replacement card...</code></pre
 <span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>        connection<span class="op">=</span>CONNECTION_STRING,</span>
 <span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>        use_jsonb<span class="op">=</span><span class="va">True</span>,</span>
 <span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>    )</span></code></pre></div>
-    <p><code>use_jsonb=True</code> tells LangChain to store document
-    metadata as JSONB rather than individual columns. This means you can
-    add fields to your metadata schema without running migrations. The
-    downside is that JSONB metadata isn’t as efficient to filter on as a
-    proper indexed column — something worth revisiting if query-time
-    metadata filtering becomes a bottleneck.</p>
-    <p>On first run, the PGVector wrapper automatically creates the
-    <code>pgvector</code> extension in PostgreSQL and initializes the
-    <code>langchain_pg_collection</code> and
-    <code>langchain_pg_embedding</code> tables. You don’t need to run
-    any migrations manually. On subsequent runs, it connects to the
-    existing tables.</p>
-    <hr />
-    <h2 id="ingestion-walking-through-the-code">Ingestion: Walking
-    Through the Code</h2>
-    <p>With all the pieces in place, the ingestion path is three
-    steps:</p>
-    <div class="sourceCode" id="cb7"><pre
-    class="sourceCode python"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> ingest(source: <span class="bu">str</span> <span class="op">=</span> <span class="st">&quot;synthetic&quot;</span>):</span>
+        <p><code>use_jsonb=True</code> tells LangChain to store document
+        metadata as JSONB rather than individual columns. This means you
+        can add fields to your metadata schema without running
+        migrations. The downside is that JSONB metadata isn’t as
+        efficient to filter on as a proper indexed column — something
+        worth revisiting if query-time metadata filtering becomes a
+        bottleneck.</p>
+        <p>On first run, the PGVector wrapper automatically creates the
+        <code>pgvector</code> extension in PostgreSQL and initializes
+        the <code>langchain_pg_collection</code> and
+        <code>langchain_pg_embedding</code> tables. You don’t need to
+        run any migrations manually. On subsequent runs, it connects to
+        the existing tables.</p>
+        <hr />
+        <h2 id="ingestion-walking-through-the-code">Ingestion: Walking
+        Through the Code</h2>
+        <p>With all the pieces in place, the ingestion path is three
+        steps:</p>
+        <div class="sourceCode" id="cb7"><pre
+        class="sourceCode python"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> ingest(source: <span class="bu">str</span> <span class="op">=</span> <span class="st">&quot;synthetic&quot;</span>):</span>
 <span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>    transcripts <span class="op">=</span> load_synthetic_data()       <span class="co"># 1. load</span></span>
 <span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>    docs <span class="op">=</span> transcripts_to_documents(transcripts)  <span class="co"># 2. convert</span></span>
 <span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>    vector_store <span class="op">=</span> get_vector_store()</span>
 <span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>    vector_store.add_documents(docs)          <span class="co"># 3. embed + store</span></span></code></pre></div>
-    <p>Step 3 is where the API calls happen.
-    <code>add_documents()</code> sends each document’s
-    <code>page_content</code> to the embedding model, receives a
-    1,536-dimensional float vector, and writes it to PostgreSQL
-    alongside the JSONB metadata. For 150 documents using OpenAI’s API,
-    this takes a few seconds and costs less than a cent. With Ollama
-    running locally, it takes longer and costs nothing.</p>
-    <p>Run it with:</p>
-    <div class="sourceCode" id="cb8"><pre
-    class="sourceCode bash"><code class="sourceCode bash"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> <span class="at">-m</span> rag.pipeline <span class="at">--ingest</span></span></code></pre></div>
-    <hr />
-    <h2 id="the-deduplication-problem">The Deduplication Problem</h2>
-    <p>There’s no deduplication guard in <code>ingest()</code>. Run it
-    twice and you’ll have 300 rows in pgvector — two copies of every
-    document. This doesn’t break the system outright, but it does
-    degrade search quality. Duplicate documents inflate the retrieval
-    results, and when the same call transcript appears twice in the
-    context window the LLM sees, you’re wasting tokens and potentially
-    confusing the model.</p>
-    <p>For a portfolio project, this is an acceptable trade-off. For
-    production, you’d want one of three fixes:</p>
-    <ol type="1">
-    <li><strong>Upsert by call_id</strong> — check if a document with
-    that metadata already exists before inserting. LangChain’s PGVector
-    doesn’t expose a native upsert, but you can implement it by deleting
-    existing rows by <code>call_id</code> before re-inserting.</li>
-    <li><strong>Idempotency hash</strong> — hash the
-    <code>full_text</code> and skip documents where that hash already
-    exists in the collection.</li>
-    <li><strong>Truncate and re-ingest</strong> — the blunt approach.
-    Drop the collection entirely and re-embed from scratch. Acceptable
-    if ingest is fast and a brief outage is tolerable.</li>
-    </ol>
-    <hr />
-    <h2 id="querying-what-happens-when-you-call-retrieve">Querying: What
-    Happens When You Call <code>retrieve()</code></h2>
-    <div class="sourceCode" id="cb9"><pre
-    class="sourceCode python"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> retrieve(query: <span class="bu">str</span>, k: <span class="bu">int</span> <span class="op">=</span> <span class="dv">5</span>) <span class="op">-&gt;</span> <span class="bu">list</span>[Document]:</span>
+        <p>Step 3 is where the API calls happen.
+        <code>add_documents()</code> sends each document’s
+        <code>page_content</code> to the embedding model, receives a
+        1,536-dimensional float vector, and writes it to PostgreSQL
+        alongside the JSONB metadata. For 150 documents using OpenAI’s
+        API, this takes a few seconds and costs less than a cent. With
+        Ollama running locally, it takes longer and costs nothing.</p>
+        <p>Run it with:</p>
+        <div class="sourceCode" id="cb8"><pre
+        class="sourceCode bash"><code class="sourceCode bash"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> <span class="at">-m</span> rag.pipeline <span class="at">--ingest</span></span></code></pre></div>
+        <hr />
+        <h2 id="the-deduplication-problem">The Deduplication
+        Problem</h2>
+        <p>There’s no deduplication guard in <code>ingest()</code>. Run
+        it twice and you’ll have 300 rows in pgvector — two copies of
+        every document. This doesn’t break the system outright, but it
+        does degrade search quality. Duplicate documents inflate the
+        retrieval results, and when the same call transcript appears
+        twice in the context window the LLM sees, you’re wasting tokens
+        and potentially confusing the model.</p>
+        <p>For a portfolio project, this is an acceptable trade-off. For
+        production, you’d want one of three fixes:</p>
+        <ol type="1">
+        <li><strong>Upsert by call_id</strong> — check if a document
+        with that metadata already exists before inserting. LangChain’s
+        PGVector doesn’t expose a native upsert, but you can implement
+        it by deleting existing rows by <code>call_id</code> before
+        re-inserting.</li>
+        <li><strong>Idempotency hash</strong> — hash the
+        <code>full_text</code> and skip documents where that hash
+        already exists in the collection.</li>
+        <li><strong>Truncate and re-ingest</strong> — the blunt
+        approach. Drop the collection entirely and re-embed from
+        scratch. Acceptable if ingest is fast and a brief outage is
+        tolerable.</li>
+        </ol>
+        <hr />
+        <h2 id="querying-what-happens-when-you-call-retrieve">Querying:
+        What Happens When You Call <code>retrieve()</code></h2>
+        <div class="sourceCode" id="cb9"><pre
+        class="sourceCode python"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> retrieve(query: <span class="bu">str</span>, k: <span class="bu">int</span> <span class="op">=</span> <span class="dv">5</span>) <span class="op">-&gt;</span> <span class="bu">list</span>[Document]:</span>
 <span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>    vector_store <span class="op">=</span> get_vector_store()</span>
 <span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> vector_store.similarity_search(query, k<span class="op">=</span>k)</span></code></pre></div>
-    <p>Behind the scenes, <code>similarity_search()</code> does three
-    things:</p>
-    <ol type="1">
-    <li><strong>Embeds the query</strong> — sends the query string to
-    the same embedding model used at ingest time, gets back a
-    1,536-dimensional vector</li>
-    <li><strong>Runs an ANN search</strong> — executes a PostgreSQL
-    query that finds the <code>k</code> rows in the
-    <code>langchain_pg_embedding</code> table with the smallest cosine
-    distance to the query vector</li>
-    <li><strong>Deserializes and returns</strong> — reconstructs the
-    LangChain <code>Document</code> objects, including the JSONB
-    metadata, and returns them</li>
-    </ol>
-    <p>The SQL pgvector runs under the hood looks roughly like:</p>
-    <div class="sourceCode" id="cb10"><pre
-    class="sourceCode sql"><code class="sourceCode sql"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> document, cmetadata, embedding <span class="op">&lt;=&gt;</span> $<span class="dv">1</span> <span class="kw">AS</span> distance</span>
+        <p>Behind the scenes, <code>similarity_search()</code> does
+        three things:</p>
+        <ol type="1">
+        <li><strong>Embeds the query</strong> — sends the query string
+        to the same embedding model used at ingest time, gets back a
+        1,536-dimensional vector</li>
+        <li><strong>Runs an ANN search</strong> — executes a PostgreSQL
+        query that finds the <code>k</code> rows in the
+        <code>langchain_pg_embedding</code> table with the smallest
+        cosine distance to the query vector</li>
+        <li><strong>Deserializes and returns</strong> — reconstructs the
+        LangChain <code>Document</code> objects, including the JSONB
+        metadata, and returns them</li>
+        </ol>
+        <p>The SQL pgvector runs under the hood looks roughly like:</p>
+        <div class="sourceCode" id="cb10"><pre
+        class="sourceCode sql"><code class="sourceCode sql"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> document, cmetadata, embedding <span class="op">&lt;=&gt;</span> $<span class="dv">1</span> <span class="kw">AS</span> distance</span>
 <span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> langchain_pg_embedding</span>
 <span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a><span class="kw">WHERE</span> collection_id <span class="op">=</span> $<span class="dv">2</span></span>
 <span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a><span class="kw">ORDER</span> <span class="kw">BY</span> distance</span>
 <span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a><span class="kw">LIMIT</span> $<span class="dv">3</span>;</span></code></pre></div>
-    <p>The <code>&lt;=&gt;</code> operator is pgvector’s cosine distance
-    operator. The result is the <code>k</code> transcript documents
-    whose embedding vectors are closest in angle to the query embedding
-    — which is to say, the <code>k</code> calls most semantically
-    similar to the question being asked.</p>
-    <p>Those documents are then passed to <code>rag_query()</code>,
-    formatted into a context block, and sent to the LLM with the
-    question. The LLM’s job is to read the retrieved transcripts and
-    synthesize a grounded answer — one that’s anchored to the actual
-    call data rather than generated from nothing.</p>
-    <hr />
-    <h2 id="whats-next">What’s Next</h2>
-    <p>The pipeline we’ve built here is the foundation. In Post 3, we’ll
-    look at the MCP server that sits in front of it — how
-    <code>search_transcripts</code>, <code>get_call_summary</code>, and
-    <code>query_csat</code> are defined, how they route to this
-    pipeline, and how Claude Desktop connects to them.</p>
-    <p>If you want to run what we’ve built so far:</p>
-    <div class="sourceCode" id="cb11"><pre
-    class="sourceCode bash"><code class="sourceCode bash"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="ex">docker</span> compose up <span class="at">-d</span></span>
+        <p>The <code>&lt;=&gt;</code> operator is pgvector’s cosine
+        distance operator. The result is the <code>k</code> transcript
+        documents whose embedding vectors are closest in angle to the
+        query embedding — which is to say, the <code>k</code> calls most
+        semantically similar to the question being asked.</p>
+        <p>Those documents are then passed to <code>rag_query()</code>,
+        formatted into a context block, and sent to the LLM with the
+        question. The LLM’s job is to read the retrieved transcripts and
+        synthesize a grounded answer — one that’s anchored to the actual
+        call data rather than generated from nothing.</p>
+        <hr />
+        <h2 id="whats-next">What’s Next</h2>
+        <p>The pipeline we’ve built here is the foundation. In Post 3,
+        we’ll look at the MCP server that sits in front of it — how
+        <code>search_transcripts</code>, <code>get_call_summary</code>,
+        and <code>query_csat</code> are defined, how they route to this
+        pipeline, and how Claude Desktop connects to them.</p>
+        <p>If you want to run what we’ve built so far:</p>
+        <div class="sourceCode" id="cb11"><pre
+        class="sourceCode bash"><code class="sourceCode bash"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="ex">docker</span> compose up <span class="at">-d</span></span>
 <span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> sync <span class="at">--extra</span> dev</span>
 <span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> data/synthetic/generate_data.py</span>
 <span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> <span class="at">-m</span> rag.pipeline <span class="at">--ingest</span></span>
 <span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> <span class="at">-m</span> rag.pipeline <span class="at">--query</span> <span class="st">&quot;fraud disputes where the member was frustrated&quot;</span></span></code></pre></div>
-    <p>The last command runs a full RAG cycle — embeds the query,
-    retrieves the top-5 most similar transcripts, and returns an
-    LLM-generated answer grounded in the actual call data.</p>
-  </div>
+        <p>The last command runs a full RAG cycle — embeds the query,
+        retrieves the top-5 most similar transcripts, and returns an
+        LLM-generated answer grounded in the actual call data.</p>
+    </div>
 </article>
 
 <nav class="post-nav">
-    <a class="nav-prev" href="../01-the-blueprint/">&#8592; The
+        <a class="nav-prev" href="../01-the-blueprint/">&#8592; The
 Blueprint</a>
-    <a class="nav-index" href="../">Series Index</a>
-    <a class="nav-next" href="../03-the-interface-layer/">The Interface
-Layer &#8594;</a>
-  </nav>
+        <a class="nav-index" href="../">Series Index</a>
+        <a class="nav-next" href="../03-the-interface-layer/">The
+Interface Layer &#8594;</a>
+    </nav>
 
 <footer class="site-footer">
-  <div class="footer-brand">
-    <span class="brand-hendo">Hendo</span><span class="brand-code">Code</span>
-  </div>
-  <p>Anchoring AI &mdash; a series on building production RAG systems</p>
-  <p><a href="https://github.com/HendoCode/contact-center-ai" target="_blank" rel="noopener">View the code on GitHub</a></p>
+    <div class="footer-brand">
+        <span class="brand-hendo">Hendo</span><span class="brand-code">Code</span>
+    </div>
+    <p>Anchoring AI &mdash; a series on building production RAG systems</p>
+    <p><a href="https://github.com/HendoCode/contact-center-ai" target="_blank" rel="noopener">View the code on
+        GitHub</a></p>
 </footer>
 
 <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
 <script>
-  // Scripts at bottom of <body> — DOM is fully parsed, no DOMContentLoaded needed.
-  // Pandoc outputs <pre class="mermaid"><code>...</code></pre>; Mermaid needs <div class="mermaid">.
-  document.querySelectorAll('pre.mermaid').forEach(function (el) {
-    var div = document.createElement('div');
-    div.className = 'mermaid';
-    div.textContent = el.textContent;
-    el.parentNode.replaceChild(div, el);
-  });
-  mermaid.initialize({ startOnLoad: false, theme: 'neutral', securityLevel: 'loose' });
-  mermaid.run();
+    // Scripts at bottom of <body> — DOM is fully parsed, no DOMContentLoaded needed.
+    // Pandoc outputs <pre class="mermaid"><code>...</code></pre>; Mermaid needs <div class="mermaid">.
+    document.querySelectorAll('pre.mermaid').forEach(function (el) {
+        var div = document.createElement('div');
+        div.className = 'mermaid';
+        div.textContent = el.textContent;
+        el.parentNode.replaceChild(div, el);
+    });
+    mermaid.initialize({startOnLoad: false, theme: 'neutral', securityLevel: 'loose'});
+    mermaid.run();
 </script>
 
 </body>

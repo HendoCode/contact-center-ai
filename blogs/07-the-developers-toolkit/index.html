@@ -1,679 +1,766 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>The Developer’s Toolkit | Anchoring AI — HendoCode</title>
-  <meta name="description" content="Post 7 of Anchoring AI: adding an
-HTTP REST API layer alongside the MCP server, documenting it with
-OpenAPI/Swagger, and exploring the JetBrains developer workflow —
-PyCharm debugging with Docker services, Junie for unit test generation
-and PEP8 cleanup, and HTTP Request files for live API testing.">
-  <meta property="og:title" content="The Developer’s Toolkit">
-  <meta property="og:description" content="Post 7 of Anchoring AI:
-adding an HTTP REST API layer alongside the MCP server, documenting it
-with OpenAPI/Swagger, and exploring the JetBrains developer workflow —
-PyCharm debugging with Docker services, Junie for unit test generation
-and PEP8 cleanup, and HTTP Request files for live API testing.">
-  <meta property="og:type" content="article">
-  <meta name="twitter:card" content="summary">
-  <meta name="twitter:title" content="The Developer’s Toolkit">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Josefin+Sans:wght@300;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <style>
-    /* ── HendoCode brand palette (from logo explorations tile 12) ── */
-    :root {
-      --slate:       #2E4A5F;
-      --slate-d:     #1e3245;
-      --slate-l:     #3d5f78;
-      --slate-ll:    #4a7090;
-      --cream:       #F0EDCF;
-      --amber:       #E8A44A;
-      --amber-d:     #c4852a;
-      --amber-l:     #f0bb72;
-      --muted:       #7FA8C0;
-      --bg-warm:     #f5f2ea;
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-7GZJFLG07M"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
 
-      /* semantic roles */
-      --nav:         var(--slate);
-      --accent:      var(--amber);
-      --accent-dark: var(--amber-d);
-      --text:        var(--slate-d);
-      --text-muted:  var(--slate-ll);
-      --bg:          #ffffff;
-      --code-bg:     var(--slate-d);
-      --code-text:   var(--cream);
-      --border:      #ddd9cc;
-      --surface:     #f8f6f0;
-      --tag-bg:      #fef7e8;
-      --tag-text:    var(--amber-d);
+        function gtag() {
+            dataLayer.push(arguments);
+        }
 
-      --font-brand:  'Josefin Sans', sans-serif;
-      --font-ui:     'Josefin Sans', sans-serif;
-      --font-body:   Georgia, 'Times New Roman', Times, serif;
-      --font-mono:   'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Courier New', monospace;
-      --width:       720px;
-    }
+        gtag('js', new Date());
 
-    /* ── Reset ── */
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    html { scroll-behavior: smooth; }
+        gtag('config', 'G-7GZJFLG07M');
+    </script>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>The Developer’s Toolkit | Anchoring AI — HendoCode</title>
+    <meta name="description"
+          content="Post 7 of Anchoring AI: adding an HTTP REST API layer
+alongside the MCP server, documenting it with OpenAPI/Swagger, and
+exploring the JetBrains developer workflow — PyCharm debugging with
+Docker services, Junie for unit test generation and PEP8 cleanup, and
+HTTP Request files for live API testing.">
+    <meta property="og:title" content="The Developer’s Toolkit">
+    <meta property="og:description"
+          content="Post 7 of Anchoring AI: adding an HTTP REST API layer
+alongside the MCP server, documenting it with OpenAPI/Swagger, and
+exploring the JetBrains developer workflow — PyCharm debugging with
+Docker services, Junie for unit test generation and PEP8 cleanup, and
+HTTP Request files for live API testing.">
+    <meta property="og:type" content="article">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="The Developer’s Toolkit">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Josefin+Sans:wght@300;700&family=JetBrains+Mono:wght@400;500&display=swap"
+          rel="stylesheet">
+    <style>
+        /* ── HendoCode brand palette (from logo explorations tile 12) ── */
+        :root {
+            --slate: #2E4A5F;
+            --slate-d: #1e3245;
+            --slate-l: #3d5f78;
+            --slate-ll: #4a7090;
+            --cream: #F0EDCF;
+            --amber: #E8A44A;
+            --amber-d: #c4852a;
+            --amber-l: #f0bb72;
+            --muted: #7FA8C0;
+            --bg-warm: #f5f2ea;
 
-    body {
-      font-family: var(--font-body);
-      font-size: 1.125rem;
-      line-height: 1.8;
-      color: var(--text);
-      background: var(--bg);
-    }
+            /* semantic roles */
+            --nav: var(--slate);
+            --accent: var(--amber);
+            --accent-dark: var(--amber-d);
+            --text: var(--slate-d);
+            --text-muted: var(--slate-ll);
+            --bg: #ffffff;
+            --code-bg: var(--slate-d);
+            --code-text: var(--cream);
+            --border: #ddd9cc;
+            --surface: #f8f6f0;
+            --tag-bg: #fef7e8;
+            --tag-text: var(--amber-d);
 
-    /* ── Top navigation bar ── */
-    nav.top-nav {
-      background: var(--nav);
-      padding: 0 2rem;
-      position: sticky;
-      top: 0;
-      z-index: 100;
-      border-bottom: 1px solid rgba(255,255,255,0.06);
-    }
+            --font-brand: 'Josefin Sans', sans-serif;
+            --font-ui: 'Josefin Sans', sans-serif;
+            --font-body: Georgia, 'Times New Roman', Times, serif;
+            --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Courier New', monospace;
+            --width: 720px;
+        }
 
-    .nav-inner {
-      max-width: var(--width);
-      margin: 0 auto;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      height: 56px;
-    }
+        /* ── Reset ── */
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
 
-    .nav-brand {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      text-decoration: none;
-    }
+        html {
+            scroll-behavior: smooth;
+        }
 
-    /* Tile-12 hairline/bold treatment at nav scale */
-    .brand-hendo {
-      font-family: var(--font-brand);
-      font-weight: 300;
-      font-size: 1.1rem;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      color: var(--cream);
-      line-height: 1;
-    }
+        body {
+            font-family: var(--font-body);
+            font-size: 1.125rem;
+            line-height: 1.8;
+            color: var(--text);
+            background: var(--bg);
+        }
 
-    .brand-code {
-      font-family: var(--font-brand);
-      font-weight: 700;
-      font-size: 1.1rem;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-      color: var(--accent);
-      line-height: 1;
-    }
+        /* ── Top navigation bar ── */
+        nav.top-nav {
+            background: var(--nav);
+            padding: 0 2rem;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        }
 
-    .nav-divider {
-      color: rgba(255,255,255,0.2);
-      font-family: var(--font-brand);
-      font-weight: 300;
-      font-size: 0.9rem;
-    }
+        .nav-inner {
+            max-width: var(--width);
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 56px;
+        }
 
-    .nav-series {
-      font-family: var(--font-brand);
-      font-weight: 300;
-      font-size: 0.75rem;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      color: var(--muted);
-    }
+        .nav-brand {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            text-decoration: none;
+        }
 
-    .post-label {
-      font-family: var(--font-brand);
-      font-weight: 300;
-      font-size: 0.75rem;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      color: rgba(255,255,255,0.3);
-    }
+        /* Tile-12 hairline/bold treatment at nav scale */
+        .brand-hendo {
+            font-family: var(--font-brand);
+            font-weight: 300;
+            font-size: 1.1rem;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--cream);
+            line-height: 1;
+        }
 
-    .nav-gh {
-      color: rgba(255,255,255,0.35);
-      text-decoration: none;
-      font-family: var(--font-brand);
-      font-weight: 300;
-      font-size: 0.75rem;
-      letter-spacing: 0.06em;
-      transition: color 0.15s;
-    }
-    .nav-gh:hover { color: var(--accent); }
+        .brand-code {
+            font-family: var(--font-brand);
+            font-weight: 700;
+            font-size: 1.1rem;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: var(--accent);
+            line-height: 1;
+        }
 
-    /* ── Article container ── */
-    article {
-      max-width: var(--width);
-      margin: 0 auto;
-      padding: 3.5rem 2rem 4rem;
-    }
+        .nav-divider {
+            color: rgba(255, 255, 255, 0.2);
+            font-family: var(--font-brand);
+            font-weight: 300;
+            font-size: 0.9rem;
+        }
 
-    /* ── Post header ── */
-    .post-header {
-      margin-bottom: 3rem;
-      padding-bottom: 2.5rem;
-      border-bottom: 1px solid var(--border);
-    }
+        .nav-series {
+            font-family: var(--font-brand);
+            font-weight: 300;
+            font-size: 0.75rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--muted);
+        }
 
-    .series-eyebrow {
-      font-family: var(--font-brand);
-      font-weight: 300;
-      font-size: 0.6875rem;
-      letter-spacing: 0.18em;
-      text-transform: uppercase;
-      color: var(--accent);
-      margin-bottom: 1rem;
-    }
+        .post-label {
+            font-family: var(--font-brand);
+            font-weight: 300;
+            font-size: 0.75rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: rgba(255, 255, 255, 0.3);
+        }
 
-    .post-header h1 {
-      font-family: var(--font-brand);
-      font-weight: 700;
-      font-size: 2.75rem;
-      line-height: 1.05;
-      letter-spacing: 0.01em;
-      text-transform: uppercase;
-      color: var(--slate);
-      margin-bottom: 0.75rem;
-    }
+        .nav-gh {
+            color: rgba(255, 255, 255, 0.35);
+            text-decoration: none;
+            font-family: var(--font-brand);
+            font-weight: 300;
+            font-size: 0.75rem;
+            letter-spacing: 0.06em;
+            transition: color 0.15s;
+        }
 
-    .post-subtitle {
-      font-family: var(--font-body);
-      font-size: 1.2rem;
-      color: var(--text-muted);
-      font-style: italic;
-      margin-bottom: 1.25rem;
-    }
+        .nav-gh:hover {
+            color: var(--accent);
+        }
 
-    .byline {
-      font-family: var(--font-brand);
-      font-weight: 300;
-      font-size: 0.8rem;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--text-muted);
-    }
+        /* ── Article container ── */
+        article {
+            max-width: var(--width);
+            margin: 0 auto;
+            padding: 3.5rem 2rem 4rem;
+        }
 
-    /* ── Amber rule under eyebrow ── */
-    .post-header::after {
-      content: '';
-      display: block;
-      width: 48px;
-      height: 2px;
-      background: var(--accent);
-      border-radius: 1px;
-      margin-top: 2.5rem;
-    }
+        /* ── Post header ── */
+        .post-header {
+            margin-bottom: 3rem;
+            padding-bottom: 2.5rem;
+            border-bottom: 1px solid var(--border);
+        }
 
-    /* ── Body content ── */
-    .post-body h2 {
-      font-family: var(--font-brand);
-      font-weight: 700;
-      font-size: 1.125rem;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      color: var(--slate);
-      margin: 3rem 0 1rem;
-      padding-top: 0.25rem;
-    }
+        .series-eyebrow {
+            font-family: var(--font-brand);
+            font-weight: 300;
+            font-size: 0.6875rem;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            color: var(--accent);
+            margin-bottom: 1rem;
+        }
 
-    .post-body h3 {
-      font-family: var(--font-brand);
-      font-weight: 700;
-      font-size: 0.875rem;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      color: var(--slate-l);
-      margin: 2rem 0 0.75rem;
-    }
+        .post-header h1 {
+            font-family: var(--font-brand);
+            font-weight: 700;
+            font-size: 2.75rem;
+            line-height: 1.05;
+            letter-spacing: 0.01em;
+            text-transform: uppercase;
+            color: var(--slate);
+            margin-bottom: 0.75rem;
+        }
 
-    .post-body h4 {
-      font-family: var(--font-brand);
-      font-weight: 700;
-      font-size: 0.8rem;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--text-muted);
-      margin: 1.5rem 0 0.5rem;
-    }
+        .post-subtitle {
+            font-family: var(--font-body);
+            font-size: 1.2rem;
+            color: var(--text-muted);
+            font-style: italic;
+            margin-bottom: 1.25rem;
+        }
 
-    .post-body p { margin-bottom: 1.5rem; }
+        .byline {
+            font-family: var(--font-brand);
+            font-weight: 300;
+            font-size: 0.8rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--text-muted);
+        }
 
-    .post-body a {
-      color: var(--amber-d);
-      text-decoration: underline;
-      text-underline-offset: 3px;
-      transition: color 0.15s;
-    }
-    .post-body a:hover { color: var(--slate); }
+        /* ── Amber rule under eyebrow ── */
+        .post-header::after {
+            content: '';
+            display: block;
+            width: 48px;
+            height: 2px;
+            background: var(--accent);
+            border-radius: 1px;
+            margin-top: 2.5rem;
+        }
 
-    /* ── Inline code ── */
-    .post-body :not(pre) > code {
-      font-family: var(--font-mono);
-      font-size: 0.85em;
-      background: var(--tag-bg);
-      color: var(--tag-text);
-      padding: 0.1em 0.35em;
-      border-radius: 3px;
-      border: 1px solid rgba(196,133,42,0.15);
-    }
+        /* ── Body content ── */
+        .post-body h2 {
+            font-family: var(--font-brand);
+            font-weight: 700;
+            font-size: 1.125rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--slate);
+            margin: 3rem 0 1rem;
+            padding-top: 0.25rem;
+        }
 
-    /* ── Code blocks ── */
-    .post-body pre {
-      background: var(--code-bg);
-      border-radius: 8px;
-      padding: 1.25rem 1.5rem;
-      overflow-x: auto;
-      margin: 1.75rem 0;
-      border: 1px solid rgba(255,255,255,0.04);
-    }
+        .post-body h3 {
+            font-family: var(--font-brand);
+            font-weight: 700;
+            font-size: 0.875rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--slate-l);
+            margin: 2rem 0 0.75rem;
+        }
 
-    .post-body pre code {
-      font-family: var(--font-mono);
-      font-size: 0.875rem;
-      background: none;
-      color: var(--cream);
-      padding: 0;
-      border: none;
-    }
+        .post-body h4 {
+            font-family: var(--font-brand);
+            font-weight: 700;
+            font-size: 0.8rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            margin: 1.5rem 0 0.5rem;
+        }
 
-    .post-body div.sourceCode {
-      background: var(--code-bg);
-      border-radius: 8px;
-      margin: 1.75rem 0;
-      overflow: hidden;
-      border: 1px solid rgba(255,255,255,0.04);
-    }
+        .post-body p {
+            margin-bottom: 1.5rem;
+        }
 
-    .post-body div.sourceCode pre {
-      background: transparent;
-      margin: 0;
-      border: none;
-      border-radius: 0;
-      padding: 1.25rem 1.5rem;
-    }
+        .post-body a {
+            color: var(--amber-d);
+            text-decoration: underline;
+            text-underline-offset: 3px;
+            transition: color 0.15s;
+        }
 
-    /* ── Mermaid diagrams ── */
-    .mermaid {
-      margin: 2.25rem 0;
-      background: var(--surface);
-      border-radius: 8px;
-      padding: 2rem 1.5rem;
-      border: 1px solid var(--border);
-      overflow-x: auto;
-      text-align: center;
-    }
+        .post-body a:hover {
+            color: var(--slate);
+        }
 
-    .mermaid svg { max-width: 100%; }
+        /* ── Inline code ── */
+        .post-body :not(pre) > code {
+            font-family: var(--font-mono);
+            font-size: 0.85em;
+            background: var(--tag-bg);
+            color: var(--tag-text);
+            padding: 0.1em 0.35em;
+            border-radius: 3px;
+            border: 1px solid rgba(196, 133, 42, 0.15);
+        }
 
-    /* ── Tables ── */
-    .post-body table {
-      width: 100%;
-      border-collapse: collapse;
-      margin: 1.75rem 0;
-      font-family: var(--font-brand);
-      font-weight: 300;
-      font-size: 0.875rem;
-      border-radius: 8px;
-      overflow: hidden;
-      border: 1px solid var(--border);
-    }
+        /* ── Code blocks ── */
+        .post-body pre {
+            background: var(--code-bg);
+            border-radius: 8px;
+            padding: 1.25rem 1.5rem;
+            overflow-x: auto;
+            margin: 1.75rem 0;
+            border: 1px solid rgba(255, 255, 255, 0.04);
+        }
 
-    .post-body th {
-      background: var(--slate);
-      color: var(--cream);
-      padding: 0.75rem 1rem;
-      text-align: left;
-      font-weight: 700;
-      font-size: 0.75rem;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-    }
+        .post-body pre code {
+            font-family: var(--font-mono);
+            font-size: 0.875rem;
+            background: none;
+            color: var(--cream);
+            padding: 0;
+            border: none;
+        }
 
-    .post-body td {
-      padding: 0.75rem 1rem;
-      border-bottom: 1px solid var(--border);
-      vertical-align: top;
-      font-family: var(--font-body);
-      font-size: 0.95rem;
-    }
+        .post-body div.sourceCode {
+            background: var(--code-bg);
+            border-radius: 8px;
+            margin: 1.75rem 0;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.04);
+        }
 
-    .post-body tr:last-child td { border-bottom: none; }
-    .post-body tr:nth-child(even) td { background: var(--surface); }
+        .post-body div.sourceCode pre {
+            background: transparent;
+            margin: 0;
+            border: none;
+            border-radius: 0;
+            padding: 1.25rem 1.5rem;
+        }
 
-    /* ── Blockquotes ── */
-    .post-body blockquote {
-      border-left: 3px solid var(--accent);
-      padding: 0.5rem 0 0.5rem 1.5rem;
-      margin: 2rem 0;
-      color: var(--text-muted);
-      font-style: italic;
-    }
-    .post-body blockquote p { margin-bottom: 0; }
+        /* ── Mermaid diagrams ── */
+        .mermaid {
+            margin: 2.25rem 0;
+            background: var(--surface);
+            border-radius: 8px;
+            padding: 2rem 1.5rem;
+            border: 1px solid var(--border);
+            overflow-x: auto;
+            text-align: center;
+        }
 
-    /* ── Lists ── */
-    .post-body ul, .post-body ol {
-      margin: 0.75rem 0 1.5rem 1.75rem;
-    }
-    .post-body li { margin-bottom: 0.4rem; }
-    .post-body li > ul, .post-body li > ol {
-      margin-top: 0.4rem;
-      margin-bottom: 0.4rem;
-    }
+        .mermaid svg {
+            max-width: 100%;
+        }
 
-    /* ── HR ── */
-    .post-body hr {
-      border: none;
-      border-top: 1px solid var(--border);
-      margin: 3.5rem 0;
-    }
+        /* ── Tables ── */
+        .post-body table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1.75rem 0;
+            font-family: var(--font-brand);
+            font-weight: 300;
+            font-size: 0.875rem;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+        }
 
-    /* ── Strong ── */
-    .post-body strong { color: var(--slate); font-weight: 700; }
+        .post-body th {
+            background: var(--slate);
+            color: var(--cream);
+            padding: 0.75rem 1rem;
+            text-align: left;
+            font-weight: 700;
+            font-size: 0.75rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
 
-    /* ── Post navigation ── */
-    nav.post-nav {
-      max-width: var(--width);
-      margin: 0 auto;
-      padding: 2rem;
-      display: grid;
-      grid-template-columns: 1fr auto 1fr;
-      gap: 1rem;
-      align-items: center;
-      border-top: 1px solid var(--border);
-    }
+        .post-body td {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--border);
+            vertical-align: top;
+            font-family: var(--font-body);
+            font-size: 0.95rem;
+        }
 
-    .nav-prev {
-      color: var(--text-muted);
-      text-decoration: none;
-      font-family: var(--font-brand);
-      font-weight: 300;
-      font-size: 0.8rem;
-      letter-spacing: 0.05em;
-      text-transform: uppercase;
-      transition: color 0.15s;
-    }
-    .nav-prev:hover { color: var(--accent-dark); }
+        .post-body tr:last-child td {
+            border-bottom: none;
+        }
 
-    .nav-index {
-      color: var(--slate);
-      text-decoration: none;
-      font-family: var(--font-brand);
-      font-weight: 700;
-      font-size: 0.7rem;
-      text-transform: uppercase;
-      letter-spacing: 0.12em;
-      text-align: center;
-      padding: 0.4rem 0.9rem;
-      border: 1px solid var(--slate);
-      border-radius: 3px;
-      transition: all 0.15s;
-      white-space: nowrap;
-    }
-    .nav-index:hover {
-      background: var(--slate);
-      color: var(--cream);
-    }
+        .post-body tr:nth-child(even) td {
+            background: var(--surface);
+        }
 
-    .nav-next {
-      color: var(--text-muted);
-      text-decoration: none;
-      font-family: var(--font-brand);
-      font-weight: 300;
-      font-size: 0.8rem;
-      letter-spacing: 0.05em;
-      text-transform: uppercase;
-      text-align: right;
-      display: block;
-      transition: color 0.15s;
-    }
-    .nav-next:hover { color: var(--accent-dark); }
+        /* ── Blockquotes ── */
+        .post-body blockquote {
+            border-left: 3px solid var(--accent);
+            padding: 0.5rem 0 0.5rem 1.5rem;
+            margin: 2rem 0;
+            color: var(--text-muted);
+            font-style: italic;
+        }
 
-    /* ── Footer ── */
-    footer.site-footer {
-      background: var(--slate);
-      color: rgba(255,255,255,0.4);
-      padding: 2.5rem 2rem;
-      text-align: center;
-      font-family: var(--font-brand);
-      font-weight: 300;
-      font-size: 0.8rem;
-      letter-spacing: 0.06em;
-      margin-top: 1rem;
-    }
+        .post-body blockquote p {
+            margin-bottom: 0;
+        }
 
-    footer.site-footer p { margin-bottom: 0.5rem; }
+        /* ── Lists ── */
+        .post-body ul, .post-body ol {
+            margin: 0.75rem 0 1.5rem 1.75rem;
+        }
 
-    footer.site-footer .footer-brand { margin-bottom: 1rem; }
-    footer.site-footer .footer-brand .brand-hendo {
-      font-size: 1.4rem;
-      letter-spacing: 0.12em;
-    }
-    footer.site-footer .footer-brand .brand-code {
-      font-size: 1.4rem;
-      letter-spacing: 0.06em;
-    }
+        .post-body li {
+            margin-bottom: 0.4rem;
+        }
 
-    footer.site-footer a {
-      color: rgba(255,255,255,0.4);
-      text-decoration: underline;
-      transition: color 0.15s;
-    }
-    footer.site-footer a:hover { color: var(--accent); }
+        .post-body li > ul, .post-body li > ol {
+            margin-top: 0.4rem;
+            margin-bottom: 0.4rem;
+        }
 
-    /* ── Responsive ── */
-    @media (max-width: 640px) {
-      article { padding: 2rem 1.25rem 3rem; }
-      .post-header h1 { font-size: 2rem; }
-      nav.post-nav {
-        grid-template-columns: 1fr;
-        text-align: center;
-      }
-      .nav-next { text-align: center; }
-      .nav-prev { text-align: center; }
-      .post-label { display: none; }
-    }
-  </style>
-  </head>
+        /* ── HR ── */
+        .post-body hr {
+            border: none;
+            border-top: 1px solid var(--border);
+            margin: 3.5rem 0;
+        }
+
+        /* ── Strong ── */
+        .post-body strong {
+            color: var(--slate);
+            font-weight: 700;
+        }
+
+        /* ── Post navigation ── */
+        nav.post-nav {
+            max-width: var(--width);
+            margin: 0 auto;
+            padding: 2rem;
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            gap: 1rem;
+            align-items: center;
+            border-top: 1px solid var(--border);
+        }
+
+        .nav-prev {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-family: var(--font-brand);
+            font-weight: 300;
+            font-size: 0.8rem;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            transition: color 0.15s;
+        }
+
+        .nav-prev:hover {
+            color: var(--accent-dark);
+        }
+
+        .nav-index {
+            color: var(--slate);
+            text-decoration: none;
+            font-family: var(--font-brand);
+            font-weight: 700;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            text-align: center;
+            padding: 0.4rem 0.9rem;
+            border: 1px solid var(--slate);
+            border-radius: 3px;
+            transition: all 0.15s;
+            white-space: nowrap;
+        }
+
+        .nav-index:hover {
+            background: var(--slate);
+            color: var(--cream);
+        }
+
+        .nav-next {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-family: var(--font-brand);
+            font-weight: 300;
+            font-size: 0.8rem;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            text-align: right;
+            display: block;
+            transition: color 0.15s;
+        }
+
+        .nav-next:hover {
+            color: var(--accent-dark);
+        }
+
+        /* ── Footer ── */
+        footer.site-footer {
+            background: var(--slate);
+            color: rgba(255, 255, 255, 0.4);
+            padding: 2.5rem 2rem;
+            text-align: center;
+            font-family: var(--font-brand);
+            font-weight: 300;
+            font-size: 0.8rem;
+            letter-spacing: 0.06em;
+            margin-top: 1rem;
+        }
+
+        footer.site-footer p {
+            margin-bottom: 0.5rem;
+        }
+
+        footer.site-footer .footer-brand {
+            margin-bottom: 1rem;
+        }
+
+        footer.site-footer .footer-brand .brand-hendo {
+            font-size: 1.4rem;
+            letter-spacing: 0.12em;
+        }
+
+        footer.site-footer .footer-brand .brand-code {
+            font-size: 1.4rem;
+            letter-spacing: 0.06em;
+        }
+
+        footer.site-footer a {
+            color: rgba(255, 255, 255, 0.4);
+            text-decoration: underline;
+            transition: color 0.15s;
+        }
+
+        footer.site-footer a:hover {
+            color: var(--accent);
+        }
+
+        /* ── Responsive ── */
+        @media (max-width: 640px) {
+            article {
+                padding: 2rem 1.25rem 3rem;
+            }
+
+            .post-header h1 {
+                font-size: 2rem;
+            }
+
+            nav.post-nav {
+                grid-template-columns: 1fr;
+                text-align: center;
+            }
+
+            .nav-next {
+                text-align: center;
+            }
+
+            .nav-prev {
+                text-align: center;
+            }
+
+            .post-label {
+                display: none;
+            }
+        }
+    </style>
+    </head>
 <body>
 
 <nav class="top-nav">
-  <div class="nav-inner">
-    <div style="display:flex;align-items:center;gap:0.65rem;">
-      <a class="nav-brand" href="../">
-        <span class="brand-hendo">Hendo</span><span class="brand-code">Code</span>
-      </a>
-      <span class="nav-divider">/</span>
-      <span class="nav-series">Anchoring AI</span>
+    <div class="nav-inner">
+        <div style="display:flex;align-items:center;gap:0.65rem;">
+            <a class="nav-brand" href="../">
+                <span class="brand-hendo">Hendo</span><span class="brand-code">Code</span>
+            </a>
             <span class="nav-divider">/</span>
-      <span class="post-label">Post 07</span>
-          </div>
-    <a class="nav-gh" href="https://github.com/HendoCode/contact-center-ai" target="_blank" rel="noopener">GitHub ↗</a>
-  </div>
+            <span class="nav-series">Anchoring AI</span>
+                        <span class="nav-divider">/</span>
+            <span class="post-label">Post 07</span>
+                    </div>
+        <a class="nav-gh" href="https://github.com/HendoCode/contact-center-ai" target="_blank" rel="noopener">GitHub
+            ↗</a>
+    </div>
 </nav>
 
 <article>
-  <header class="post-header">
-        <div class="series-eyebrow">Anchoring AI &mdash; Post 07</div>
-        <h1>The Developer’s Toolkit</h1>
-    <p class="post-subtitle">REST API, OpenAPI/Swagger, PyCharm
+    <header class="post-header">
+                <div class="series-eyebrow">Anchoring AI &mdash; Post 07</div>
+                <h1>The Developer’s Toolkit</h1>
+        <p class="post-subtitle">REST API, OpenAPI/Swagger, PyCharm
 debugging, and JetBrains AI in the same workflow</p>
-        <div class="byline">
-      Stephen Henderson &middot; TBD
-    </div>
-      </header>
+                <div class="byline">
+            Stephen Henderson &middot; TBD
+        </div>
+            </header>
 
-  <div class="post-body">
-    <blockquote>
-    <p><strong>Status: Placeholder.</strong> This post is planned. The
-    outline and key concepts below describe what it will cover.</p>
-    </blockquote>
-    <hr />
-    <h2 id="what-this-post-covers">What This Post Covers</h2>
-    <p>The MCP server is stdio-only. That’s the right transport for
-    Claude Desktop and agent integrations, but it’s not how you test a
-    backend in practice. You can’t <code>curl</code> it. You can’t wire
-    it to a browser frontend. And you can’t connect it to teams that
-    aren’t running an MCP-capable client.</p>
-    <p>This post adds an HTTP REST API layer alongside the existing MCP
-    server — not replacing it, just adding a second surface. FastAPI
-    handles the routing and generates an OpenAPI spec for free; Swagger
-    UI gives you a browser-accessible test interface. Then we step back
-    from the code and look at the tooling that made all of this
-    possible: PyCharm’s Docker-aware debugger, Junie for generating unit
-    tests and enforcing idiomatic Python, and the HTTP Request feature
-    for testing the new API without leaving the IDE.</p>
-    <p>There’s also something worth saying about authoring all of this —
-    including these blog posts — from inside the same JetBrains
-    workspace as the code.</p>
-    <hr />
-    <h2 id="key-concepts">Key Concepts</h2>
-    <ul>
-    <li><strong>FastAPI</strong> — async Python web framework; automatic
-    OpenAPI 3.1 spec generation; Pydantic models as request/response
-    schemas; why it’s a natural fit alongside a LangChain-based
-    backend</li>
-    <li><strong>OpenAPI/Swagger</strong> — what the spec actually
-    contains; the <code>/docs</code> and <code>/redoc</code> endpoints
-    FastAPI generates automatically; using the spec as a contract for
-    frontend or third-party integration</li>
-    <li><strong>Sharing tool logic</strong> — the three MCP tools in
-    <code>mcp/tools.py</code> become the same three REST endpoints; no
-    duplication of business logic, just a new transport</li>
-    <li><strong>PyCharm + Docker debugging</strong> — attaching
-    PyCharm’s debugger to a running Docker container; setting
-    breakpoints in <code>pipeline.py</code> during a live query; the
-    Docker Compose service configuration for remote debugging</li>
-    <li><strong>JetBrains Junie</strong> — AI-assisted unit test
-    generation; PEP8 and idiomatic Python suggestions; the difference
-    between “AI writes the test” and “AI writes a test worth keeping”;
-    code review workflow inside the IDE</li>
-    <li><strong>HTTP Request files (<code>.http</code>)</strong> —
-    JetBrains’ built-in HTTP client; <code>.http</code> files as living
-    API documentation checked into the repo; running requests against
-    local and production environments with environment variables</li>
-    <li><strong>Writing blog posts in JetBrains</strong> — Markdown
-    preview, Git integration, running build.sh from the terminal — all
-    from the same workspace as the Python source code; the case for not
-    switching contexts</li>
-    </ul>
-    <hr />
-    <h2 id="the-new-architecture">The New Architecture</h2>
-    <pre><code>Claude Desktop ──(stdio)──► MCP Server (mcp/server.py)
+    <div class="post-body">
+        <blockquote>
+        <p><strong>Status: Placeholder.</strong> This post is planned.
+        The outline and key concepts below describe what it will
+        cover.</p>
+        </blockquote>
+        <hr />
+        <h2 id="what-this-post-covers">What This Post Covers</h2>
+        <p>The MCP server is stdio-only. That’s the right transport for
+        Claude Desktop and agent integrations, but it’s not how you test
+        a backend in practice. You can’t <code>curl</code> it. You can’t
+        wire it to a browser frontend. And you can’t connect it to teams
+        that aren’t running an MCP-capable client.</p>
+        <p>This post adds an HTTP REST API layer alongside the existing
+        MCP server — not replacing it, just adding a second surface.
+        FastAPI handles the routing and generates an OpenAPI spec for
+        free; Swagger UI gives you a browser-accessible test interface.
+        Then we step back from the code and look at the tooling that
+        made all of this possible: PyCharm’s Docker-aware debugger,
+        Junie for generating unit tests and enforcing idiomatic Python,
+        and the HTTP Request feature for testing the new API without
+        leaving the IDE.</p>
+        <p>There’s also something worth saying about authoring all of
+        this — including these blog posts — from inside the same
+        JetBrains workspace as the code.</p>
+        <hr />
+        <h2 id="key-concepts">Key Concepts</h2>
+        <ul>
+        <li><strong>FastAPI</strong> — async Python web framework;
+        automatic OpenAPI 3.1 spec generation; Pydantic models as
+        request/response schemas; why it’s a natural fit alongside a
+        LangChain-based backend</li>
+        <li><strong>OpenAPI/Swagger</strong> — what the spec actually
+        contains; the <code>/docs</code> and <code>/redoc</code>
+        endpoints FastAPI generates automatically; using the spec as a
+        contract for frontend or third-party integration</li>
+        <li><strong>Sharing tool logic</strong> — the three MCP tools in
+        <code>mcp/tools.py</code> become the same three REST endpoints;
+        no duplication of business logic, just a new transport</li>
+        <li><strong>PyCharm + Docker debugging</strong> — attaching
+        PyCharm’s debugger to a running Docker container; setting
+        breakpoints in <code>pipeline.py</code> during a live query; the
+        Docker Compose service configuration for remote debugging</li>
+        <li><strong>JetBrains Junie</strong> — AI-assisted unit test
+        generation; PEP8 and idiomatic Python suggestions; the
+        difference between “AI writes the test” and “AI writes a test
+        worth keeping”; code review workflow inside the IDE</li>
+        <li><strong>HTTP Request files (<code>.http</code>)</strong> —
+        JetBrains’ built-in HTTP client; <code>.http</code> files as
+        living API documentation checked into the repo; running requests
+        against local and production environments with environment
+        variables</li>
+        <li><strong>Writing blog posts in JetBrains</strong> — Markdown
+        preview, Git integration, running build.sh from the terminal —
+        all from the same workspace as the Python source code; the case
+        for not switching contexts</li>
+        </ul>
+        <hr />
+        <h2 id="the-new-architecture">The New Architecture</h2>
+        <pre><code>Claude Desktop ──(stdio)──► MCP Server (mcp/server.py)
                                 │
 HTTP Client ────(HTTP)───► REST API (api/server.py)  ─────► mcp/tools.py ──► rag_query()
                                                                           └──► csat (JSON)
 
 Both surfaces share the same tool implementations.</code></pre>
-    <hr />
-    <h2 id="planned-outline">Planned Outline</h2>
-    <ol type="1">
-    <li><strong>Why add REST alongside MCP</strong> — the audiences that
-    can’t use stdio; testing and developer experience; frontend
-    integration paths</li>
-    <li><strong>FastAPI in 30 lines</strong> — a
-    <code>api/server.py</code> that exposes the three tools as POST
-    endpoints; Pydantic request/response models; <code>uvicorn</code> as
-    the runner</li>
-    <li><strong>OpenAPI for free</strong> — what FastAPI generates;
-    navigating the Swagger UI; how the spec doubles as integration
-    documentation for other teams</li>
-    <li><strong>Adding to docker-compose</strong> — the <code>api</code>
-    service; port exposure; shared environment variables with the MCP
-    server</li>
-    <li><strong>PyCharm debugging with Docker</strong> — configuring a
-    remote interpreter; attaching to the API container; stepping through
-    <code>rag_query()</code> during a live request; what changes when
-    you debug through a Docker boundary vs. locally</li>
-    <li><strong>Junie: unit tests from the AI assistant</strong> —
-    generating tests for <code>query_csat()</code> and
-    <code>search_transcripts()</code>; evaluating what Junie produces;
-    fixing the category filter bug (known bug from Post 3) and watching
-    the test catch it</li>
-    <li><strong>Junie: PEP8 and idiomatic cleanup</strong> — what
-    suggestions come out; which ones to accept; which ones are style
-    preferences vs. correctness improvements</li>
-    <li><strong>HTTP Request files</strong> — creating
-    <code>api/requests.http</code>; environment variables for local
-    vs. production; checking <code>.http</code> files into the repo as
-    executable documentation</li>
-    <li><strong>Authoring in JetBrains</strong> — the blog post you’re
-    reading was written in the same IDE; Markdown preview, terminal, Git
-    — one window</li>
-    </ol>
-    <hr />
-    <h2 id="code-changes-for-this-post">Code Changes for This Post</h2>
-    <ul>
-    <li>New <code>api/server.py</code> — FastAPI application with three
-    endpoints mirroring the MCP tools</li>
-    <li>New <code>api/models.py</code> — Pydantic request/response
-    models</li>
-    <li>Add <code>fastapi</code>, <code>uvicorn</code> to
-    <code>pyproject.toml</code> dependencies</li>
-    <li>Add <code>api</code> service to
-    <code>docker-compose.yml</code></li>
-    <li>New <code>api/requests.http</code> — HTTP Request file for all
-    three endpoints (checked into repo)</li>
-    <li>Unit tests for <code>mcp/tools.py</code> (generated with Junie,
-    then reviewed + fixed)</li>
-    <li>Fix the <code>query_csat</code> category filter bug (Bug 2 from
-    Post 3, tested by new test)</li>
-    </ul>
-    <hr />
-    <h2 id="outstanding-questions-tbd">Outstanding Questions / TBD</h2>
-    <ul>
-    <li>Use FastAPI or Flask? (FastAPI is the clear choice for OpenAPI
-    generation; Flask if simplicity is the argument)</li>
-    <li>Add authentication to the REST API? (The MCP server relies on
-    Entra Easy Auth at the infra layer — the REST API needs its own auth
-    strategy if exposed beyond localhost)</li>
-    <li>Include a section on the difference between the Swagger spec
-    FastAPI generates and writing an OpenAPI spec by hand?</li>
-    <li>Show Junie generating tests for the known bug in
-    <code>get_call_summary()</code> as well?</li>
-    <li><code>debugpy</code> for Docker debugging or PyCharm’s built-in
-    Docker interpreter?</li>
-    </ul>
-  </div>
+        <hr />
+        <h2 id="planned-outline">Planned Outline</h2>
+        <ol type="1">
+        <li><strong>Why add REST alongside MCP</strong> — the audiences
+        that can’t use stdio; testing and developer experience; frontend
+        integration paths</li>
+        <li><strong>FastAPI in 30 lines</strong> — a
+        <code>api/server.py</code> that exposes the three tools as POST
+        endpoints; Pydantic request/response models;
+        <code>uvicorn</code> as the runner</li>
+        <li><strong>OpenAPI for free</strong> — what FastAPI generates;
+        navigating the Swagger UI; how the spec doubles as integration
+        documentation for other teams</li>
+        <li><strong>Adding to docker-compose</strong> — the
+        <code>api</code> service; port exposure; shared environment
+        variables with the MCP server</li>
+        <li><strong>PyCharm debugging with Docker</strong> — configuring
+        a remote interpreter; attaching to the API container; stepping
+        through <code>rag_query()</code> during a live request; what
+        changes when you debug through a Docker boundary
+        vs. locally</li>
+        <li><strong>Junie: unit tests from the AI assistant</strong> —
+        generating tests for <code>query_csat()</code> and
+        <code>search_transcripts()</code>; evaluating what Junie
+        produces; fixing the category filter bug (known bug from Post 3)
+        and watching the test catch it</li>
+        <li><strong>Junie: PEP8 and idiomatic cleanup</strong> — what
+        suggestions come out; which ones to accept; which ones are style
+        preferences vs. correctness improvements</li>
+        <li><strong>HTTP Request files</strong> — creating
+        <code>api/requests.http</code>; environment variables for local
+        vs. production; checking <code>.http</code> files into the repo
+        as executable documentation</li>
+        <li><strong>Authoring in JetBrains</strong> — the blog post
+        you’re reading was written in the same IDE; Markdown preview,
+        terminal, Git — one window</li>
+        </ol>
+        <hr />
+        <h2 id="code-changes-for-this-post">Code Changes for This
+        Post</h2>
+        <ul>
+        <li>New <code>api/server.py</code> — FastAPI application with
+        three endpoints mirroring the MCP tools</li>
+        <li>New <code>api/models.py</code> — Pydantic request/response
+        models</li>
+        <li>Add <code>fastapi</code>, <code>uvicorn</code> to
+        <code>pyproject.toml</code> dependencies</li>
+        <li>Add <code>api</code> service to
+        <code>docker-compose.yml</code></li>
+        <li>New <code>api/requests.http</code> — HTTP Request file for
+        all three endpoints (checked into repo)</li>
+        <li>Unit tests for <code>mcp/tools.py</code> (generated with
+        Junie, then reviewed + fixed)</li>
+        <li>Fix the <code>query_csat</code> category filter bug (Bug 2
+        from Post 3, tested by new test)</li>
+        </ul>
+        <hr />
+        <h2 id="outstanding-questions-tbd">Outstanding Questions /
+        TBD</h2>
+        <ul>
+        <li>Use FastAPI or Flask? (FastAPI is the clear choice for
+        OpenAPI generation; Flask if simplicity is the argument)</li>
+        <li>Add authentication to the REST API? (The MCP server relies
+        on Entra Easy Auth at the infra layer — the REST API needs its
+        own auth strategy if exposed beyond localhost)</li>
+        <li>Include a section on the difference between the Swagger spec
+        FastAPI generates and writing an OpenAPI spec by hand?</li>
+        <li>Show Junie generating tests for the known bug in
+        <code>get_call_summary()</code> as well?</li>
+        <li><code>debugpy</code> for Docker debugging or PyCharm’s
+        built-in Docker interpreter?</li>
+        </ul>
+    </div>
 </article>
 
 <nav class="post-nav">
-    <a class="nav-prev" href="../06-built-to-last/">&#8592; Built to
+        <a class="nav-prev" href="../06-built-to-last/">&#8592; Built to
 Last</a>
-    <a class="nav-index" href="../">Series Index</a>
-    <a class="nav-next" href="../08-what-should-we-measure/">What Should
-We Measure? &#8594;</a>
-  </nav>
+        <a class="nav-index" href="../">Series Index</a>
+        <a class="nav-next" href="../08-what-should-we-measure/">What
+Should We Measure? &#8594;</a>
+    </nav>
 
 <footer class="site-footer">
-  <div class="footer-brand">
-    <span class="brand-hendo">Hendo</span><span class="brand-code">Code</span>
-  </div>
-  <p>Anchoring AI &mdash; a series on building production RAG systems</p>
-  <p><a href="https://github.com/HendoCode/contact-center-ai" target="_blank" rel="noopener">View the code on GitHub</a></p>
+    <div class="footer-brand">
+        <span class="brand-hendo">Hendo</span><span class="brand-code">Code</span>
+    </div>
+    <p>Anchoring AI &mdash; a series on building production RAG systems</p>
+    <p><a href="https://github.com/HendoCode/contact-center-ai" target="_blank" rel="noopener">View the code on
+        GitHub</a></p>
 </footer>
 
 <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
 <script>
-  // Scripts at bottom of <body> — DOM is fully parsed, no DOMContentLoaded needed.
-  // Pandoc outputs <pre class="mermaid"><code>...</code></pre>; Mermaid needs <div class="mermaid">.
-  document.querySelectorAll('pre.mermaid').forEach(function (el) {
-    var div = document.createElement('div');
-    div.className = 'mermaid';
-    div.textContent = el.textContent;
-    el.parentNode.replaceChild(div, el);
-  });
-  mermaid.initialize({ startOnLoad: false, theme: 'neutral', securityLevel: 'loose' });
-  mermaid.run();
+    // Scripts at bottom of <body> — DOM is fully parsed, no DOMContentLoaded needed.
+    // Pandoc outputs <pre class="mermaid"><code>...</code></pre>; Mermaid needs <div class="mermaid">.
+    document.querySelectorAll('pre.mermaid').forEach(function (el) {
+        var div = document.createElement('div');
+        div.className = 'mermaid';
+        div.textContent = el.textContent;
+        el.parentNode.replaceChild(div, el);
+    });
+    mermaid.initialize({startOnLoad: false, theme: 'neutral', securityLevel: 'loose'});
+    mermaid.run();
 </script>
 
 </body>
