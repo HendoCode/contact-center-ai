@@ -5,13 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Run Anywhere | Anchoring AI — HendoCode</title>
   <meta name="description" content="Post 4 of Anchoring AI: how the
-LLM_PROVIDER env var pattern works, how to run the entire stack locally
-with Ollama, and the cost and privacy trade-offs of each approach.">
+LLM_PROVIDER pattern works, running the full stack locally with Ollama,
+the embedding dimension constraint, and when local models are good
+enough.">
   <meta property="og:title" content="Run Anywhere">
   <meta property="og:description" content="Post 4 of Anchoring AI: how
-the LLM_PROVIDER env var pattern works, how to run the entire stack
-locally with Ollama, and the cost and privacy trade-offs of each
-approach.">
+the LLM_PROVIDER pattern works, running the full stack locally with
+Ollama, the embedding dimension constraint, and when local models are
+good enough.">
   <meta property="og:type" content="article">
   <meta name="twitter:card" content="summary">
   <meta name="twitter:title" content="Run Anywhere">
@@ -480,6 +481,75 @@ approach.">
       .post-label { display: none; }
     }
   </style>
+    <style>
+    html { -webkit-text-size-adjust: 100%; }
+    pre > code.sourceCode { white-space: pre; position: relative; }
+    pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+    pre > code.sourceCode > span:empty { height: 1.2em; }
+    .sourceCode { overflow: visible; }
+    code.sourceCode > span { color: inherit; text-decoration: inherit; }
+    div.sourceCode { margin: 1em 0; }
+    pre.sourceCode { margin: 0; }
+    @media screen {
+    div.sourceCode { overflow: auto; }
+    }
+    @media print {
+    pre > code.sourceCode { white-space: pre-wrap; }
+    pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+    }
+    pre.numberSource code
+      { counter-reset: source-line 0; }
+    pre.numberSource code > span
+      { position: relative; left: -4em; counter-increment: source-line; }
+    pre.numberSource code > span > a:first-child::before
+      { content: counter(source-line);
+        position: relative; left: -1em; text-align: right; vertical-align: baseline;
+        border: none; display: inline-block;
+        -webkit-touch-callout: none; -webkit-user-select: none;
+        -khtml-user-select: none; -moz-user-select: none;
+        -ms-user-select: none; user-select: none;
+        padding: 0 4px; width: 4em;
+        background-color: #232629;
+        color: #7a7c7d;
+      }
+    pre.numberSource { margin-left: 3em; border-left: 1px solid #7a7c7d;  padding-left: 4px; }
+    div.sourceCode
+      { color: #cfcfc2; background-color: #232629; }
+    @media screen {
+    pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+    }
+    code span { color: #cfcfc2; } /* Normal */
+    code span.al { color: #95da4c; background-color: #4d1f24; font-weight: bold; } /* Alert */
+    code span.an { color: #3f8058; } /* Annotation */
+    code span.at { color: #2980b9; } /* Attribute */
+    code span.bn { color: #f67400; } /* BaseN */
+    code span.bu { color: #7f8c8d; } /* BuiltIn */
+    code span.cf { color: #fdbc4b; font-weight: bold; } /* ControlFlow */
+    code span.ch { color: #3daee9; } /* Char */
+    code span.cn { color: #27aeae; font-weight: bold; } /* Constant */
+    code span.co { color: #7a7c7d; } /* Comment */
+    code span.cv { color: #7f8c8d; } /* CommentVar */
+    code span.do { color: #a43340; } /* Documentation */
+    code span.dt { color: #2980b9; } /* DataType */
+    code span.dv { color: #f67400; } /* DecVal */
+    code span.er { color: #da4453; text-decoration: underline; } /* Error */
+    code span.ex { color: #0099ff; font-weight: bold; } /* Extension */
+    code span.fl { color: #f67400; } /* Float */
+    code span.fu { color: #8e44ad; } /* Function */
+    code span.im { color: #27ae60; } /* Import */
+    code span.in { color: #c45b00; } /* Information */
+    code span.kw { color: #cfcfc2; font-weight: bold; } /* Keyword */
+    code span.op { color: #cfcfc2; } /* Operator */
+    code span.ot { color: #27ae60; } /* Other */
+    code span.pp { color: #27ae60; } /* Preprocessor */
+    code span.re { color: #2980b9; background-color: #153042; } /* RegionMarker */
+    code span.sc { color: #3daee9; } /* SpecialChar */
+    code span.ss { color: #da4453; } /* SpecialString */
+    code span.st { color: #f44f4f; } /* String */
+    code span.va { color: #27aeae; } /* Variable */
+    code span.vs { color: #da4453; } /* VerbatimString */
+    code span.wa { color: #da4453; } /* Warning */
+  </style>
   </head>
 <body>
 
@@ -505,92 +575,301 @@ approach.">
     <p class="post-subtitle">Provider agnosticism: swapping OpenAI for
 Ollama with one environment variable</p>
         <div class="byline">
-      Stephen Henderson &middot; TBD
+      Stephen Henderson &middot; June 2026
     </div>
       </header>
 
   <div class="post-body">
-    <blockquote>
-    <p><strong>Status: Placeholder.</strong> This post is planned. The
-    outline and key concepts below describe what it will cover.</p>
-    </blockquote>
+    <p>Early in the engagement, a question came up that shaped a lot of
+    the architecture: <em>what happens if the client decides to stop
+    using OpenAI?</em></p>
+    <p>It’s not a hypothetical. The credit union had already watched one
+    team sign a two-year contract with a vendor that pivoted its product
+    and left them stuck. They were cautious about building on any single
+    provider’s API, and they had a compliance team asking pointed
+    questions about which member data was being sent where.</p>
+    <p>Both concerns point to the same design requirement: <strong>the
+    system should be able to run without calling any external
+    API.</strong> Not as a fallback, not as a workaround — as a
+    first-class operating mode. An environment variable decides which
+    provider runs. Nothing else changes.</p>
+    <p>This post is about how that works, what it costs in quality, and
+    when running local is actually the right call.</p>
     <hr />
-    <h2 id="what-this-post-covers">What This Post Covers</h2>
-    <p>One of the cleaner design decisions in this codebase is that the
-    entire LLM stack — embeddings and completions — can be swapped
-    between OpenAI and Ollama by changing a single environment variable
-    and restarting the server. No code changes. This post explains how
-    that works, why it was designed that way, and what the real-world
-    trade-offs are.</p>
-    <p>It also covers Ollama specifically: setting it up, pulling the
-    models, and what “local LLM” actually means in practice for a use
-    case like this one.</p>
+    <h2 id="the-pattern">The Pattern</h2>
+    <p>The entire provider selection lives in two functions across two
+    files. That’s it.</p>
+    <p>In <code>rag/embeddings.py</code>, <code>get_embeddings()</code>
+    checks <code>LLM_PROVIDER</code> and returns the appropriate
+    embedding model:</p>
+    <div class="sourceCode" id="cb1"><pre
+    class="sourceCode python"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> get_embeddings():</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>    provider <span class="op">=</span> os.getenv(<span class="st">&quot;LLM_PROVIDER&quot;</span>, <span class="st">&quot;openai&quot;</span>).lower()</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> provider <span class="op">==</span> <span class="st">&quot;ollama&quot;</span>:</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>        <span class="im">from</span> langchain_ollama <span class="im">import</span> OllamaEmbeddings</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> OllamaEmbeddings(</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>            model<span class="op">=</span>os.getenv(<span class="st">&quot;OLLAMA_EMBEDDING_MODEL&quot;</span>, <span class="st">&quot;nomic-embed-text&quot;</span>),</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>            base_url<span class="op">=</span>os.getenv(<span class="st">&quot;OLLAMA_BASE_URL&quot;</span>, <span class="st">&quot;http://localhost:11434&quot;</span>),</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>        )</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>    <span class="im">from</span> langchain_openai <span class="im">import</span> OpenAIEmbeddings</span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> OpenAIEmbeddings(</span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>        model<span class="op">=</span><span class="st">&quot;text-embedding-3-small&quot;</span>,</span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a>        api_key<span class="op">=</span>os.getenv(<span class="st">&quot;OPENAI_API_KEY&quot;</span>),</span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a>    )</span></code></pre></div>
+    <p>In <code>rag/pipeline.py</code>, <code>rag_query()</code> does
+    the same for the completion model:</p>
+    <div class="sourceCode" id="cb2"><pre
+    class="sourceCode python"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>provider <span class="op">=</span> os.getenv(<span class="st">&quot;LLM_PROVIDER&quot;</span>, <span class="st">&quot;openai&quot;</span>).lower()</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> provider <span class="op">==</span> <span class="st">&quot;ollama&quot;</span>:</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>    <span class="im">from</span> langchain_ollama <span class="im">import</span> ChatOllama</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>    llm <span class="op">=</span> ChatOllama(</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>        model<span class="op">=</span>os.getenv(<span class="st">&quot;OLLAMA_MODEL&quot;</span>, <span class="st">&quot;llama3.2&quot;</span>),</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>        base_url<span class="op">=</span>os.getenv(<span class="st">&quot;OLLAMA_BASE_URL&quot;</span>, <span class="st">&quot;http://localhost:11434&quot;</span>),</span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a><span class="cf">else</span>:</span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>    <span class="im">from</span> langchain_openai <span class="im">import</span> ChatOpenAI</span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>    llm <span class="op">=</span> ChatOpenAI(model<span class="op">=</span><span class="st">&quot;gpt-4o-mini&quot;</span>, api_key<span class="op">=</span>os.getenv(<span class="st">&quot;OPENAI_API_KEY&quot;</span>))</span></code></pre></div>
+    <p>Everything else in the codebase — the ingestion pipeline, the
+    retrieval step, the MCP server — calls <code>get_embeddings()</code>
+    or <code>get_vector_store()</code> and gets whatever comes back.
+    Neither the MCP tools nor the server have any awareness of which
+    provider is running.</p>
+    <p>Notice the lazy imports:
+    <code>from langchain_ollama import ...</code> lives inside the
+    <code>if</code> branch, not at the top of the file. This means the
+    import only happens when that provider is actually selected. Both
+    packages are installed (they’re in <code>pyproject.toml</code>), but
+    the pattern keeps the coupling explicit at the point where the
+    choice is made.</p>
     <hr />
-    <h2 id="key-concepts">Key Concepts</h2>
-    <ul>
-    <li><strong><code>LLM_PROVIDER</code> env var</strong> — how a
-    single variable controls both embedding model and completion model
-    selection</li>
-    <li><strong><code>rag/embeddings.py</code> as the single coupling
-    point</strong> — why provider swaps require editing only this
-    file</li>
-    <li><strong>LangChain provider abstractions</strong> —
-    <code>OpenAIEmbeddings</code> vs <code>OllamaEmbeddings</code>;
-    <code>ChatOpenAI</code> vs <code>ChatOllama</code></li>
-    <li><strong>Ollama</strong> — running models locally;
-    <code>nomic-embed-text</code> as an embedding alternative to
-    <code>text-embedding-3-small</code>; <code>llama3.2</code> as a
-    <code>gpt-4o-mini</code> alternative</li>
-    <li><strong>Embedding dimension mismatch</strong> — why you can’t
-    switch embedding models mid-stream without re-ingesting; the data
-    compatibility constraint</li>
-    <li><strong>Cost and privacy trade-offs</strong> — API cost
-    vs. hardware cost; what “local” means for data that can’t leave the
-    network</li>
-    <li><strong>Model quality gap</strong> — where the quality
-    difference between OpenAI and Ollama matters most for this use
-    case</li>
-    </ul>
+    <h2 id="setting-up-ollama">Setting Up Ollama</h2>
+    <p>Ollama is already in <code>docker-compose.yml</code>:</p>
+    <div class="sourceCode" id="cb3"><pre
+    class="sourceCode yaml"><code class="sourceCode yaml"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ollama</span><span class="kw">:</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">image</span><span class="kw">:</span><span class="at"> ollama/ollama:latest</span></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">container_name</span><span class="kw">:</span><span class="at"> ollama</span></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">tty</span><span class="kw">:</span><span class="at"> </span><span class="ch">true</span></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">restart</span><span class="kw">:</span><span class="at"> unless-stopped</span></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">ports</span><span class="kw">:</span></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="kw">-</span><span class="at"> </span><span class="st">&quot;11434:11434&quot;</span></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">volumes</span><span class="kw">:</span></span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="kw">-</span><span class="at"> ollama:/root/.ollama</span></span></code></pre></div>
+    <p>The container runs but doesn’t come with any models pre-loaded.
+    You pull them after it starts:</p>
+    <div class="sourceCode" id="cb4"><pre
+    class="sourceCode bash"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="ex">docker</span> compose up <span class="at">-d</span> ollama</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Pull the models</span></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a><span class="ex">docker</span> compose exec ollama ollama pull nomic-embed-text</span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a><span class="ex">docker</span> compose exec ollama ollama pull llama3.2</span></code></pre></div>
+    <p><code>nomic-embed-text</code> is the embedding model — the local
+    equivalent of <code>text-embedding-3-small</code>.
+    <code>llama3.2</code> is the completion model — the local equivalent
+    of <code>gpt-4o-mini</code>. Both run inside the container. No
+    network calls once they’re pulled.</p>
+    <p>Then flip the provider:</p>
+    <div class="sourceCode" id="cb5"><pre
+    class="sourceCode bash"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="co"># In .env</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="va">LLM_PROVIDER</span><span class="op">=</span>ollama</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="va">OLLAMA_BASE_URL</span><span class="op">=</span>http://localhost:11434</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a><span class="va">OLLAMA_MODEL</span><span class="op">=</span>llama3.2</span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a><span class="va">OLLAMA_EMBEDDING_MODEL</span><span class="op">=</span>nomic-embed-text</span></code></pre></div>
+    <p>Restart the server and the entire stack is running locally. The
+    MCP tools work identically from the client’s perspective. The only
+    difference is where the compute happens.</p>
     <hr />
-    <h2 id="planned-outline">Planned Outline</h2>
-    <ol type="1">
-    <li><strong>The design constraint</strong> — why the credit union
-    needed a “no API key” mode; what drove the provider abstraction</li>
-    <li><strong>How the swap works</strong> — reading
-    <code>LLM_PROVIDER</code> in <code>embeddings.py</code> and
-    <code>pipeline.py</code>; the conditional import pattern</li>
-    <li><strong>Ollama setup</strong> —
-    <code>docker compose up -d ollama</code>; pulling models; verifying
-    they’re available</li>
-    <li><strong>Running the full stack with Ollama</strong> —
-    step-by-step: ingest, query, MCP server — all local, no external
-    calls</li>
-    <li><strong>The embedding dimension problem</strong> —
-    <code>text-embedding-3-small</code> is 1536 dims;
-    <code>nomic-embed-text</code> is 768; why switching mid-stream
-    breaks everything</li>
-    <li><strong>Quality comparison</strong> — a side-by-side query
-    comparison: the same question answered by OpenAI vs. Ollama; where
-    the gap is visible</li>
-    <li><strong>Adding a third provider</strong> — what it would take to
-    add Anthropic or Gemini embeddings; what would need to change</li>
-    <li><strong>When to use which</strong> — decision guide: API key
-    available + quality matters → OpenAI; data privacy + no external
-    calls → Ollama; prototyping → either</li>
-    </ol>
+    <h2 id="the-dimension-problem">The Dimension Problem</h2>
+    <p>There’s a constraint worth understanding before you switch
+    providers on an existing system: <strong>you cannot swap embedding
+    models on a populated vector store.</strong></p>
+    <p><code>text-embedding-3-small</code> produces 1,536-dimensional
+    vectors. <code>nomic-embed-text</code> produces 768-dimensional
+    vectors. The two are fundamentally incompatible — you can’t do
+    cosine similarity between a 1,536-dim query vector and a 768-dim
+    document vector, and pgvector will reject the attempt.</p>
+    <p>If you switch <code>LLM_PROVIDER</code> from <code>openai</code>
+    to <code>ollama</code> without re-ingesting, your queries will fail
+    at the vector search step. The documents in pgvector were embedded
+    with OpenAI’s model; the query is now being embedded with Ollama’s.
+    The dimensions don’t match.</p>
+    <p>The fix is a full re-ingest:</p>
+    <div class="sourceCode" id="cb6"><pre
+    class="sourceCode bash"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Drop the existing collection (connect to psql and truncate, or</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="co"># delete via psycopg2 — PGVector has no built-in drop collection CLI)</span></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Re-ingest with the new provider active</span></span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a><span class="va">LLM_PROVIDER</span><span class="op">=</span>ollama <span class="ex">python</span> <span class="at">-m</span> rag.pipeline <span class="at">--ingest</span></span></code></pre></div>
+    <p>This also means that if you’re running in production with OpenAI
+    embeddings and you want to evaluate Ollama, you’d stand up a second
+    collection (<code>call_transcripts_ollama</code>), ingest into it,
+    and compare results — not swap the live collection in place. We’ll
+    return to this shadow-mode evaluation pattern in Post 8 when we talk
+    about drift detection.</p>
+    <p>The practical rule: treat a provider change as a schema
+    migration. Plan it, test it, don’t do it live.</p>
     <hr />
-    <h2 id="code-changes-for-this-post">Code Changes for This Post</h2>
-    <p>Possibly: add a third provider option as a demonstration (e.g., a
-    stub for Anthropic or a <code>cohere</code> embedding option).
-    TBD.</p>
+    <h2 id="open-webui-testing-models-before-you-commit">open-webui:
+    Testing Models Before You Commit</h2>
+    <p>The docker-compose file includes one more service worth knowing
+    about:</p>
+    <div class="sourceCode" id="cb7"><pre
+    class="sourceCode yaml"><code class="sourceCode yaml"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="fu">open-webui</span><span class="kw">:</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">image</span><span class="kw">:</span><span class="at"> ghcr.io/open-webui/open-webui:main</span></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">ports</span><span class="kw">:</span></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="kw">-</span><span class="at"> </span><span class="st">&quot;9090:8080&quot;</span></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">environment</span><span class="kw">:</span></span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="kw">-</span><span class="at"> OLLAMA_BASE_URL=http://ollama:11434</span></span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">depends_on</span><span class="kw">:</span></span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="kw">-</span><span class="at"> ollama</span></span></code></pre></div>
+    <p>Open WebUI is a ChatGPT-style interface that talks to your local
+    Ollama instance. Navigate to <code>http://localhost:9090</code>
+    after <code>docker compose up -d</code> and you can chat directly
+    with any model you’ve pulled.</p>
+    <p>This is useful before committing a model to the pipeline. You can
+    test <code>llama3.2</code> interactively — ask it call-center-style
+    questions, probe its reasoning, check if its output format matches
+    what the RAG prompt expects. Models have different personalities:
+    some are verbose, some terse, some follow instructions precisely,
+    some paraphrase the prompt back to you. Knowing what you’re getting
+    before it’s embedded in production is worth the five minutes.</p>
     <hr />
-    <h2 id="outstanding-questions-tbd">Outstanding Questions / TBD</h2>
-    <ul>
-    <li>Benchmark query latency and quality across providers?</li>
-    <li>Show the docker-compose Ollama service in detail?</li>
-    <li>Discuss open-webui (already in docker-compose) as a way to test
-    models before integrating?</li>
-    </ul>
+    <h2 id="quality-an-honest-comparison">Quality: An Honest
+    Comparison</h2>
+    <p>The capability gap between <code>gpt-4o-mini</code> and
+    <code>llama3.2</code> is real, and it shows up in specific ways for
+    this use case.</p>
+    <p><strong>Where Ollama holds up well:</strong> Summarization. If
+    the RAG pipeline retrieves the right documents (the embedding
+    quality determines this), <code>llama3.2</code> does a reasonable
+    job of synthesizing them into a coherent answer. The model isn’t
+    being asked to reason from scratch — it’s being asked to read a set
+    of transcripts and report what it finds. That’s a task where a
+    smaller model performs adequately.</p>
+    <p><strong>Where OpenAI pulls ahead:</strong> Complex queries. “What
+    patterns do you see in calls that escalated after 8pm compared to
+    those that escalated during business hours?” requires the model to
+    reason across multiple retrieved documents, identify trends, and
+    produce a structured comparison. <code>gpt-4o-mini</code> handles
+    this more reliably. <code>llama3.2</code> tends to produce flatter
+    answers that restate the retrieved content without the synthesis
+    layer.</p>
+    <p><strong>Embedding quality matters more than completion
+    quality.</strong> If the wrong documents are retrieved, even
+    <code>gpt-4o-mini</code> can’t produce a good answer — it’ll
+    hallucinate or tell you nothing useful was found.
+    <code>nomic-embed-text</code> is a strong embedding model and
+    performs comparably to <code>text-embedding-3-small</code> for most
+    retrieval tasks in this domain. The quality difference between the
+    two embedding models is smaller than the quality difference between
+    the two completion models.</p>
+    <p>The practical implication: if you’re optimizing for cost and data
+    privacy, use Ollama for both embeddings and completions. If you need
+    the best possible answers and can afford the API calls, use OpenAI
+    for completions and you could argue for either embedding model.
+    Don’t mix embedding providers on the same collection.</p>
+    <hr />
+    <h2 id="adding-a-third-provider">Adding a Third Provider</h2>
+    <p>The pattern is designed to extend. Adding Anthropic or Gemini
+    embeddings means editing two functions in one file. Here’s what
+    adding Anthropic’s embedding model would look like in
+    <code>get_embeddings()</code>:</p>
+    <div class="sourceCode" id="cb8"><pre
+    class="sourceCode python"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> provider <span class="op">==</span> <span class="st">&quot;anthropic&quot;</span>:</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Anthropic doesn&#39;t yet publish a standalone embeddings API;</span></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>    <span class="co"># this would use a third-party wrapper or voyage-ai embeddings</span></span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>    <span class="im">from</span> langchain_voyageai <span class="im">import</span> VoyageAIEmbeddings</span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> VoyageAIEmbeddings(</span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>        model<span class="op">=</span><span class="st">&quot;voyage-3&quot;</span>,</span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>        api_key<span class="op">=</span>os.getenv(<span class="st">&quot;VOYAGE_API_KEY&quot;</span>),</span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a>    )</span></code></pre></div>
+    <p>And the corresponding completion model in
+    <code>rag_query()</code>:</p>
+    <div class="sourceCode" id="cb9"><pre
+    class="sourceCode python"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> provider <span class="op">==</span> <span class="st">&quot;anthropic&quot;</span>:</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>    <span class="im">from</span> langchain_anthropic <span class="im">import</span> ChatAnthropic</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>    llm <span class="op">=</span> ChatAnthropic(</span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>        model<span class="op">=</span><span class="st">&quot;claude-sonnet-4-5&quot;</span>,</span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>        api_key<span class="op">=</span>os.getenv(<span class="st">&quot;ANTHROPIC_API_KEY&quot;</span>),</span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>    )</span></code></pre></div>
+    <p>That’s the entire change. LangChain’s provider abstractions
+    (<code>ChatOpenAI</code>, <code>ChatOllama</code>,
+    <code>ChatAnthropic</code>) all implement the same interface, so the
+    <code>llm.invoke(prompt)</code> call in <code>rag_query()</code>
+    works identically regardless of which object it gets.</p>
+    <p>The credit union’s multi-vendor reality — Claude, OpenAI, Gemini
+    running in parallel across different teams — is actually a good fit
+    for this architecture. Each team’s deployment can point at a
+    different provider via environment variable. The MCP server code is
+    identical. The data pipeline is identical. Only the provider config
+    differs.</p>
+    <hr />
+    <h2 id="when-to-use-which">When to Use Which</h2>
+    <p>A decision guide based on what actually matters:</p>
+    <table>
+    <colgroup>
+    <col style="width: 50%" />
+    <col style="width: 50%" />
+    </colgroup>
+    <thead>
+    <tr>
+    <th>Scenario</th>
+    <th>Recommendation</th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr>
+    <td>Development and prototyping</td>
+    <td>Ollama — no API costs, no key management, works offline</td>
+    </tr>
+    <tr>
+    <td>Regulated data that cannot leave the network</td>
+    <td>Ollama on self-hosted infrastructure</td>
+    </tr>
+    <tr>
+    <td>Best answer quality, cost is secondary</td>
+    <td>OpenAI (<code>gpt-4o-mini</code> +
+    <code>text-embedding-3-small</code>)</td>
+    </tr>
+    <tr>
+    <td>High query volume, cost is primary</td>
+    <td>Ollama on adequately sized hardware</td>
+    </tr>
+    <tr>
+    <td>Client has Azure enterprise agreement</td>
+    <td>Azure OpenAI Service (same models, different endpoint)</td>
+    </tr>
+    </tbody>
+    </table>
+    <p>The one thing worth resisting: switching providers mid-project to
+    chase marginal quality gains. Each switch is a re-ingest event and a
+    validation exercise. The engineering cost is real, and the quality
+    difference between well-tuned retrieval with
+    <code>nomic-embed-text</code> and retrieval with
+    <code>text-embedding-3-small</code> is usually smaller than the
+    difference between good prompts and bad ones.</p>
+    <hr />
+    <h2 id="whats-next">What’s Next</h2>
+    <p>Post 5 takes the system to production. We’ll walk through
+    <code>infra/terraform/main.tf</code> — the Azure infrastructure that
+    hosts the MCP server, the managed pgvector database, and the Entra
+    authentication layer that means the Python code never has to handle
+    a token.</p>
+    <p>To switch to Ollama locally right now:</p>
+    <div class="sourceCode" id="cb10"><pre
+    class="sourceCode bash"><code class="sourceCode bash"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="ex">docker</span> compose up <span class="at">-d</span> ollama</span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a><span class="ex">docker</span> compose exec ollama ollama pull nomic-embed-text</span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a><span class="ex">docker</span> compose exec ollama ollama pull llama3.2</span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a><span class="co"># Update .env</span></span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a><span class="bu">echo</span> <span class="st">&quot;LLM_PROVIDER=ollama&quot;</span> <span class="op">&gt;&gt;</span> .env</span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a><span class="co"># Re-ingest with the local provider</span></span>
+<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> <span class="at">-m</span> rag.pipeline <span class="at">--ingest</span></span>
+<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-11"><a href="#cb10-11" aria-hidden="true" tabindex="-1"></a><span class="co"># Test</span></span>
+<span id="cb10-12"><a href="#cb10-12" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> <span class="at">-m</span> rag.pipeline <span class="at">--query</span> <span class="st">&quot;fraud disputes where members were frustrated&quot;</span></span></code></pre></div>
   </div>
 </article>
 
