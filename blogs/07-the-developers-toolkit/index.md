@@ -34,6 +34,7 @@ There's also something worth saying about authoring all of this — including th
 - **JetBrains Junie** — AI-assisted unit test generation; PEP8 and idiomatic Python suggestions; the difference between "AI writes the test" and "AI writes a test worth keeping"; code review workflow inside the IDE
 - **HTTP Request files (`.http`)** — JetBrains' built-in HTTP client; `.http` files as living API documentation checked into the repo; running requests against local and production environments with environment variables
 - **Writing blog posts in JetBrains** — Markdown preview, Git integration, running build.sh from the terminal — all from the same workspace as the Python source code; the case for not switching contexts
+- **IDE landscape comparison** — JetBrains vs. Windsurf vs. Cursor vs. Copilot: agentic ("do this whole task") vs. assistant ("help with this selection") paradigms; where each tool is strongest; a tool-equivalence table so readers on other IDEs can translate the workflow
 
 ---
 
@@ -61,6 +62,7 @@ Both surfaces share the same tool implementations.
 7. **Junie: PEP8 and idiomatic cleanup** — what suggestions come out; which ones to accept; which ones are style preferences vs. correctness improvements
 8. **HTTP Request files** — creating `api/requests.http`; environment variables for local vs. production; checking `.http` files into the repo as executable documentation
 9. **Authoring in JetBrains** — the blog post you're reading was written in the same IDE; Markdown preview, terminal, Git — one window
+10. **IDE comparison: JetBrains in context** — this workflow is one ecosystem, not the only one; Windsurf (Cascade, agentic multi-file flows), Cursor (VS Code fork + full-repo context, configurable model), GitHub Copilot (ubiquitous, completion-first); the key distinctions: agentic vs. assistant paradigm, depth of Docker/Python tooling, whether `.http`-style testing is built in or plugin-dependent; a tool-equivalence table so readers on other stacks can map each JetBrains feature to their own workflow
 
 ---
 
@@ -76,6 +78,37 @@ Both surfaces share the same tool implementations.
 
 ---
 
+## IDE Comparison Reference
+
+Framing for section 10: the JetBrains workflow is one valid path, not the only one. The post should give readers enough to translate it to their own stack.
+
+**Paradigm distinction:**
+- *Assistant* (Junie, Copilot): responds to specific prompts inside a file or selection — you direct every step
+- *Agentic* (Windsurf Cascade, Cursor Composer): takes an instruction like "add rate limiting and write the tests" and executes across multiple files autonomously — faster for greenfield work, less control when the answer isn't obvious
+
+**Landscape table (for the post):**
+
+| Tool | Paradigm | Strongest at | Weakest at |
+|---|---|---|---|
+| PyCharm + Junie | Assistant | Deep Python tooling, Docker debugger, `.http` testing, single-window blog authoring | AI waits to be asked; no autonomous multi-file flows |
+| Windsurf (Cascade) | Agentic | "Do this whole task" across multiple files; whole-repo context maintained automatically | Thinner Python-specific tooling; Docker debugging setup more manual |
+| Cursor | Agentic/assistant hybrid | Best-in-class autocomplete with repo context; configurable model (Claude or GPT-4o); large VS Code plugin ecosystem | Less opinionated than Windsurf; still feels like VS Code + a smart copilot |
+| GitHub Copilot | Assistant | Ubiquitous; good autocomplete; tight GitHub integration | Primarily completion-focused; Workspace (agentic mode) is early |
+| Claude Code (CLI) | Agentic | Autonomous multi-step tasks across the whole repo | No GUI, no debugger, no `.http` runner — power tool, not daily driver |
+
+**Tool equivalence table (for the post — end of section 10):**
+
+| JetBrains feature | VS Code / Cursor equivalent | Windsurf equivalent |
+|---|---|---|
+| Junie (test gen + PEP8) | Copilot Chat / Cursor Composer | Cascade flow |
+| HTTP Request files | REST Client extension (plugin) | External tool (Bruno, Insomnia) |
+| Docker remote interpreter | Docker extension + `launch.json` | Docker extension + `launch.json` |
+| Terminal + Markdown + Git | Built into VS Code | Built into Windsurf |
+
+**Closing note for the section:** if your team is on Windsurf or Cursor, the `.http` files and Junie-generated tests translate directly — the workflows are the same; the tools have different names.
+
+---
+
 ## Outstanding Questions / TBD
 
 - Use FastAPI or Flask? (FastAPI is the clear choice for OpenAPI generation; Flask if simplicity is the argument)
@@ -83,3 +116,4 @@ Both surfaces share the same tool implementations.
 - Include a section on the difference between the Swagger spec FastAPI generates and writing an OpenAPI spec by hand?
 - Show Junie generating tests for the known bug in `get_call_summary()` as well?
 - `debugpy` for Docker debugging or PyCharm's built-in Docker interpreter?
+- For the IDE comparison: keep it as a short closing section, or pull it up earlier as context-setting for why JetBrains was chosen for this post?
