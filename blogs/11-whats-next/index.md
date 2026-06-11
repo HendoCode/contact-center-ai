@@ -7,8 +7,8 @@ post_number: "11"
 description: "Post 11 of Anchoring AI: comparing the handcrafted MCP approach with the emerging landscape of AI agent frameworks — GitAgent, LangGraph, Azure AI Agents, GitHub Copilot Workspace — and what to look for when choosing."
 prev_url: "../10-trust-but-verify/"
 prev_title: "Trust, but Verify"
-next_url: ""
-next_title: ""
+next_url: "../12-agent-harness/"
+next_title: "The Agent Harness"
 ---
 
 > **Status: Structured draft.** This post has a detailed outline and will be written after Posts 02–08 are complete.
@@ -19,7 +19,7 @@ next_title: ""
 
 The system we built — a handcrafted MCP tool server with a RAG pipeline — is a deliberate choice for a specific context: multiple teams, multiple LLM vendors, a need for reuse across use cases, and a client not yet ready to standardize. Every design decision in this series has been shaped by those constraints.
 
-But the landscape is shifting fast. GitAgent-style coding agents, managed agent runtimes from Microsoft and OpenAI, and stateful orchestration frameworks like LangGraph are changing what "build your own" looks like — and what it competes with. This final post maps the next horizon: what these tools are, where they fit, and whether the nine posts of work you just read still make sense.
+But the landscape is shifting fast. GitAgent-style coding agents, managed agent runtimes from Microsoft and OpenAI, and stateful orchestration frameworks like LangGraph are changing what "build your own" looks like — and what it competes with. This final post maps the next horizon: what these tools are, where they fit, and whether the work in this series still makes sense.
 
 The short answer: yes. Here's why.
 
@@ -39,7 +39,7 @@ The short answer: yes. Here's why.
 
 ## Planned Outline
 
-1. **Where we started and where we are** — recap the nine-post arc; what was built, what it cost in time and API calls, what it taught about RAG system design
+1. **Where we started and where we are** — recap the series so far; what was built, what it cost in time and API calls, what it taught about RAG system design
 
 2. **The agentic shift** — RAG tools answer questions; agents take actions. The call center supervisor use case has natural next steps:
    - *"Find all fraud calls from last month and draft a summary report"* — multi-step task, not a query
@@ -77,7 +77,7 @@ The short answer: yes. Here's why.
    - *Revisit CSAT integration* once the 3rd-party provider transition unblocks; a SQL-backed approach (not in-memory JSON) is the right upgrade
    - *Add the S3 ingestion path* once the data pipeline is productionized; the stub in `pipeline.py` is ready to fill in
 
-8. **The eleven-post arc, complete**
+8. **The journey so far**
 
    | Post | What we built | What we learned |
    |---|---|---|

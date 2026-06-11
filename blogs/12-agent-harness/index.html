@@ -16,21 +16,21 @@
     </script>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>What’s Next | Anchoring AI — HendoCode</title>
+    <title>The Agent Harness | Anchoring AI — HendoCode</title>
     <meta name="description"
-          content="Post 11 of Anchoring AI: comparing the handcrafted
-MCP approach with the emerging landscape of AI agent frameworks —
-GitAgent, LangGraph, Azure AI Agents, GitHub Copilot Workspace — and
-what to look for when choosing.">
-    <meta property="og:title" content="What’s Next">
+          content="Post 12 of Anchoring AI: introducing gitagent.sh as
+an agent harness, connecting it to this codebase, and exploring what
+changes when you give an agent a task and the run of the repo rather
+than prompting it interactively.">
+    <meta property="og:title" content="The Agent Harness">
     <meta property="og:description"
-          content="Post 11 of Anchoring AI: comparing the handcrafted
-MCP approach with the emerging landscape of AI agent frameworks —
-GitAgent, LangGraph, Azure AI Agents, GitHub Copilot Workspace — and
-what to look for when choosing.">
+          content="Post 12 of Anchoring AI: introducing gitagent.sh as
+an agent harness, connecting it to this codebase, and exploring what
+changes when you give an agent a task and the run of the repo rather
+than prompting it interactively.">
     <meta property="og:type" content="article">
     <meta name="twitter:card" content="summary">
-    <meta name="twitter:title" content="What’s Next">
+    <meta name="twitter:title" content="The Agent Harness">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Josefin+Sans:wght@300;700&family=JetBrains+Mono:wght@400;500&display=swap"
@@ -572,7 +572,7 @@ what to look for when choosing.">
             <span class="nav-divider">/</span>
             <span class="nav-series">Anchoring AI</span>
                         <span class="nav-divider">/</span>
-            <span class="post-label">Post 11</span>
+            <span class="post-label">Post 12</span>
                     </div>
         <a class="nav-gh" href="https://github.com/HendoCode/contact-center-ai" target="_blank" rel="noopener">GitHub
             ↗</a>
@@ -581,10 +581,10 @@ what to look for when choosing.">
 
 <article>
     <header class="post-header">
-                <div class="series-eyebrow">Anchoring AI &mdash; Post 11</div>
-                <h1>What’s Next</h1>
-        <p class="post-subtitle">GitAgent, LangGraph, Azure AI Foundry —
-and why the MCP-first approach stays durable</p>
+                <div class="series-eyebrow">Anchoring AI &mdash; Post 12</div>
+                <h1>The Agent Harness</h1>
+        <p class="post-subtitle">Putting gitagent.sh to work on a real
+codebase — from task prompt to pull request</p>
                 <div class="byline">
             Stephen Henderson &middot; TBD
         </div>
@@ -592,280 +592,140 @@ and why the MCP-first approach stays durable</p>
 
     <div class="post-body">
         <blockquote>
-        <p><strong>Status: Structured draft.</strong> This post has a
-        detailed outline and will be written after Posts 02–08 are
-        complete.</p>
+        <p><strong>Status: Placeholder.</strong> This post is planned.
+        The outline and key concepts below describe what it will
+        cover.</p>
         </blockquote>
         <hr />
-        <h2 id="thesis">Thesis</h2>
-        <p>The system we built — a handcrafted MCP tool server with a
-        RAG pipeline — is a deliberate choice for a specific context:
-        multiple teams, multiple LLM vendors, a need for reuse across
-        use cases, and a client not yet ready to standardize. Every
-        design decision in this series has been shaped by those
-        constraints.</p>
-        <p>But the landscape is shifting fast. GitAgent-style coding
-        agents, managed agent runtimes from Microsoft and OpenAI, and
-        stateful orchestration frameworks like LangGraph are changing
-        what “build your own” looks like — and what it competes with.
-        This final post maps the next horizon: what these tools are,
-        where they fit, and whether the work in this series still makes
-        sense.</p>
-        <p>The short answer: yes. Here’s why.</p>
+        <h2 id="what-this-post-covers">What This Post Covers</h2>
+        <p>Post 11 surveyed the agent framework landscape —
+        GitAgent-style tools, LangGraph, Azure AI Foundry Agents — and
+        explained why MCP-first architecture ages well regardless of
+        which orchestration layer wins. This post stops surveying and
+        starts doing.</p>
+        <p><a href="https://gitagent.sh">gitagent.sh</a> is an agent
+        harness: a runtime that gives an AI agent a task, a repo, and
+        the autonomy to execute across both. The distinction from a
+        coding assistant is fundamental — you’re not prompting
+        interactively and reviewing each step. You’re defining a task,
+        handing it off, and getting back a result (code, a PR, a
+        report). The agent plans, reads, writes, and commits without you
+        in the loop.</p>
+        <p>This post walks through connecting gitagent.sh to this
+        contact-center-ai codebase: what the harness is, how it’s
+        configured, what tasks are a good fit (and what aren’t), and
+        what actually happens when you point it at a real backlog
+        item.</p>
         <hr />
         <h2 id="key-concepts">Key Concepts</h2>
         <ul>
-        <li><strong>Agentic AI vs. RAG tools</strong> — the shift from
-        “query a tool and get an answer” to “agent plans and executes
-        multi-step tasks autonomously”</li>
-        <li><strong>GitAgent / GitHub Copilot Workspace</strong> — AI
-        agents that operate on repositories: read code, write PRs, run
-        tests, respond to issues; how they could use the MCP server as a
-        data source <em>or</em> how a coding agent could evolve this
-        codebase autonomously</li>
-        <li><strong>LangGraph</strong> — stateful, multi-step agent
-        orchestration built on LangChain (already a dependency); when a
-        graph of steps is the right abstraction over a simple RAG
-        chain</li>
-        <li><strong>Azure AI Foundry Agents</strong> — Microsoft’s
-        managed agent runtime; how it compares to self-hosted MCP; what
-        “managed” gets you and what it costs</li>
-        <li><strong>OpenAI Assistants API</strong> — the OpenAI-native
-        alternative to MCP; threads, runs, and tool calls; trade-offs
-        vs. the protocol-based approach</li>
-        <li><strong>MCP as the stable adapter layer</strong> —
-        regardless of which agent framework wins, MCP tools remain the
-        interface; the work in this series doesn’t get thrown away when
-        the orchestration layer changes</li>
-        <li><strong>The consolidation question</strong> — Northgate
-        Federal Credit Union was going to consolidate GenAI efforts in
-        3–6 months; what criteria should drive that decision?</li>
+        <li><strong>Agent harness vs. coding assistant</strong> — the
+        paradigm shift: interactive prompt/response vs. task-level
+        autonomy; what “agentic” actually means in practice when the
+        agent has file access, shell access, and git access</li>
+        <li><strong>gitagent.sh</strong> — what the harness provides:
+        task definition format, repo context injection, tool surface
+        (read/write/shell/git), output contract (diff, PR, report); how
+        it compares to Claude Code CLI, Cursor Composer, and Windsurf
+        Cascade</li>
+        <li><strong>Task design</strong> — what makes a good agent task:
+        bounded scope, clear success criteria, recoverable if wrong;
+        what makes a bad one: ambiguous requirements, tasks that need
+        human judgement mid-execution</li>
+        <li><strong>The MCP server as an agent target</strong> — how
+        this codebase’s MCP tools become data sources for the agent
+        harness itself: an agent can query call transcripts while
+        implementing a feature that depends on understanding call
+        patterns</li>
+        <li><strong>Repo context and grounding</strong> — how
+        gitagent.sh injects CLAUDE.md, architecture docs, and file
+        structure to ground the agent before it starts; why the work we
+        did on CLAUDE.md pays off here</li>
+        <li><strong>Reviewing agent output</strong> — what to look for
+        in an agent-generated diff; the human-in-the-loop checkpoint
+        that matters most (before merge, not during execution)</li>
+        <li><strong>The meta angle</strong> — this entire codebase and
+        blog series was built collaboratively with Claude Code;
+        gitagent.sh represents the next step toward fully autonomous
+        codebase evolution</li>
         </ul>
         <hr />
         <h2 id="planned-outline">Planned Outline</h2>
         <ol type="1">
-        <li><p><strong>Where we started and where we are</strong> —
-        recap the series so far; what was built, what it cost in time
-        and API calls, what it taught about RAG system design</p></li>
-        <li><p><strong>The agentic shift</strong> — RAG tools answer
-        questions; agents take actions. The call center supervisor use
-        case has natural next steps:</p>
+        <li><p><strong>From assistant to harness</strong> — the
+        conceptual shift: what you give up (interactive control) and
+        what you gain (delegation at task granularity); when that
+        trade-off makes sense</p></li>
+        <li><p><strong>What gitagent.sh is</strong> — the harness model:
+        task file → agent execution → diff/PR output; what the agent can
+        do (read files, run shell commands, write code, commit); what it
+        can’t (make architectural decisions without context, handle
+        ambiguous requirements)</p></li>
+        <li><p><strong>Setting it up with this repo</strong> —
+        configuration walkthrough: pointing gitagent.sh at the
+        contact-center-ai repo; CLAUDE.md as the primary grounding
+        document; what environment the agent runs in</p></li>
+        <li><p><strong>Choosing a first task</strong> — picking
+        something from the actual backlog:</p>
         <ul>
-        <li><em>“Find all fraud calls from last month and draft a
-        summary report”</em> — multi-step task, not a query</li>
-        <li><em>“Flag any call where an agent promised something outside
-        policy”</em> — needs reasoning across multiple retrieved
-        documents</li>
-        <li>These tasks require an agent that can plan, retrieve,
-        reason, and act — not just <code>rag_query()</code></li>
+        <li>Fix the <code>query_csat()</code> category filter bug (known
+        bug from Post 3, small scope, clear success criteria)</li>
+        <li>Or: implement the S3 deduplication guard from Post 5</li>
+        <li>Criteria: bounded, testable, consequence of getting it wrong
+        is low</li>
         </ul></li>
-        <li><p><strong>GitAgent and coding agents</strong></p>
-        <ul>
-        <li>What GitAgent-style tools do: repo-aware, code-gen, PR
-        automation, issue triage</li>
-        <li>How they could integrate with this MCP server: a coding
-        agent queries call data to understand what’s failing before
-        opening a fix PR</li>
-        <li>The meta case: using Claude Code (or a similar coding agent)
-        to evolve this codebase autonomously — we already did this
-        during development</li>
-        <li>The implication: the MCP server is not just for call center
-        supervisors; it’s a data source for any AI agent that needs call
-        center context</li>
-        </ul></li>
-        <li><p><strong>Framework comparison</strong></p>
-        <table>
-        <colgroup>
-        <col style="width: 25%" />
-        <col style="width: 25%" />
-        <col style="width: 25%" />
-        <col style="width: 25%" />
-        </colgroup>
-        <thead>
-        <tr>
-        <th>Framework</th>
-        <th>Strengths</th>
-        <th>Weaknesses</th>
-        <th>Fit for this project</th>
-        </tr>
-        </thead>
-        <tbody>
-        <tr>
-        <td>Custom MCP (built here)</td>
-        <td>Maximum control, reusable, protocol-standard</td>
-        <td>You own the ops; stateless by default</td>
-        <td>✅ Right for multi-team shared access</td>
-        </tr>
-        <tr>
-        <td>LangGraph</td>
-        <td>Stateful, graph-based agents; built on LangChain (already a
-        dep)</td>
-        <td>Adds complexity; opinionated</td>
-        <td>✅ Right next step for multi-step agent tasks</td>
-        </tr>
-        <tr>
-        <td>Azure AI Foundry Agents</td>
-        <td>Managed, Azure-native; built-in persistence</td>
-        <td>Vendor lock-in; cost; less flexibility</td>
-        <td>⚠️ Evaluate in 6 months</td>
-        </tr>
-        <tr>
-        <td>OpenAI Assistants</td>
-        <td>Mature API, good tooling; threads &amp; runs</td>
-        <td>No Ollama fallback; OpenAI-only</td>
-        <td>⚠️ If committing to OpenAI</td>
-        </tr>
-        <tr>
-        <td>GitHub Copilot Workspace</td>
-        <td>Excellent for code-centric tasks</td>
-        <td>Not designed for domain data query</td>
-        <td>❌ Wrong tool for call center RAG</td>
-        </tr>
-        </tbody>
-        </table></li>
-        <li><p><strong>The MCP advantage</strong> — MCP is an interface
-        standard, not an implementation. Whichever orchestration layer
-        wins in 12 months, the three tools defined in
-        <code>mcp/tools.py</code> remain the stable API surface. The
-        investment is durable in a way that rewriting to a specific
-        framework’s native tool format is not.</p></li>
-        <li><p><strong>Criteria for the consolidation decision</strong>
-        — a decision matrix for Northgate Federal Credit Union (and any
-        similar organization):</p>
-        <ul>
-        <li>Team size and AI expertise (small team → managed &gt;
-        self-hosted)</li>
-        <li>Data sensitivity (PII, regulated data → local Ollama or
-        private cloud &gt; external API)</li>
-        <li>Vendor contracts already in place (Azure EA → Azure AI
-        Foundry becomes cheaper at the margin)</li>
-        <li>Time-to-market pressure (six weeks to demo → build on
-        existing MCP &gt; rewrite to new framework)</li>
-        <li>Consolidation timeline (&lt; 6 months → don’t optimize for
-        the future state; &gt; 12 months → design for it)</li>
-        </ul></li>
-        <li><p><strong>Our recommendation for Northgate
-        Federal</strong></p>
-        <ul>
-        <li><em>Stay on MCP + add LangGraph for multi-step agent
-        tasks</em> — the existing tools become nodes in a LangGraph
-        workflow; no rewrite required</li>
-        <li><em>Evaluate Azure AI Foundry in 6 months</em> after the
-        provider consolidation decision is final; don’t
-        pre-optimize</li>
-        <li><em>Revisit CSAT integration</em> once the 3rd-party
-        provider transition unblocks; a SQL-backed approach (not
-        in-memory JSON) is the right upgrade</li>
-        <li><em>Add the S3 ingestion path</em> once the data pipeline is
-        productionized; the stub in <code>pipeline.py</code> is ready to
-        fill in</li>
-        </ul></li>
-        <li><p><strong>The journey so far</strong></p>
-        <table>
-        <colgroup>
-        <col style="width: 33%" />
-        <col style="width: 33%" />
-        <col style="width: 33%" />
-        </colgroup>
-        <thead>
-        <tr>
-        <th>Post</th>
-        <th>What we built</th>
-        <th>What we learned</th>
-        </tr>
-        </thead>
-        <tbody>
-        <tr>
-        <td>01</td>
-        <td>Architecture and diagrams</td>
-        <td>The value of a clear system context before writing code</td>
-        </tr>
-        <tr>
-        <td>02</td>
-        <td>RAG pipeline + pgvector</td>
-        <td>Embeddings are powerful; dimensions matter; no free
-        dedup</td>
-        </tr>
-        <tr>
-        <td>03</td>
-        <td>MCP server and tools</td>
-        <td>Protocols beat APIs for multi-team AI platforms</td>
-        </tr>
-        <tr>
-        <td>04</td>
-        <td>Ollama provider swap</td>
-        <td>Env-var abstraction is worth the upfront design cost</td>
-        </tr>
-        <tr>
-        <td>05</td>
-        <td>S3 ingestion + MinIO</td>
-        <td>Object storage ingestion is worth completing before you go
-        to production</td>
-        </tr>
-        <tr>
-        <td>06</td>
-        <td>Terraform / Azure / Entra</td>
-        <td>Auth at the infra layer beats auth in the app</td>
-        </tr>
-        <tr>
-        <td>07</td>
-        <td>REST API + JetBrains toolkit</td>
-        <td>The right IDE makes the whole stack more debuggable</td>
-        </tr>
-        <tr>
-        <td>08</td>
-        <td>Observability design</td>
-        <td>What to measure matters more than how to measure it</td>
-        </tr>
-        <tr>
-        <td>09</td>
-        <td>OTel + Grafana</td>
-        <td>Instrumentation is cheap; the hard part is defining good
-        thresholds</td>
-        </tr>
-        <tr>
-        <td>10</td>
-        <td>Validation + drift detection</td>
-        <td>RAG systems need ongoing validation, not just initial
-        testing</td>
-        </tr>
-        <tr>
-        <td>11</td>
-        <td>Landscape comparison</td>
-        <td>MCP-first ages well; the interface standard outlives the
-        implementation</td>
-        </tr>
-        </tbody>
-        </table></li>
-        <li><p><strong>What to read next</strong> — links to: LangGraph
-        documentation, MCP spec, Ragas (RAG evaluation), Azure AI
-        Foundry overview, OpenTelemetry Python SDK</p></li>
+        <li><p><strong>Running the task</strong> — what the execution
+        looks like; what the agent reads first; how it plans; what it
+        produces</p></li>
+        <li><p><strong>Reviewing the output</strong> — reading the diff;
+        what the agent got right; what needed adjustment; the human
+        judgement calls that belong to the reviewer, not the
+        agent</p></li>
+        <li><p><strong>The MCP-as-data-source angle</strong> — an agent
+        implementing a feature that queries call data through the MCP
+        server to inform its implementation choices; the loop
+        closes</p></li>
+        <li><p><strong>What this changes</strong> — how the development
+        workflow shifts when some tasks go to an agent; what stays
+        human; the right mental model for agent harnesses as a team tool
+        rather than a solo accelerator</p></li>
         </ol>
         <hr />
         <h2 id="code-changes-for-this-post">Code Changes for This
         Post</h2>
-        <p>None — this is a retrospective and forward-looking design
-        post. No new code added.</p>
+        <ul>
+        <li>Task definition file(s) for gitagent.sh (checked into repo
+        under <code>agent-tasks/</code>)</li>
+        <li>Fix <code>query_csat()</code> category filter bug (the task
+        the agent runs — reviewed and merged if the output is
+        correct)</li>
+        <li>Any configuration added to support the harness (environment
+        setup, task format)</li>
+        </ul>
         <hr />
         <h2 id="outstanding-questions-tbd">Outstanding Questions /
         TBD</h2>
         <ul>
-        <li>Include a live demo of adding a LangGraph workflow on top of
-        the existing MCP tools?</li>
-        <li>Compare response quality: single RAG query vs. LangGraph
-        multi-step agent on the same question?</li>
-        <li>Discuss Claude Code specifically as a GitAgent-style tool
-        and how it was used to build this very codebase?</li>
+        <li>What format does gitagent.sh use for task definitions? Need
+        to review https://gitagent.sh docs.</li>
+        <li>Does gitagent.sh run the MCP server as a tool, or does it
+        interact with the codebase directly?</li>
+        <li>Is there a local execution mode (no external API required),
+        or does it require a cloud runtime?</li>
+        <li>Show a comparison: same task run by gitagent.sh vs. run
+        interactively with Claude Code — same result? Different
+        approach?</li>
+        <li>Include the agent’s actual output (the diff or PR) as a code
+        block in the post?</li>
         </ul>
     </div>
 </article>
 
 <nav class="post-nav">
-        <a class="nav-prev" href="../10-trust-but-verify/">&#8592; Trust,
-but Verify</a>
+        <a class="nav-prev" href="../11-whats-next/">&#8592; What’s
+Next</a>
         <a class="nav-index" href="../">Series Index</a>
-        <a class="nav-next" href="../12-agent-harness/">The Agent
-Harness &#8594;</a>
+        <span></span>
     </nav>
 
 <footer class="site-footer">
