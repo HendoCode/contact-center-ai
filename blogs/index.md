@@ -1,14 +1,14 @@
 ---
 title: "Series Overview"
-subtitle: "Eleven posts on building a production RAG system from scratch"
+subtitle: "Building a production RAG system from scratch — an ongoing series"
 author: Stephen Henderson
 date: "2026"
-description: "Anchoring AI is an eleven-part blog series about building a real RAG pipeline, MCP server, and observability stack for a call center — from synthetic data to production infrastructure."
+description: "Anchoring AI is a growing blog series about building a real RAG pipeline, MCP server, and observability stack for a call center — from synthetic data to production infrastructure."
 ---
 
 ## What is Anchoring AI?
 
-This is an eleven-post series about building a real AI system — not a demo, not a tutorial with a toy dataset, but the kind of thing you'd actually deploy for a paying client. The codebase is a portfolio mirror of consulting work I did for a credit union. The data is synthetic. The architecture decisions, trade-offs, and lessons are real.
+Anchoring AI is a growing series about building a real AI system — not a demo, not a tutorial with a toy dataset, but the kind of thing you'd actually deploy for a paying client. The codebase is a portfolio mirror of consulting work I did for a credit union. The data is synthetic. The architecture decisions, trade-offs, and lessons are real.
 
 The series follows a **build-with-me** arc: each post adds a layer to the system. By the end, we'll have a RAG pipeline, an MCP server, object storage ingestion, a REST API, Azure infrastructure, a Grafana observability stack, and a validation framework — all grounded in a real use case.
 
@@ -31,4 +31,5 @@ The repo lives at [github.com/HendoCode/contact-center-ai](https://github.com/He
 | [09](./09-wiring-it-up/) | **Wiring It Up** | OpenTelemetry instrumentation, docker-compose additions, live Grafana dashboards |
 | [10](./10-trust-but-verify/) | **Trust, but Verify** | Validation strategies, drift detection, CSAT as a ground-truth signal, SLOs for AI systems |
 | [11](./11-whats-next/) | **What's Next** | GitAgent, LangGraph, Azure AI Foundry — comparing what we built with the emerging landscape |
+| [12](./12-agent-harness/) | **The Agent Harness** | gitagent.sh hands-on: connecting an agent harness to this codebase, what changes when an agent has the run of the repo |
 
