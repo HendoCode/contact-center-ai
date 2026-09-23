@@ -30,6 +30,6 @@ The repo lives at [github.com/HendoCode/contact-center-ai](https://github.com/He
 | [08](./08-what-should-we-measure/) | **What Should We Measure?** | LLM and RAG-specific metrics, Grafana + OpenTelemetry landscape, dashboard design |
 | [09](./09-wiring-it-up/) | **Wiring It Up** | OpenTelemetry instrumentation, docker-compose additions, live Grafana dashboards |
 | [10](./10-trust-but-verify/) | **Trust, but Verify** | Validation strategies, drift detection, CSAT as a ground-truth signal, SLOs for AI systems |
-| [11](./11-whats-next/) | **What's Next** | GitAgent, LangGraph, Azure AI Foundry — comparing what we built with the emerging landscape |
-| [12](./12-agent-harness/) | **The Agent Harness** | gitagent.sh hands-on: connecting an agent harness to this codebase, what changes when an agent has the run of the repo |
+| [11](./11-whats-next/) | **What's Next** | Coding agents, LangGraph, Azure AI Foundry — comparing what we built with the emerging landscape |
+| [12](./12-agent-harness/) | **The Agent Harness** | Claude Code and the Pi coding agent, with firstmate orchestrating parallel agent sessions: what changes when an agent owns a task end to end |
 

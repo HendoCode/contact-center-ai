@@ -236,7 +236,7 @@ This first post covered the architecture at a high level. The next eight posts b
 | 06 | [What Should We Measure?](../06-what-should-we-measure/) | LLM and RAG observability design: what metrics matter, what Grafana and OpenTelemetry bring |
 | 07 | [Wiring It Up](../07-wiring-it-up/) | Implementing observability: OTel instrumentation, docker-compose additions, live Grafana dashboards |
 | 08 | [Trust, but Verify](../08-trust-but-verify/) | Detecting RAG degradation: embedding drift, retrieval quality signals, CSAT as ground truth, SLOs |
-| 09 | [What's Next](../09-whats-next/) | The emerging landscape: GitAgent, LangGraph, Azure AI Foundry — and how this MCP-first approach stays durable |
+| 09 | [What's Next](../09-whats-next/) | The emerging landscape: Coding agents, LangGraph, Azure AI Foundry — and how this MCP-first approach stays durable |
 
 ---
 

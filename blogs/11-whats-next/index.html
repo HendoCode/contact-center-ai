@@ -19,15 +19,15 @@
     <title>What’s Next | Anchoring AI — HendoCode</title>
     <meta name="description"
           content="Post 11 of Anchoring AI: comparing the handcrafted
-MCP approach with the emerging landscape of AI agent frameworks —
-GitAgent, LangGraph, Azure AI Agents, GitHub Copilot Workspace — and
-what to look for when choosing.">
+MCP approach with the emerging landscape of AI agent frameworks — coding
+agents, LangGraph, Azure AI Agents, GitHub Copilot Workspace — and what
+to look for when choosing.">
     <meta property="og:title" content="What’s Next">
     <meta property="og:description"
           content="Post 11 of Anchoring AI: comparing the handcrafted
-MCP approach with the emerging landscape of AI agent frameworks —
-GitAgent, LangGraph, Azure AI Agents, GitHub Copilot Workspace — and
-what to look for when choosing.">
+MCP approach with the emerging landscape of AI agent frameworks — coding
+agents, LangGraph, Azure AI Agents, GitHub Copilot Workspace — and what
+to look for when choosing.">
     <meta property="og:type" content="article">
     <meta name="twitter:card" content="summary">
     <meta name="twitter:title" content="What’s Next">
@@ -583,8 +583,8 @@ what to look for when choosing.">
     <header class="post-header">
                 <div class="series-eyebrow">Anchoring AI &mdash; Post 11</div>
                 <h1>What’s Next</h1>
-        <p class="post-subtitle">GitAgent, LangGraph, Azure AI Foundry —
-and why the MCP-first approach stays durable</p>
+        <p class="post-subtitle">Coding agents, LangGraph, Azure AI
+Foundry, and why the MCP-first approach stays durable</p>
                 <div class="byline">
             Stephen Henderson &middot; TBD
         </div>
@@ -604,7 +604,7 @@ and why the MCP-first approach stays durable</p>
         use cases, and a client not yet ready to standardize. Every
         design decision in this series has been shaped by those
         constraints.</p>
-        <p>But the landscape is shifting fast. GitAgent-style coding
+        <p>But the landscape is shifting fast. Repository-aware coding
         agents, managed agent runtimes from Microsoft and OpenAI, and
         stateful orchestration frameworks like LangGraph are changing
         what “build your own” looks like — and what it competes with.
@@ -618,11 +618,11 @@ and why the MCP-first approach stays durable</p>
         <li><strong>Agentic AI vs. RAG tools</strong> — the shift from
         “query a tool and get an answer” to “agent plans and executes
         multi-step tasks autonomously”</li>
-        <li><strong>GitAgent / GitHub Copilot Workspace</strong> — AI
-        agents that operate on repositories: read code, write PRs, run
-        tests, respond to issues; how they could use the MCP server as a
-        data source <em>or</em> how a coding agent could evolve this
-        codebase autonomously</li>
+        <li><strong>Coding agents (Claude Code, GitHub Copilot,
+        Pi)</strong> — AI agents that operate on repositories: read
+        code, write PRs, run tests, respond to issues; how they could
+        use the MCP server as a data source <em>or</em> how a coding
+        agent could evolve this codebase autonomously</li>
         <li><strong>LangGraph</strong> — stateful, multi-step agent
         orchestration built on LangChain (already a dependency); when a
         graph of steps is the right abstraction over a simple RAG
@@ -659,9 +659,9 @@ and why the MCP-first approach stays durable</p>
         <li>These tasks require an agent that can plan, retrieve,
         reason, and act — not just <code>rag_query()</code></li>
         </ul></li>
-        <li><p><strong>GitAgent and coding agents</strong></p>
+        <li><p><strong>Coding agents</strong></p>
         <ul>
-        <li>What GitAgent-style tools do: repo-aware, code-gen, PR
+        <li>What repository-aware coding agents do: code-gen, PR
         automation, issue triage</li>
         <li>How they could integrate with this MCP server: a coding
         agent queries call data to understand what’s failing before
@@ -846,17 +846,6 @@ and why the MCP-first approach stays durable</p>
         Post</h2>
         <p>None — this is a retrospective and forward-looking design
         post. No new code added.</p>
-        <hr />
-        <h2 id="outstanding-questions-tbd">Outstanding Questions /
-        TBD</h2>
-        <ul>
-        <li>Include a live demo of adding a LangGraph workflow on top of
-        the existing MCP tools?</li>
-        <li>Compare response quality: single RAG query vs. LangGraph
-        multi-step agent on the same question?</li>
-        <li>Discuss Claude Code specifically as a GitAgent-style tool
-        and how it was used to build this very codebase?</li>
-        </ul>
     </div>
 </article>
 
