@@ -98,8 +98,12 @@ See `.env.example` for the full list including AWS credentials and MCP server ho
 The "Anchoring AI" series lives in `blogs/`. Posts use this codebase as a live playground.
 
 ```bash
-# Build all HTML from Markdown (requires pandoc: brew install pandoc)
+# Build all HTML from Markdown (requires pandoc >= 3.3, the release that renamed
+# --highlight-style to --syntax-highlighting; older pandoc aborts build.sh)
 bash blogs/build.sh
+
+# The committed blogs/**/index.html files are pandoc output, not hand-written.
+# Always re-run build.sh after editing a post's index.md so .md and .html agree.
 
 # Build a single post
 bash blogs/build.sh 05
@@ -121,7 +125,7 @@ Deployed via GitHub Actions → GitHub Pages at https://hendocode.github.io/cont
 | 09 | `09-wiring-it-up` | Wiring It Up | Placeholder |
 | 10 | `10-trust-but-verify` | Trust, but Verify | Structured draft |
 | 11 | `11-whats-next` | What's Next | Structured draft |
-| 12 | `12-agent-harness` | The Agent Harness (gitagent.sh) | Placeholder |
+| 12 | `12-agent-harness` | The Agent Harness (Claude Code, Pi, firstmate) | Placeholder |
 
 **Known bugs documented in the series (not yet fixed in code):**
 - `mcp/tools.py` `get_call_summary()`: retrieved document is never passed to the LLM — a second `rag_query()` call re-retrieves independently, so the specific call may not be summarized

@@ -95,11 +95,3 @@ This post shows how to use the telemetry from Post 7 to detect degradation early
 - New Grafana panel: CSAT score vs. RAG query volume (time series, JSON committed to `infra/grafana/`)
 - Grafana alert rule for retrieval score degradation (provisioned alert YAML)
 
----
-
-## Outstanding Questions / TBD
-
-- How to log query/answer pairs for the LLM-as-judge eval? Need a structured log format from Post 7 instrumentation.
-- Include Ragas (the open-source RAG eval framework) as an alternative to hand-rolled LLM-as-judge?
-- Show the HNSW index rebuild command for pgvector?
-- Discuss the annotation / human feedback loop as a path toward true supervised eval?
