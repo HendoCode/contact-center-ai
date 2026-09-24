@@ -1,64 +1,32 @@
 """
-Smoke test for MCP server handshake.
+Smoke test: the MCP server completes a real client handshake and lists its tools.
 
-This test verifies that the MCP server can handle initialization
-and tool listing without crashing, which was broken due to 
-notification_options=None being passed to get_capabilities().
+Regression guard for the crash where get_capabilities() received
+notification_options=None. Needs no database and no LLM key.
 """
 
-import subprocess
 import sys
-import asyncio
+from pathlib import Path
+
 import pytest
+from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+EXPECTED_TOOLS = {"search_transcripts", "get_call_summary", "query_csat"}
 
 
 @pytest.mark.asyncio
 async def test_server_handshake():
-    """Test that the MCP server initializes and lists tools correctly."""
-    
-    # Spawn the server process
-    proc = subprocess.Popen(
-        [sys.executable, "-m", "ccai_mcp.server"],
-        stdin=subprocess.PIPE,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True
+    params = StdioServerParameters(
+        command=sys.executable,
+        args=["-m", "ccai_mcp.server"],
+        cwd=str(REPO_ROOT),
     )
-    
-    try:
-        # Create client and connect to the server
-        async with stdio_client(proc.stdin, proc.stdout) as client:
-            # Initialize the server
-            init_result = await client.initialize(
-                {
-                    "serverName": "contact-center-ai",
-                    "serverVersion": "0.1.0"
-                }
-            )
-            
-            # Verify server info
-            assert init_result.server_info.name == "contact-center-ai"
-            assert init_result.server_info.version == "0.1.0"
-            
-            # List tools
-            tools_result = await client.list_tools()
-            
-            # Verify we get the expected tools
-            tool_names = [tool.name for tool in tools_result.tools]
-            expected_tools = {"search_transcripts", "get_call_summary", "query_csat"}
-            assert set(tool_names) == expected_tools
-            
-            print("Server handshake test passed!")
-            return True
-            
-    except Exception as e:
-        print(f"Server handshake test failed: {e}")
-        raise
-    finally:
-        # Clean up the process
-        proc.terminate()
-        try:
-            proc.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            proc.kill()
+    async with stdio_client(params) as (read, write):
+        async with ClientSession(read, write) as session:
+            init = await session.initialize()
+            assert init.serverInfo.name == "contact-center-ai"
+
+            tools = await session.list_tools()
+            assert {t.name for t in tools.tools} == EXPECTED_TOOLS
