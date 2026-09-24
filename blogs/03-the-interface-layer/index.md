@@ -3,6 +3,7 @@ title: "The Interface Layer"
 subtitle: "MCP as enterprise glue: how three tools become a shared AI platform"
 author: Stephen Henderson
 date: "June 2026"
+updated: "2026-09-24"
 post_number: "03"
 description: "Post 3 of Anchoring AI: inside the MCP server — tool schemas, the stdio transport, call routing, and why the Model Context Protocol is the right abstraction for a multi-team AI platform."
 prev_url: "../02-from-text-to-vectors/"
@@ -86,7 +87,7 @@ Tool(
         "Search call transcripts using natural language. "
         "Use this to find calls about specific topics, issues, or patterns. "
         "Examples: 'calls where members complained about fees', "
-        "'fraud disputes from last week', 'calls that were escalated'."
+        "'fraud disputes where the member was frustrated', 'calls that were escalated'."
     ),
     inputSchema={
         "type": "object",
@@ -108,7 +109,7 @@ Tool(
 
 Two things shape how a tool gets used in practice:
 
-**The description is for the model, not the user.** When Claude Desktop connects and the supervisor types a question, Claude reads the tool description to decide whether to invoke the tool and how to fill in the parameters. A vague description like "search calls" produces worse tool use than one with concrete examples. The examples in the description (`'fraud disputes from last week'`, `'calls that were escalated'`) aren't documentation — they're few-shot prompts that guide the model toward useful queries.
+**The description is for the model, not the user.** When Claude Desktop connects and the supervisor types a question, Claude reads the tool description to decide whether to invoke the tool and how to fill in the parameters. A vague description like "search calls" produces worse tool use than one with concrete examples. The examples in the description (`'fraud disputes where the member was frustrated'`, `'calls that were escalated'`) aren't documentation — they're few-shot prompts that guide the model toward useful queries.
 
 **`required` controls what the model must provide.** `query` is required; `k` is optional with a default. The model will always fill in the query, and will only specify `k` if the user gives a reason to retrieve more or fewer results. This keeps the common case simple and the power-user case available.
 
@@ -177,18 +178,36 @@ def get_call_summary(call_id: str) -> str:
     )
 ```
 
-This one is worth studying, because it has an interesting inefficiency. The function:
+The first version had two problems. It looked the call up by embedding the string `"call_id:CALL-00042"` and running a semantic search, but call IDs aren't in the embedded text, so the requested call usually wasn't in the results at all. And when it was found, the function ignored it and ran a fresh `rag_query()` with k=1, which retrieves whichever transcript best matches the words "summarize this call." That's effectively an arbitrary call.
 
-1. Retrieves documents by embedding the string `"call_id:CALL-00042"` and doing a semantic search — using the vector store as a lookup when a direct metadata filter would be cleaner
-2. Filters the results to find the exact `call_id` match
-3. Finds the right document... and then ignores it
-4. Calls `rag_query()` with a fixed summary prompt and `k=1`, which does a *fresh* retrieval pass on its own
+The fix does an exact lookup with a metadata filter and summarizes that document directly:
 
-The `doc` variable on line 4 is never used in the final response. The summary is generated from whatever `rag_query()` retrieves with `k=1` — which may or may not be the specific call being asked about.
+```python
+def get_call_summary(call_id: str) -> str:
+    doc = get_vector_store().similarity_search(
+        call_id, k=1, filter={"call_id": {"$eq": call_id}}
+    )
 
-For a portfolio project with a small, consistent dataset, this usually works fine in practice: the `k=1` retrieval typically surfaces the right call. In production, with a growing corpus, it would be wrong often enough to matter. The fix is to pass the retrieved document directly to the LLM rather than triggering another retrieval pass.
+    if not doc:
+        return f"No transcript found for call ID: {call_id}"
 
-This is the kind of thing that's worth being honest about. The architecture is sound; the implementation has rough edges.
+    doc = doc[0]
+    meta = doc.metadata
+    prompt = f"""Summarize this call concisely: what was the member's issue, how did the agent handle it, and what was the outcome?
+
+Call ID: {meta.get('call_id')}
+Date: {meta.get('date')}
+Category: {meta.get('category')}
+Outcome: {meta.get('outcome')}
+
+TRANSCRIPT:
+{doc.page_content}"""
+
+    response = get_llm().invoke(prompt)
+    return response.content
+```
+
+The general lesson: use the vector store for similarity, and use filters for identity.
 
 ### `query_csat` — the bypass
 
@@ -203,6 +222,8 @@ def query_csat(min_score=None, max_score=None, category=None) -> str:
         filtered = [r for r in filtered if r["score"] >= min_score]
     if max_score is not None:
         filtered = [r for r in filtered if r["score"] <= max_score]
+    if category:
+        filtered = [r for r in filtered if r.get("category") == category]
 
     avg_score = sum(r["score"] for r in filtered) / len(filtered)
     score_dist = {i: sum(1 for r in filtered if r["score"] == i) for i in range(1, 6)}
@@ -213,9 +234,9 @@ def query_csat(min_score=None, max_score=None, category=None) -> str:
 
 `query_csat` doesn't touch pgvector or the LLM. It reads `csat.json` directly, filters in Python, and returns a formatted summary. Two things worth noting:
 
-First, the `category` parameter is defined in the tool schema and accepted by the function signature — but the implementation never filters by it. The parameter is silently ignored. This is a genuine bug: if Claude passes `category="fraud_dispute"` because the user asked about fraud call satisfaction, the filter doesn't apply and the result is unscoped. Easy fix for a future post.
+First, the `category` parameter is defined in the tool schema and accepted by the function signature — but the implementation never filters by it. The parameter is silently ignored. This is a genuine bug: if Claude passes `category="fraud_dispute"` because the user asked about fraud call satisfaction, the filter doesn't apply and the result is unscoped. The fix needed two changes: the generator now records each call's category on its CSAT record, and the tool filters on it.
 
-Second, this bypass is actually the *correct* architecture for structured data at this scale. CSAT data is small, it has a clear schema, and questions about it are aggregations over numeric scores — exactly the kind of thing in-memory filtering handles perfectly. Adding it to pgvector would add complexity and latency with no benefit. If the dataset grew to millions of records, you'd move to SQL; at 112 rows, loading a JSON file is the right call.
+Second, this bypass is actually the *correct* architecture for structured data at this scale. CSAT data is small, it has a clear schema, and questions about it are aggregations over numeric scores — exactly the kind of thing in-memory filtering handles perfectly. Adding it to pgvector would add complexity and latency with no benefit. If the dataset grew to millions of records, you'd move to SQL; at 113 rows, loading a JSON file is the right call.
 
 ---
 
@@ -229,13 +250,9 @@ Claude Desktop connects by spawning the server process directly. The `claude_des
 {
   "mcpServers": {
     "contact-center-ai": {
-      "command": "python",
-      "args": ["-m", "ccai_mcp.server"],
-      "cwd": "/path/to/contact-center-ai",
-      "env": {
-        "OPENAI_API_KEY": "sk-...",
-        "DATABASE_URL": "postgresql://..."
-      }
+      "command": "uv",
+      "args": ["--directory", "/path/to/contact-center-ai", "run", "python", "-m", "ccai_mcp.server"],
+      "env": { "OPENAI_API_KEY": "sk-...", "DATABASE_URL": "postgresql://..." }
     }
   }
 }
@@ -243,7 +260,7 @@ Claude Desktop connects by spawning the server process directly. The `claude_des
 
 Claude Desktop spawns the process, sends an initialization handshake, calls `list_tools()` to discover what's available, and then routes relevant user queries to the appropriate tool. The user sees tool results incorporated into Claude's response — they don't see the raw tool call at all.
 
-The stdio model is clean for local development but doesn't work for production: you can't spawn a local process from a cloud-hosted client. In production on Azure App Service, the MCP SDK's HTTP transport layer surfaces the same tools over HTTPS. The Python code is identical; only the transport changes. We'll cover the infrastructure side of that in Post 5.
+The stdio model is clean for local development but doesn't work for a cloud deployment: a hosted client can't spawn a process on your laptop. For Azure App Service, the server needs an HTTP entry point using the MCP SDK's Streamable HTTP transport. The tool code stays the same; the entry point and hosting change. That piece isn't built yet.
 
 ---
 
@@ -257,9 +274,9 @@ Three reasons for this system in particular:
 
 **Multi-client without glue code.** A REST API means every client team writes their own HTTP client, their own auth handling, their own error handling. MCP clients implement the protocol once and pick up new tools automatically when the server adds them. When the compliance team adds a `search_policies` tool to this server next quarter, every connected client gets it without a code change on their end.
 
-**Transport agnosticism.** The same server code runs over stdio locally and over HTTPS in production. Swapping transports doesn't touch the business logic.
+**Transport flexibility.** The tool logic is independent of the transport, so moving from stdio to HTTP means a new entry point, not new tools.
 
-The trade-off is ecosystem maturity — MCP is newer than REST and there are fewer off-the-shelf tools for testing, monitoring, and debugging it. That's a real cost, and it's part of why observability (Posts 6 and 7) matters more here than it would for a well-worn REST API.
+The trade-off is ecosystem maturity — MCP is newer than REST and there are fewer off-the-shelf tools for testing, monitoring, and debugging it. That's a real cost, and it's part of why observability matters more here than it would for a well-worn REST API.
 
 ---
 
@@ -270,11 +287,8 @@ The MCP server is built. The RAG pipeline is working behind it. In Post 4, we'll
 If you want to connect Claude Desktop to this server right now:
 
 ```bash
-# Start the server (leave this running)
-python -m ccai_mcp.server
-
-# In claude_desktop_config.json, add the server entry above.
-# Restart Claude Desktop and the tools appear automatically.
+# Add the server entry above to claude_desktop_config.json,
+# then restart Claude Desktop. It starts the server itself.
 ```
 
 Then ask Claude: *"Use the search_transcripts tool to find calls where members were frustrated with wait times."* It will invoke the tool, retrieve from pgvector, and synthesize an answer — all transparently.
