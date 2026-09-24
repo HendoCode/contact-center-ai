@@ -19,6 +19,25 @@ from langchain_core.documents import Document
 from rag.embeddings import get_vector_store, get_embeddings
 
 
+# ── LLM ───────────────────────────────────────────────────────────────────────
+
+def get_llm():
+    """
+    Return the chat LLM based on LLM_PROVIDER env var."""
+    provider = os.getenv("LLM_PROVIDER", "openai").lower()
+    if provider == "ollama":
+        from langchain_ollama import ChatOllama
+        return ChatOllama(
+            model=os.getenv("OLLAMA_MODEL", "llama3.2"),
+            base_url=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"),
+        )
+    from langchain_openai import ChatOpenAI
+    return ChatOpenAI(
+        model="gpt-4o-mini",
+        api_key=os.getenv("OPENAI_API_KEY"),
+    )
+
+
 # ── Ingest ────────────────────────────────────────────────────────────────────
 
 def load_synthetic_data() -> list[dict]:
@@ -107,19 +126,7 @@ def rag_query(query: str, k: int = 5) -> str:
         for doc in docs
     )
 
-    provider = os.getenv("LLM_PROVIDER", "openai").lower()
-    if provider == "ollama":
-        from langchain_ollama import ChatOllama
-        llm = ChatOllama(
-            model=os.getenv("OLLAMA_MODEL", "llama3.2"),
-            base_url=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"),
-        )
-    else:
-        from langchain_openai import ChatOpenAI
-        llm = ChatOpenAI(
-            model="gpt-4o-mini",
-            api_key=os.getenv("OPENAI_API_KEY"),
-        )
+    llm = get_llm()
 
     prompt = f"""You are an assistant helping contact center supervisors understand call patterns and member issues.
 
@@ -143,9 +150,13 @@ if __name__ == "__main__":
     parser.add_argument("--ingest", action="store_true", help="Ingest data into vector store")
     parser.add_argument("--source", default="synthetic", help="Data source: synthetic or s3")
     parser.add_argument("--query", type=str, help="Query to run against the vector store")
+    parser.add_argument("--reset", action="store_true", help="Delete the vector store collection")
     args = parser.parse_args()
 
-    if args.ingest:
+    if args.reset:
+        get_vector_store().delete_collection()
+        print("Collection deleted. Re-run --ingest to rebuild it.")
+    elif args.ingest:
         ingest(source=args.source)
     elif args.query:
         print(rag_query(args.query))

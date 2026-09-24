@@ -17,6 +17,10 @@ from faker import Faker
 
 fake = Faker()
 
+# Seed for reproducible synthetic data
+random.seed(42)
+Faker.seed(42)
+
 # ── Call categories and sample dialogue templates ────────────────────────────
 
 CATEGORIES = [
@@ -104,7 +108,7 @@ def generate_transcript(call_id: str, category: str, member_name: str, member_id
     }
 
 
-def generate_csat(call_id: str, member_id: str, outcome: str) -> dict:
+def generate_csat(call_id: str, member_id: str, outcome: str, category: str) -> dict:
     """Generate a CSAT survey result for a call."""
     # Weight scores toward the outcome
     if outcome == "resolved":
@@ -127,9 +131,10 @@ def generate_csat(call_id: str, member_id: str, outcome: str) -> dict:
     return {
         "call_id": call_id,
         "member_id": member_id,
+        "category": category,
         "score": score,
         "comment": random.choice(comments_by_score[score]),
-        "survey_date": (datetime.now() - timedelta(days=random.randint(0, 3))).isoformat(),
+        "survey_date": (datetime.now().replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=random.randint(0, 3))).isoformat(),
     }
 
 
@@ -153,7 +158,7 @@ def main():
 
         # ~75% of calls result in a CSAT survey
         if random.random() < 0.75:
-            csat_results.append(generate_csat(call_id, member_id, transcript["outcome"]))
+            csat_results.append(generate_csat(call_id, member_id, transcript["outcome"], category))
 
     # Write output
     with open(output_dir / "transcripts.json", "w") as f:

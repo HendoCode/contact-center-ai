@@ -9,7 +9,7 @@ Tools:
 
 import json
 from pathlib import Path
-from rag.pipeline import rag_query, retrieve
+from rag.pipeline import rag_query, get_llm, get_vector_store
 
 
 def search_transcripts(query: str, k: int = 5) -> str:
@@ -36,19 +36,27 @@ def get_call_summary(call_id: str) -> str:
     Returns:
         Summary of the call transcript, or an error if not found
     """
-    results = retrieve(f"call_id:{call_id}", k=10)
+    doc = get_vector_store().similarity_search(
+        call_id, k=1, filter={"call_id": {"$eq": call_id}}
+    )
 
-    # Filter to exact call_id match
-    matches = [doc for doc in results if doc.metadata.get("call_id") == call_id]
-
-    if not matches:
+    if not doc:
         return f"No transcript found for call ID: {call_id}"
 
-    doc = matches[0]
-    return rag_query(
-        f"Summarize this call concisely: what was the member's issue, how did the agent handle it, and what was the outcome?",
-        k=1,
-    )
+    doc = doc[0]
+    meta = doc.metadata
+    prompt = f"""Summarize this call concisely: what was the member's issue, how did the agent handle it, and what was the outcome?
+
+Call ID: {meta.get('call_id')}
+Date: {meta.get('date')}
+Category: {meta.get('category')}
+Outcome: {meta.get('outcome')}
+
+TRANSCRIPT:
+{doc.page_content}"""
+
+    response = get_llm().invoke(prompt)
+    return response.content
 
 
 def query_csat(
@@ -81,6 +89,8 @@ def query_csat(
         filtered = [r for r in filtered if r["score"] >= min_score]
     if max_score is not None:
         filtered = [r for r in filtered if r["score"] <= max_score]
+    if category:
+        filtered = [r for r in filtered if r.get("category") == category]
 
     if not filtered:
         return "No CSAT results found matching the given filters."
