@@ -18,7 +18,7 @@ CONNECTION_STRING = os.getenv(
     "postgresql://postgres:postgres@localhost:5432/contactcenter"
 )
 
-COLLECTION_NAME = "call_transcripts"
+COLLECTION_NAME = os.getenv("COLLECTION_NAME", "call_transcripts")
 
 
 def get_embeddings():

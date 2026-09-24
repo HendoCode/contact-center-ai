@@ -13,6 +13,7 @@ Production (Azure App Service):
     - Infra: infra/terraform/main.tf
 """
 
+import asyncio
 import mcp.server.stdio
 from mcp.server import Server
 from mcp.server.models import InitializationOptions
@@ -33,7 +34,7 @@ async def list_tools() -> list[Tool]:
                 "Search call transcripts using natural language. "
                 "Use this to find calls about specific topics, issues, or patterns. "
                 "Examples: 'calls where members complained about fees', "
-                "'fraud disputes from last week', 'calls that were escalated'."
+                "'fraud disputes where the member was frustrated', 'calls that were escalated'."
             ),
             inputSchema={
                 "type": "object",
@@ -99,14 +100,18 @@ async def list_tools() -> list[Tool]:
 @app.call_tool()
 async def call_tool(name: str, arguments: dict) -> list[TextContent]:
     if name == "search_transcripts":
-        result = search_transcripts(
+        result = await asyncio.to_thread(
+            search_transcripts,
             query=arguments["query"],
-            k=arguments.get("k", 5)
+            k=arguments.get("k", 5),
         )
     elif name == "get_call_summary":
-        result = get_call_summary(call_id=arguments["call_id"])
+        result = await asyncio.to_thread(
+            get_call_summary, call_id=arguments["call_id"]
+        )
     elif name == "query_csat":
-        result = query_csat(
+        result = await asyncio.to_thread(
+            query_csat,
             min_score=arguments.get("min_score"),
             max_score=arguments.get("max_score"),
             category=arguments.get("category"),
@@ -134,5 +139,4 @@ async def main():
 
 
 if __name__ == "__main__":
-    import asyncio
     asyncio.run(main())
