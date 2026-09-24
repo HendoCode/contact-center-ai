@@ -3,6 +3,7 @@ title: "From Text to Vectors"
 subtitle: "Building the RAG data pipeline: synthetic transcripts, embeddings, and pgvector"
 author: Stephen Henderson
 date: "June 2026"
+updated: "2026-09-24"
 post_number: "02"
 description: "Post 2 of Anchoring AI: how 150 synthetic call transcripts go from a Python script to searchable embeddings in PostgreSQL, and what LangChain is actually doing along the way."
 prev_url: "../01-the-blueprint/"
@@ -38,7 +39,7 @@ CATEGORIES = [
 ]
 ```
 
-And one of four outcomes: `resolved`, `escalated`, `callback_scheduled`, `unresolved`. The outcome matters because it's used to weight the CSAT scores — a resolved call skews toward 4-5 stars, an unresolved one toward 1-2. That correlation is intentional: it makes the CSAT data analytically interesting, and later (Post 8) we'll use it as a ground-truth signal for evaluating whether the AI system's answers are actually useful.
+And one of four outcomes: `resolved`, `escalated`, `callback_scheduled`, `unresolved`. The outcome matters because it's used to weight the CSAT scores — a resolved call skews toward 4-5 stars, an unresolved one toward 1-2. That correlation is intentional: it makes the CSAT data analytically interesting, and in a later post we'll use it as a ground-truth signal for evaluating whether the AI system's answers are actually useful.
 
 The generator builds a `full_text` field by joining the dialogue turns:
 
@@ -108,9 +109,11 @@ Why does this matter? Consider two transcript excerpts:
 - "I'm disputing a charge I don't recognize on my debit card."
 - "There's a transaction on my account that I didn't make."
 
-Keyword search finds neither when you search for "unauthorized transaction." Cosine similarity between their embeddings and the query embedding is high, because the *meaning* overlaps significantly. The model has learned that "charge I don't recognize," "transaction I didn't make," and "unauthorized transaction" are semantically equivalent.
+An exact-phrase search for "unauthorized transaction" finds neither. Cosine similarity between their embeddings and the query embedding is high, because the *meaning* overlaps significantly. The model has learned that "charge I don't recognize," "transaction I didn't make," and "unauthorized transaction" are semantically equivalent.
 
-This is what makes the call center use case work. Supervisors don't search for specific phrases. They ask questions like "what drove our escalations last week?" — and the system needs to understand that `escalated` outcomes, frustrated dialogue, and phrases like "I need to speak to a manager" all point to the same underlying concept.
+This is what makes the call center use case work. Supervisors don't search for specific phrases. They ask questions like "why do members get frustrated on fraud calls?" and the system needs to recognize that "I need to speak to a manager," "this is the third time I've called," and "I'm closing my account" all point to the same underlying frustration.
+
+One limit to keep in mind: similarity search finds calls by what was said, not by when or how they ended. Questions like "escalations last week" need a metadata filter on date and outcome, which this pipeline doesn't apply yet.
 
 ---
 
@@ -138,7 +141,7 @@ def get_embeddings():
 
 That's 15 lines. It's the only place in the entire codebase that knows which embedding model is in use. Everything else — the ingestion pipeline, the retrieval step, the MCP tools — calls `get_embeddings()` and gets whatever it returns. Swap `LLM_PROVIDER=ollama` into your environment and the whole system switches to running locally without a single line of code changing.
 
-There's a catch, though, and it's important: **you can't swap embedding models on an existing collection without re-ingesting everything.** `text-embedding-3-small` produces 1,536-dimensional vectors. Ollama's `nomic-embed-text` produces 768-dimensional vectors. If you embed your transcripts with OpenAI and then try to query with Ollama embeddings, you're comparing apples to oranges — the dimensions don't even match. The pgvector index would reject the query outright.
+There's a catch, though, and it's important: **you can't swap embedding models on an existing collection without re-ingesting everything.** `text-embedding-3-small` produces 1,536-dimensional vectors. Ollama's `nomic-embed-text` produces 768-dimensional vectors. If you embed your transcripts with OpenAI and then try to query with Ollama embeddings, you're comparing apples to oranges — the dimensions don't even match. PostgreSQL would reject the comparison, since pgvector can't compare vectors of different dimensions.
 
 The practical consequence: pick your embedding model before you ingest, and treat a provider change as a full re-ingest event. We'll cover this more in Post 4 when we walk through the Ollama setup.
 
@@ -148,7 +151,7 @@ The practical consequence: pick your embedding model before you ingest, and trea
 
 The vector store is PostgreSQL with the `pgvector` extension. The choice warrants a sentence: why not a dedicated vector database like Pinecone, Weaviate, or Chroma?
 
-For this use case, the answer is operational simplicity. The system already needs PostgreSQL for the App Service deployment on Azure (Azure Database for PostgreSQL Flexible Server). Adding a separate vector database would mean another managed service, another connection string, another thing to monitor. pgvector gives us vector similarity search as an extension on top of a database we'd need anyway.
+For this use case, the answer is operational simplicity. PostgreSQL is a database the client's platform team already knows how to run, back up, and secure, and Azure offers it as a managed service. pgvector adds similarity search to it as an extension, which means one fewer specialized service to operate.
 
 The `get_vector_store()` function wires this up:
 
@@ -183,7 +186,7 @@ def ingest(source: str = "synthetic"):
     vector_store.add_documents(docs)          # 3. embed + store
 ```
 
-Step 3 is where the API calls happen. `add_documents()` sends each document's `page_content` to the embedding model, receives a 1,536-dimensional float vector, and writes it to PostgreSQL alongside the JSONB metadata. For 150 documents using OpenAI's API, this takes a few seconds and costs less than a cent. With Ollama running locally, it takes longer and costs nothing.
+Step 3 is where the API calls happen. `add_documents()` sends the documents' `page_content` to the embedding model in batches, receives a vector for each, and writes them to PostgreSQL alongside the JSONB metadata. For 150 documents using OpenAI's API, this takes a few seconds and costs less than a cent. With Ollama running locally, it takes longer and costs nothing.
 
 Run it with:
 
@@ -216,7 +219,7 @@ def retrieve(query: str, k: int = 5) -> list[Document]:
 Behind the scenes, `similarity_search()` does three things:
 
 1. **Embeds the query** — sends the query string to the same embedding model used at ingest time, gets back a 1,536-dimensional vector
-2. **Runs an ANN search** — executes a PostgreSQL query that finds the `k` rows in the `langchain_pg_embedding` table with the smallest cosine distance to the query vector
+2. **Runs a nearest-neighbor search**: executes a PostgreSQL query that finds the `k` rows with the smallest cosine distance to the query vector. With no vector index defined, this is an exact scan; at 150 rows that's instant. At scale you'd add an HNSW index and accept approximate results.
 3. **Deserializes and returns** — reconstructs the LangChain `Document` objects, including the JSONB metadata, and returns them
 
 The SQL pgvector runs under the hood looks roughly like:
@@ -244,9 +247,11 @@ If you want to run what we've built so far:
 ```bash
 docker compose up -d
 uv sync --extra dev
-python data/synthetic/generate_data.py
-python -m rag.pipeline --ingest
-python -m rag.pipeline --query "fraud disputes where the member was frustrated"
+cp .env.example .env
+# Edit .env: set OPENAI_API_KEY (or set LLM_PROVIDER=ollama for no API key)
+uv run python data/synthetic/generate_data.py
+uv run python -m rag.pipeline --ingest
+uv run python -m rag.pipeline --query "fraud disputes where the member was frustrated"
 ```
 
 The last command runs a full RAG cycle — embeds the query, retrieves the top-5 most similar transcripts, and returns an LLM-generated answer grounded in the actual call data.

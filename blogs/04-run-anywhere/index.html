@@ -661,17 +661,15 @@ for Ollama with one environment variable</p>
         <p>Early in the engagement, a question came up that shaped a lot
         of the architecture: <em>what happens if the client decides to
         stop using OpenAI?</em></p>
-        <p>It’s not a hypothetical. The credit union had already watched
-        one team sign a two-year contract with a vendor that pivoted its
-        product and left them stuck. They were cautious about building
-        on any single provider’s API, and they had a compliance team
-        asking pointed questions about which member data was being sent
-        where.</p>
+        <p>It’s a fair question for any regulated institution. A
+        compliance team will ask which member data is being sent where,
+        and building on a single provider’s API is a dependency like any
+        other.</p>
         <p>Both concerns point to the same design requirement:
         <strong>the system should be able to run without calling any
-        external API.</strong> Not as a fallback, not as a workaround —
-        as a first-class operating mode. An environment variable decides
-        which provider runs. Nothing else changes.</p>
+        external API.</strong> Running fully local is a first-class
+        operating mode: an environment variable decides which provider
+        runs, and nothing else changes.</p>
         <p>This post is about how that works, what it costs in quality,
         and when running local is actually the right call.</p>
         <hr />
@@ -727,14 +725,15 @@ for Ollama with one environment variable</p>
         <p>Ollama is already in <code>docker-compose.yml</code>:</p>
         <div class="sourceCode" id="cb3"><pre
         class="sourceCode yaml"><code class="sourceCode yaml"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ollama</span><span class="kw">:</span></span>
-<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">image</span><span class="kw">:</span><span class="at"> ollama/ollama:latest</span></span>
-<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">container_name</span><span class="kw">:</span><span class="at"> ollama</span></span>
-<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">tty</span><span class="kw">:</span><span class="at"> </span><span class="ch">true</span></span>
-<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">restart</span><span class="kw">:</span><span class="at"> unless-stopped</span></span>
-<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">ports</span><span class="kw">:</span></span>
-<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="kw">-</span><span class="at"> </span><span class="st">&quot;11434:11434&quot;</span></span>
-<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">volumes</span><span class="kw">:</span></span>
-<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="kw">-</span><span class="at"> ollama:/root/.ollama</span></span></code></pre></div>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">volumes</span><span class="kw">:</span></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="kw">-</span><span class="at"> ollama:/root/.ollama</span></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">container_name</span><span class="kw">:</span><span class="at"> ollama</span></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">pull_policy</span><span class="kw">:</span><span class="at"> always</span></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">tty</span><span class="kw">:</span><span class="at"> </span><span class="ch">true</span></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">restart</span><span class="kw">:</span><span class="at"> unless-stopped</span></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">image</span><span class="kw">:</span><span class="at"> ollama/ollama:${OLLAMA_DOCKER_TAG-latest}</span></span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">ports</span><span class="kw">:</span></span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="kw">-</span><span class="at"> </span><span class="st">&quot;11434:11434&quot;</span></span></code></pre></div>
         <p>The container runs but doesn’t come with any models
         pre-loaded. You pull them after it starts:</p>
         <div class="sourceCode" id="cb4"><pre
@@ -776,17 +775,17 @@ for Ollama with one environment variable</p>
         being embedded with Ollama’s. The dimensions don’t match.</p>
         <p>The fix is a full re-ingest:</p>
         <div class="sourceCode" id="cb6"><pre
-        class="sourceCode bash"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Drop the existing collection (connect to psql and truncate, or</span></span>
-<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="co"># delete via psycopg2 — PGVector has no built-in drop collection CLI)</span></span>
-<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Re-ingest with the new provider active</span></span>
-<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a><span class="va">LLM_PROVIDER</span><span class="op">=</span>ollama <span class="ex">python</span> <span class="at">-m</span> rag.pipeline <span class="at">--ingest</span></span></code></pre></div>
+        class="sourceCode bash"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Drop the existing collection, then re-ingest with the new provider active</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> <span class="at">-m</span> rag.pipeline <span class="at">--reset</span></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> <span class="at">-m</span> rag.pipeline <span class="at">--ingest</span></span></code></pre></div>
         <p>This also means that if you’re running in production with
         OpenAI embeddings and you want to evaluate Ollama, you’d stand
         up a second collection (<code>call_transcripts_ollama</code>),
         ingest into it, and compare results — not swap the live
-        collection in place. We’ll return to this shadow-mode evaluation
-        pattern in Post 8 when we talk about drift detection.</p>
+        collection in place (set
+        <code>COLLECTION_NAME=call_transcripts_ollama</code>). We’ll
+        return to this shadow-mode evaluation pattern in a later post
+        when we talk about drift detection.</p>
         <p>The practical rule: treat a provider change as a schema
         migration. Plan it, test it, don’t do it live.</p>
         <hr />
@@ -796,13 +795,20 @@ for Ollama with one environment variable</p>
         knowing about:</p>
         <div class="sourceCode" id="cb7"><pre
         class="sourceCode yaml"><code class="sourceCode yaml"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="fu">open-webui</span><span class="kw">:</span></span>
-<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">image</span><span class="kw">:</span><span class="at"> ghcr.io/open-webui/open-webui:main</span></span>
-<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">ports</span><span class="kw">:</span></span>
-<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="kw">-</span><span class="at"> </span><span class="st">&quot;9090:8080&quot;</span></span>
-<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">environment</span><span class="kw">:</span></span>
-<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="kw">-</span><span class="at"> OLLAMA_BASE_URL=http://ollama:11434</span></span>
-<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">depends_on</span><span class="kw">:</span></span>
-<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="kw">-</span><span class="at"> ollama</span></span></code></pre></div>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">image</span><span class="kw">:</span><span class="at"> ghcr.io/open-webui/open-webui:${WEBUI_DOCKER_TAG-main}</span></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">container_name</span><span class="kw">:</span><span class="at"> open-webui</span></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">volumes</span><span class="kw">:</span></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="kw">-</span><span class="at"> open-webui:/app/backend/data</span></span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">depends_on</span><span class="kw">:</span></span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="kw">-</span><span class="at"> ollama</span></span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">ports</span><span class="kw">:</span></span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="kw">-</span><span class="at"> </span><span class="st">&quot;9090:8080&quot;</span></span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">environment</span><span class="kw">:</span></span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="kw">-</span><span class="at"> </span><span class="st">&#39;OLLAMA_BASE_URL=http://ollama:11434&#39;</span></span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="kw">-</span><span class="at"> </span><span class="st">&#39;WEBUI_SECRET_KEY=&#39;</span></span>
+<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">extra_hosts</span><span class="kw">:</span></span>
+<span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="kw">-</span><span class="at"> host.docker.internal:host-gateway</span></span>
+<span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">restart</span><span class="kw">:</span><span class="at"> unless-stopped</span></span></code></pre></div>
         <p>Open WebUI is a ChatGPT-style interface that talks to your
         local Ollama instance. Navigate to
         <code>http://localhost:9090</code> after
@@ -817,8 +823,9 @@ for Ollama with one environment variable</p>
         to you. Knowing what you’re getting before it’s embedded in
         production is worth the five minutes.</p>
         <hr />
-        <h2 id="quality-an-honest-comparison">Quality: An Honest
-        Comparison</h2>
+        <h2 id="quality-what-i-observed">Quality: What I Observed</h2>
+        <p>These are working impressions from building the system, not a
+        measured benchmark.</p>
         <p>The capability gap between <code>gpt-4o-mini</code> and
         <code>llama3.2</code> is real, and it shows up in specific ways
         for this use case.</p>
@@ -830,22 +837,20 @@ for Ollama with one environment variable</p>
         asked to read a set of transcripts and report what it finds.
         That’s a task where a smaller model performs adequately.</p>
         <p><strong>Where OpenAI pulls ahead:</strong> Complex queries.
-        “What patterns do you see in calls that escalated after 8pm
-        compared to those that escalated during business hours?”
-        requires the model to reason across multiple retrieved
-        documents, identify trends, and produce a structured comparison.
-        <code>gpt-4o-mini</code> handles this more reliably.
+        “What separates calls that got resolved from calls that
+        escalated?” requires the model to reason across multiple
+        retrieved documents, identify trends, and produce a structured
+        comparison. <code>gpt-4o-mini</code> handles this more reliably.
         <code>llama3.2</code> tends to produce flatter answers that
         restate the retrieved content without the synthesis layer.</p>
         <p><strong>Embedding quality matters more than completion
         quality.</strong> If the wrong documents are retrieved, even
         <code>gpt-4o-mini</code> can’t produce a good answer — it’ll
-        hallucinate or tell you nothing useful was found.
-        <code>nomic-embed-text</code> is a strong embedding model and
-        performs comparably to <code>text-embedding-3-small</code> for
-        most retrieval tasks in this domain. The quality difference
-        between the two embedding models is smaller than the quality
-        difference between the two completion models.</p>
+        hallucinate or tell you nothing useful was found. In my use,
+        <code>nomic-embed-text</code> retrieved comparably to
+        <code>text-embedding-3-small</code> for this domain, and the gap
+        between the two embedding models felt smaller than the gap
+        between the two completion models.</p>
         <p>The practical implication: if you’re optimizing for cost and
         data privacy, use Ollama for both embeddings and completions. If
         you need the best possible answers and can afford the API calls,
@@ -855,7 +860,7 @@ for Ollama with one environment variable</p>
         <hr />
         <h2 id="adding-a-third-provider">Adding a Third Provider</h2>
         <p>The pattern is designed to extend. Adding Anthropic or Gemini
-        embeddings means editing two functions in one file. Here’s what
+        embeddings means editing two functions in two files. Here’s what
         adding Anthropic’s embedding model would look like in
         <code>get_embeddings()</code>:</p>
         <div class="sourceCode" id="cb8"><pre
@@ -922,7 +927,8 @@ for Ollama with one environment variable</p>
         </tr>
         <tr>
         <td>Client has Azure enterprise agreement</td>
-        <td>Azure OpenAI Service (same models, different endpoint)</td>
+        <td>Azure OpenAI Service (same models; uses LangChain’s
+        AzureChatOpenAI and AzureOpenAIEmbeddings classes)</td>
         </tr>
         </tbody>
         </table>
@@ -935,7 +941,7 @@ for Ollama with one environment variable</p>
         difference between good prompts and bad ones.</p>
         <hr />
         <h2 id="whats-next">What’s Next</h2>
-        <p>Post 5 completes the ingestion pipeline. There’s a
+        <p>A later post completes the ingestion pipeline: There’s a
         <code>NotImplementedError</code> sitting in
         <code>pipeline.py</code> — the S3 source path has always been a
         stub. We’ll implement it using MinIO, a local S3-compatible
@@ -948,10 +954,10 @@ for Ollama with one environment variable</p>
 <span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a><span class="ex">docker</span> compose exec ollama ollama pull nomic-embed-text</span>
 <span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a><span class="ex">docker</span> compose exec ollama ollama pull llama3.2</span>
 <span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a><span class="co"># Update .env</span></span>
-<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a><span class="bu">echo</span> <span class="st">&quot;LLM_PROVIDER=ollama&quot;</span> <span class="op">&gt;&gt;</span> .env</span>
-<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a><span class="co"># Re-ingest with the local provider</span></span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a><span class="co"># Set LLM_PROVIDER=ollama in .env</span></span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Drop the OpenAI-embedded collection, then re-ingest with the local provider</span></span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> <span class="at">-m</span> rag.pipeline <span class="at">--reset</span></span>
 <span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> <span class="at">-m</span> rag.pipeline <span class="at">--ingest</span></span>
 <span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb10-11"><a href="#cb10-11" aria-hidden="true" tabindex="-1"></a><span class="co"># Test</span></span>

@@ -697,8 +697,8 @@ become a shared AI platform</p>
         it once and every team’s AI client can use it.</p>
         <hr />
         <h2 id="the-server-in-30-lines">The Server in 30 Lines</h2>
-        <p>The entire entry point is <code>ccai_mcp/server.py</code>. Here’s
-        the core of it:</p>
+        <p>The entire entry point is <code>ccai_mcp/server.py</code>.
+        Here’s the core of it:</p>
         <div class="sourceCode" id="cb1"><pre
         class="sourceCode python"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> mcp.server <span class="im">import</span> Server</span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> mcp.types <span class="im">import</span> Tool, TextContent</span>
@@ -752,7 +752,7 @@ become a shared AI platform</p>
 <span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>        <span class="st">&quot;Search call transcripts using natural language. &quot;</span></span>
 <span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>        <span class="st">&quot;Use this to find calls about specific topics, issues, or patterns. &quot;</span></span>
 <span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>        <span class="st">&quot;Examples: &#39;calls where members complained about fees&#39;, &quot;</span></span>
-<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>        <span class="st">&quot;&#39;fraud disputes from last week&#39;, &#39;calls that were escalated&#39;.&quot;</span></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>        <span class="st">&quot;&#39;fraud disputes where the member was frustrated&#39;, &#39;calls that were escalated&#39;.&quot;</span></span>
 <span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>    ),</span>
 <span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>    inputSchema<span class="op">=</span>{</span>
 <span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>        <span class="st">&quot;type&quot;</span>: <span class="st">&quot;object&quot;</span>,</span>
@@ -777,7 +777,7 @@ become a shared AI platform</p>
         whether to invoke the tool and how to fill in the parameters. A
         vague description like “search calls” produces worse tool use
         than one with concrete examples. The examples in the description
-        (<code>'fraud disputes from last week'</code>,
+        (<code>'fraud disputes where the member was frustrated'</code>,
         <code>'calls that were escalated'</code>) aren’t documentation —
         they’re few-shot prompts that guide the model toward useful
         queries.</p>
@@ -828,8 +828,8 @@ become a shared AI platform</p>
         <hr />
         <h2 id="the-three-tool-implementations">The Three Tool
         Implementations</h2>
-        <p>The actual work happens in <code>ccai_mcp/tools.py</code>. Let’s
-        look at each one honestly.</p>
+        <p>The actual work happens in <code>ccai_mcp/tools.py</code>.
+        Let’s look at each one honestly.</p>
         <h3
         id="search_transcripts-the-clean-one"><code>search_transcripts</code>
         — the clean one</h3>
@@ -857,52 +857,62 @@ become a shared AI platform</p>
 <span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>        <span class="st">&quot;how did the agent handle it, and what was the outcome?&quot;</span>,</span>
 <span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a>        k<span class="op">=</span><span class="dv">1</span>,</span>
 <span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a>    )</span></code></pre></div>
-        <p>This one is worth studying, because it has an interesting
-        inefficiency. The function:</p>
-        <ol type="1">
-        <li>Retrieves documents by embedding the string
-        <code>"call_id:CALL-00042"</code> and doing a semantic search —
-        using the vector store as a lookup when a direct metadata filter
-        would be cleaner</li>
-        <li>Filters the results to find the exact <code>call_id</code>
-        match</li>
-        <li>Finds the right document… and then ignores it</li>
-        <li>Calls <code>rag_query()</code> with a fixed summary prompt
-        and <code>k=1</code>, which does a <em>fresh</em> retrieval pass
-        on its own</li>
-        </ol>
-        <p>The <code>doc</code> variable on line 4 is never used in the
-        final response. The summary is generated from whatever
-        <code>rag_query()</code> retrieves with <code>k=1</code> — which
-        may or may not be the specific call being asked about.</p>
-        <p>For a portfolio project with a small, consistent dataset,
-        this usually works fine in practice: the <code>k=1</code>
-        retrieval typically surfaces the right call. In production, with
-        a growing corpus, it would be wrong often enough to matter. The
-        fix is to pass the retrieved document directly to the LLM rather
-        than triggering another retrieval pass.</p>
-        <p>This is the kind of thing that’s worth being honest about.
-        The architecture is sound; the implementation has rough
-        edges.</p>
+        <p>The first version had two problems. It looked the call up by
+        embedding the string <code>"call_id:CALL-00042"</code> and
+        running a semantic search, but call IDs aren’t in the embedded
+        text, so the requested call usually wasn’t in the results at
+        all. And when it was found, the function ignored it and ran a
+        fresh <code>rag_query()</code> with k=1, which retrieves
+        whichever transcript best matches the words “summarize this
+        call.” That’s effectively an arbitrary call.</p>
+        <p>The fix does an exact lookup with a metadata filter and
+        summarizes that document directly:</p>
+        <div class="sourceCode" id="cb6"><pre
+        class="sourceCode python"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> get_call_summary(call_id: <span class="bu">str</span>) <span class="op">-&gt;</span> <span class="bu">str</span>:</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>    doc <span class="op">=</span> get_vector_store().similarity_search(</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>        call_id, k<span class="op">=</span><span class="dv">1</span>, <span class="bu">filter</span><span class="op">=</span>{<span class="st">&quot;call_id&quot;</span>: {<span class="st">&quot;$eq&quot;</span>: call_id}}</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="kw">not</span> doc:</span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="ss">f&quot;No transcript found for call ID: </span><span class="sc">{</span>call_id<span class="sc">}</span><span class="ss">&quot;</span></span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>    doc <span class="op">=</span> doc[<span class="dv">0</span>]</span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>    meta <span class="op">=</span> doc.metadata</span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>    prompt <span class="op">=</span> <span class="ss">f&quot;&quot;&quot;Summarize this call concisely: what was the member&#39;s issue, how did the agent handle it, and what was the outcome?</span></span>
+<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a><span class="ss">Call ID: </span><span class="sc">{</span>meta<span class="sc">.</span>get(<span class="st">&#39;call_id&#39;</span>)<span class="sc">}</span></span>
+<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a><span class="ss">Date: </span><span class="sc">{</span>meta<span class="sc">.</span>get(<span class="st">&#39;date&#39;</span>)<span class="sc">}</span></span>
+<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a><span class="ss">Category: </span><span class="sc">{</span>meta<span class="sc">.</span>get(<span class="st">&#39;category&#39;</span>)<span class="sc">}</span></span>
+<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a><span class="ss">Outcome: </span><span class="sc">{</span>meta<span class="sc">.</span>get(<span class="st">&#39;outcome&#39;</span>)<span class="sc">}</span></span>
+<span id="cb6-17"><a href="#cb6-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-18"><a href="#cb6-18" aria-hidden="true" tabindex="-1"></a><span class="ss">TRANSCRIPT:</span></span>
+<span id="cb6-19"><a href="#cb6-19" aria-hidden="true" tabindex="-1"></a><span class="sc">{</span>doc<span class="sc">.</span>page_content<span class="sc">}</span><span class="ss">&quot;&quot;&quot;</span></span>
+<span id="cb6-20"><a href="#cb6-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-21"><a href="#cb6-21" aria-hidden="true" tabindex="-1"></a>    response <span class="op">=</span> get_llm().invoke(prompt)</span>
+<span id="cb6-22"><a href="#cb6-22" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> response.content</span></code></pre></div>
+        <p>The general lesson: use the vector store for similarity, and
+        use filters for identity.</p>
         <h3 id="query_csat-the-bypass"><code>query_csat</code> — the
         bypass</h3>
-        <div class="sourceCode" id="cb6"><pre
-        class="sourceCode python"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> query_csat(min_score<span class="op">=</span><span class="va">None</span>, max_score<span class="op">=</span><span class="va">None</span>, category<span class="op">=</span><span class="va">None</span>) <span class="op">-&gt;</span> <span class="bu">str</span>:</span>
-<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>    csat_path <span class="op">=</span> Path(<span class="va">__file__</span>).parent.parent <span class="op">/</span> <span class="st">&quot;data&quot;</span> <span class="op">/</span> <span class="st">&quot;synthetic&quot;</span> <span class="op">/</span> <span class="st">&quot;csat.json&quot;</span></span>
-<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>    <span class="cf">with</span> <span class="bu">open</span>(csat_path) <span class="im">as</span> f:</span>
-<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>        csat_data <span class="op">=</span> json.load(f)</span>
-<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>    filtered <span class="op">=</span> csat_data</span>
-<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> min_score <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:</span>
-<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>        filtered <span class="op">=</span> [r <span class="cf">for</span> r <span class="kw">in</span> filtered <span class="cf">if</span> r[<span class="st">&quot;score&quot;</span>] <span class="op">&gt;=</span> min_score]</span>
-<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> max_score <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:</span>
-<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>        filtered <span class="op">=</span> [r <span class="cf">for</span> r <span class="kw">in</span> filtered <span class="cf">if</span> r[<span class="st">&quot;score&quot;</span>] <span class="op">&lt;=</span> max_score]</span>
-<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>    avg_score <span class="op">=</span> <span class="bu">sum</span>(r[<span class="st">&quot;score&quot;</span>] <span class="cf">for</span> r <span class="kw">in</span> filtered) <span class="op">/</span> <span class="bu">len</span>(filtered)</span>
-<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a>    score_dist <span class="op">=</span> {i: <span class="bu">sum</span>(<span class="dv">1</span> <span class="cf">for</span> r <span class="kw">in</span> filtered <span class="cf">if</span> r[<span class="st">&quot;score&quot;</span>] <span class="op">==</span> i) <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">1</span>, <span class="dv">6</span>)}</span>
-<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a>    sample_comments <span class="op">=</span> [r[<span class="st">&quot;comment&quot;</span>] <span class="cf">for</span> r <span class="kw">in</span> filtered[:<span class="dv">5</span>]]</span>
-<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="ss">f&quot;CSAT Summary (</span><span class="sc">{</span><span class="bu">len</span>(filtered)<span class="sc">}</span><span class="ss"> responses)</span><span class="ch">\n</span><span class="ss">Average score: </span><span class="sc">{</span>avg_score<span class="sc">:.2f}</span><span class="ss">/5</span><span class="ch">\n</span><span class="ss">...&quot;</span></span></code></pre></div>
+        <div class="sourceCode" id="cb7"><pre
+        class="sourceCode python"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> query_csat(min_score<span class="op">=</span><span class="va">None</span>, max_score<span class="op">=</span><span class="va">None</span>, category<span class="op">=</span><span class="va">None</span>) <span class="op">-&gt;</span> <span class="bu">str</span>:</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>    csat_path <span class="op">=</span> Path(<span class="va">__file__</span>).parent.parent <span class="op">/</span> <span class="st">&quot;data&quot;</span> <span class="op">/</span> <span class="st">&quot;synthetic&quot;</span> <span class="op">/</span> <span class="st">&quot;csat.json&quot;</span></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>    <span class="cf">with</span> <span class="bu">open</span>(csat_path) <span class="im">as</span> f:</span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>        csat_data <span class="op">=</span> json.load(f)</span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>    filtered <span class="op">=</span> csat_data</span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> min_score <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:</span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>        filtered <span class="op">=</span> [r <span class="cf">for</span> r <span class="kw">in</span> filtered <span class="cf">if</span> r[<span class="st">&quot;score&quot;</span>] <span class="op">&gt;=</span> min_score]</span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> max_score <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:</span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>        filtered <span class="op">=</span> [r <span class="cf">for</span> r <span class="kw">in</span> filtered <span class="cf">if</span> r[<span class="st">&quot;score&quot;</span>] <span class="op">&lt;=</span> max_score]</span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> category:</span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a>        filtered <span class="op">=</span> [r <span class="cf">for</span> r <span class="kw">in</span> filtered <span class="cf">if</span> r.get(<span class="st">&quot;category&quot;</span>) <span class="op">==</span> category]</span>
+<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a>    avg_score <span class="op">=</span> <span class="bu">sum</span>(r[<span class="st">&quot;score&quot;</span>] <span class="cf">for</span> r <span class="kw">in</span> filtered) <span class="op">/</span> <span class="bu">len</span>(filtered)</span>
+<span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a>    score_dist <span class="op">=</span> {i: <span class="bu">sum</span>(<span class="dv">1</span> <span class="cf">for</span> r <span class="kw">in</span> filtered <span class="cf">if</span> r[<span class="st">&quot;score&quot;</span>] <span class="op">==</span> i) <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">1</span>, <span class="dv">6</span>)}</span>
+<span id="cb7-16"><a href="#cb7-16" aria-hidden="true" tabindex="-1"></a>    sample_comments <span class="op">=</span> [r[<span class="st">&quot;comment&quot;</span>] <span class="cf">for</span> r <span class="kw">in</span> filtered[:<span class="dv">5</span>]]</span>
+<span id="cb7-17"><a href="#cb7-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-18"><a href="#cb7-18" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="ss">f&quot;CSAT Summary (</span><span class="sc">{</span><span class="bu">len</span>(filtered)<span class="sc">}</span><span class="ss"> responses)</span><span class="ch">\n</span><span class="ss">Average score: </span><span class="sc">{</span>avg_score<span class="sc">:.2f}</span><span class="ss">/5</span><span class="ch">\n</span><span class="ss">...&quot;</span></span></code></pre></div>
         <p><code>query_csat</code> doesn’t touch pgvector or the LLM. It
         reads <code>csat.json</code> directly, filters in Python, and
         returns a formatted summary. Two things worth noting:</p>
@@ -912,49 +922,47 @@ become a shared AI platform</p>
         ignored. This is a genuine bug: if Claude passes
         <code>category="fraud_dispute"</code> because the user asked
         about fraud call satisfaction, the filter doesn’t apply and the
-        result is unscoped. Easy fix for a future post.</p>
+        result is unscoped. The fix needed two changes: the generator
+        now records each call’s category on its CSAT record, and the
+        tool filters on it.</p>
         <p>Second, this bypass is actually the <em>correct</em>
         architecture for structured data at this scale. CSAT data is
         small, it has a clear schema, and questions about it are
         aggregations over numeric scores — exactly the kind of thing
         in-memory filtering handles perfectly. Adding it to pgvector
         would add complexity and latency with no benefit. If the dataset
-        grew to millions of records, you’d move to SQL; at 112 rows,
+        grew to millions of records, you’d move to SQL; at 113 rows,
         loading a JSON file is the right call.</p>
         <hr />
         <h2 id="how-stdio-works">How stdio Works</h2>
-        <p>Running <code>python -m ccai_mcp.server</code> starts the server
-        and puts it into <code>stdio_server()</code> mode. The process
-        reads MCP messages from stdin and writes responses to stdout.
-        That’s the entire transport.</p>
+        <p>Running <code>python -m ccai_mcp.server</code> starts the
+        server and puts it into <code>stdio_server()</code> mode. The
+        process reads MCP messages from stdin and writes responses to
+        stdout. That’s the entire transport.</p>
         <p>Claude Desktop connects by spawning the server process
         directly. The <code>claude_desktop_config.json</code> entry for
         this server looks like:</p>
-        <div class="sourceCode" id="cb7"><pre
-        class="sourceCode json"><code class="sourceCode json"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
-<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;mcpServers&quot;</span><span class="fu">:</span> <span class="fu">{</span></span>
-<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;contact-center-ai&quot;</span><span class="fu">:</span> <span class="fu">{</span></span>
-<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;command&quot;</span><span class="fu">:</span> <span class="st">&quot;python&quot;</span><span class="fu">,</span></span>
-<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;args&quot;</span><span class="fu">:</span> <span class="ot">[</span><span class="st">&quot;-m&quot;</span><span class="ot">,</span> <span class="st">&quot;ccai_mcp.server&quot;</span><span class="ot">]</span><span class="fu">,</span></span>
-<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;cwd&quot;</span><span class="fu">:</span> <span class="st">&quot;/path/to/contact-center-ai&quot;</span><span class="fu">,</span></span>
-<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;env&quot;</span><span class="fu">:</span> <span class="fu">{</span></span>
-<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>        <span class="dt">&quot;OPENAI_API_KEY&quot;</span><span class="fu">:</span> <span class="st">&quot;sk-...&quot;</span><span class="fu">,</span></span>
-<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>        <span class="dt">&quot;DATABASE_URL&quot;</span><span class="fu">:</span> <span class="st">&quot;postgresql://...&quot;</span></span>
-<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>      <span class="fu">}</span></span>
-<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>    <span class="fu">}</span></span>
-<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">}</span></span>
-<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div>
+        <div class="sourceCode" id="cb8"><pre
+        class="sourceCode json"><code class="sourceCode json"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;mcpServers&quot;</span><span class="fu">:</span> <span class="fu">{</span></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;contact-center-ai&quot;</span><span class="fu">:</span> <span class="fu">{</span></span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;command&quot;</span><span class="fu">:</span> <span class="st">&quot;uv&quot;</span><span class="fu">,</span></span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;args&quot;</span><span class="fu">:</span> <span class="ot">[</span><span class="st">&quot;--directory&quot;</span><span class="ot">,</span> <span class="st">&quot;/path/to/contact-center-ai&quot;</span><span class="ot">,</span> <span class="st">&quot;run&quot;</span><span class="ot">,</span> <span class="st">&quot;python&quot;</span><span class="ot">,</span> <span class="st">&quot;-m&quot;</span><span class="ot">,</span> <span class="st">&quot;ccai_mcp.server&quot;</span><span class="ot">]</span><span class="fu">,</span></span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;env&quot;</span><span class="fu">:</span> <span class="fu">{</span> <span class="dt">&quot;OPENAI_API_KEY&quot;</span><span class="fu">:</span> <span class="st">&quot;sk-...&quot;</span><span class="fu">,</span> <span class="dt">&quot;DATABASE_URL&quot;</span><span class="fu">:</span> <span class="st">&quot;postgresql://...&quot;</span> <span class="fu">}</span></span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>    <span class="fu">}</span></span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">}</span></span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div>
         <p>Claude Desktop spawns the process, sends an initialization
         handshake, calls <code>list_tools()</code> to discover what’s
         available, and then routes relevant user queries to the
         appropriate tool. The user sees tool results incorporated into
         Claude’s response — they don’t see the raw tool call at all.</p>
         <p>The stdio model is clean for local development but doesn’t
-        work for production: you can’t spawn a local process from a
-        cloud-hosted client. In production on Azure App Service, the MCP
-        SDK’s HTTP transport layer surfaces the same tools over HTTPS.
-        The Python code is identical; only the transport changes. We’ll
-        cover the infrastructure side of that in Post 5.</p>
+        work for a cloud deployment: a hosted client can’t spawn a
+        process on your laptop. For Azure App Service, the server needs
+        an HTTP entry point using the MCP SDK’s Streamable HTTP
+        transport. The tool code stays the same; the entry point and
+        hosting change. That piece isn’t built yet.</p>
         <hr />
         <h2 id="why-mcp-and-not-a-rest-api">Why MCP and Not a REST
         API?</h2>
@@ -976,14 +984,14 @@ become a shared AI platform</p>
         <code>search_policies</code> tool to this server next quarter,
         every connected client gets it without a code change on their
         end.</p>
-        <p><strong>Transport agnosticism.</strong> The same server code
-        runs over stdio locally and over HTTPS in production. Swapping
-        transports doesn’t touch the business logic.</p>
+        <p><strong>Transport flexibility.</strong> The tool logic is
+        independent of the transport, so moving from stdio to HTTP means
+        a new entry point, not new tools.</p>
         <p>The trade-off is ecosystem maturity — MCP is newer than REST
         and there are fewer off-the-shelf tools for testing, monitoring,
         and debugging it. That’s a real cost, and it’s part of why
-        observability (Posts 6 and 7) matters more here than it would
-        for a well-worn REST API.</p>
+        observability matters more here than it would for a well-worn
+        REST API.</p>
         <hr />
         <h2 id="whats-next">What’s Next</h2>
         <p>The MCP server is built. The RAG pipeline is working behind
@@ -993,12 +1001,9 @@ become a shared AI platform</p>
         practice.</p>
         <p>If you want to connect Claude Desktop to this server right
         now:</p>
-        <div class="sourceCode" id="cb8"><pre
-        class="sourceCode bash"><code class="sourceCode bash"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Start the server (leave this running)</span></span>
-<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> <span class="at">-m</span> ccai_mcp.server</span>
-<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a><span class="co"># In claude_desktop_config.json, add the server entry above.</span></span>
-<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a><span class="co"># Restart Claude Desktop and the tools appear automatically.</span></span></code></pre></div>
+        <div class="sourceCode" id="cb9"><pre
+        class="sourceCode bash"><code class="sourceCode bash"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Add the server entry above to claude_desktop_config.json,</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="co"># then restart Claude Desktop. It starts the server itself.</span></span></code></pre></div>
         <p>Then ask Claude: <em>“Use the search_transcripts tool to find
         calls where members were frustrated with wait times.”</em> It
         will invoke the tool, retrieve from pgvector, and synthesize an

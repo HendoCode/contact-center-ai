@@ -663,17 +663,15 @@ the ground up</p>
         <p>The data exists. Hundreds of call transcripts, recorded and
         transcribed every week. CSAT surveys from members who bothered
         to respond. Agent notes. Outcome codes. But turning that pile of
-        raw data into an answer to “show me all fraud disputes that
-        escalated last month” requires someone to actually dig through
-        it — manually. Keyword searching, listening to recordings,
-        building mental models across dozens of calls. It’s slow, it
-        misses context, and it doesn’t scale.</p>
+        raw data into an answer to “what are members saying on fraud
+        dispute calls that go badly?” requires someone to actually dig
+        through it — manually. Keyword searching, listening to
+        recordings, building mental models across dozens of calls. It’s
+        slow, it misses context, and it doesn’t scale.</p>
         <p>This series is about building a system that makes that
-        question answerable in seconds, using natural language. Not as a
-        demo, not as a tutorial with 10 rows of fake data — but as a
-        real, deployable system with production infrastructure,
-        swap-friendly LLM providers, and the kind of observability that
-        lets you trust what you’ve built.</p>
+        question answerable in seconds, using natural language, with the
+        pieces a real deployment needs: a shared service boundary,
+        swappable LLM providers, and infrastructure as code.</p>
         <hr />
         <h2 id="the-context">The Context</h2>
         <p>The system documented in this series grew out of a consulting
@@ -682,11 +680,9 @@ the ground up</p>
         problem familiar to any enterprise mid-AI-adoption: multiple
         teams independently using Claude, OpenAI, and Gemini, no shared
         infrastructure, and no way to reuse the work across teams.</p>
-        <p>The call center team wanted to query call recordings and
-        transcripts in natural language. The compliance team wanted to
-        run ad-hoc CSAT analyses. The operations team had something
-        different in mind. All of them were going to end up building
-        separate pipelines to the same underlying data.</p>
+        <p>Several teams were independently building AI features against
+        the same call and survey data, each heading toward its own
+        pipeline to it.</p>
         <p>The design constraint that shaped everything: <strong>build
         one thing that all of them can use.</strong> That meant the core
         retrieval and data access layer needed to be a shared service,
@@ -696,6 +692,9 @@ the ground up</p>
         real member information, no real call recordings, no PII. The
         architecture decisions are real. The code is real. The numbers
         are fake.</p>
+        <p>The code behind this series was built between April and June
+        2026. The first four write-ups were published together once it
+        was working.</p>
         <hr />
         <h2 id="what-were-building">What We’re Building</h2>
         <p>At its core, this is a <strong>RAG pipeline</strong>
@@ -755,8 +754,13 @@ the ground up</p>
         variable.</em></p>
         <hr />
         <h3 id="containers">Containers</h3>
-        <p>Zooming in, the system is six containers. Two are live data
-        paths; one is a future-planned external source.</p>
+        <p>Zooming in, there are three containers: one Python process
+        (the MCP server, which runs the RAG pipeline and embeddings
+        module in-process), PostgreSQL with pgvector, and the JSON data
+        files, plus the external LLM provider. The diagram also draws
+        the pipeline and embeddings module as separate boxes because the
+        component boundary matters more than the process boundary for
+        what follows.</p>
         <pre class="mermaid"><code>flowchart TB
     supervisor([&quot;Supervisor&quot;])
 
@@ -770,7 +774,7 @@ the ground up</p>
 
     llmProvider[&quot;LLM Provider — OpenAI or Ollama&quot;]
 
-    supervisor --&gt;|&quot;MCP stdio / HTTPS&quot;| mcpServer
+    supervisor --&gt;|&quot;MCP stdio (HTTPS planned)&quot;| mcpServer
     mcpServer --&gt;|&quot;rag_query()&quot;| ragPipeline
     mcpServer --&gt;|&quot;reads csat.json directly&quot;| dataFiles
     ragPipeline --&gt;|&quot;get_vector_store()&quot;| embedModule
@@ -810,7 +814,7 @@ the ground up</p>
     callTool --&gt;|&quot;get_call_summary&quot;| summaryTool
     callTool --&gt;|&quot;query_csat&quot;| csatTool
     searchTool --&gt;|&quot;rag_query(query, k)&quot;| ragPipeline
-    summaryTool --&gt;|&quot;retrieve then rag_query&quot;| ragPipeline
+    summaryTool --&gt;|&quot;retrieve then summarize&quot;| ragPipeline
     csatTool --&gt;|&quot;bypasses RAG entirely&quot;| dataFiles</code></pre>
         <p><em>Figure 3 — The tool dispatch layer.
         <code>query_csat</code> is the outlier: it’s the only tool that
@@ -822,8 +826,8 @@ the ground up</p>
         what actually happens when a request comes in.</p>
         <h3 id="flow-1-a-single-mcp-query">Flow 1 — A Single MCP
         Query</h3>
-        <p>When a supervisor types “show me fraud disputes from last
-        week” into Claude Desktop, here’s the full path:</p>
+        <p>When a supervisor types “fraud disputes where the member was
+        frustrated” into Claude Desktop, here’s the full path:</p>
         <pre class="mermaid"><code>sequenceDiagram
     actor Supervisor
     participant CD as Claude Desktop
@@ -834,7 +838,7 @@ the ground up</p>
     participant PG as pgvector
     participant LLM as LLM Provider
 
-    Supervisor-&gt;&gt;CD: show me fraud disputes from last week
+    Supervisor-&gt;&gt;CD: fraud disputes where the member was frustrated
     CD-&gt;&gt;MCP: call_tool search_transcripts query k=5
     MCP-&gt;&gt;Tools: search_transcripts(query, k=5)
     Tools-&gt;&gt;RAG: rag_query(query, k=5)
@@ -844,17 +848,18 @@ the ground up</p>
     LLM--&gt;&gt;RAG: query embedding
     RAG-&gt;&gt;PG: similarity_search(embedding, k=5)
     PG--&gt;&gt;RAG: top-5 LangChain Documents
-    RAG-&gt;&gt;LLM: ChatOpenAI.invoke(prompt + retrieved context)
+    RAG-&gt;&gt;LLM: llm.invoke(prompt + retrieved context)
     LLM--&gt;&gt;RAG: grounded answer text
     RAG--&gt;&gt;Tools: answer string
     Tools--&gt;&gt;MCP: TextContent(answer)
     MCP--&gt;&gt;CD: tool result
     CD--&gt;&gt;Supervisor: displays answer</code></pre>
         <p><em>Figure 4 — MCP query flow. The round-trip involves two
-        LLM calls: one to embed the query (fast, cheap), one to
-        synthesize the answer (slower, more expensive). Both happen over
-        the same provider — swap the <code>LLM_PROVIDER</code> env var
-        and both switch simultaneously.</em></p>
+        model calls: one embedding call to vectorize the query (fast,
+        cheap) and one chat completion to synthesize the answer (slower,
+        more expensive). Both happen over the same provider — swap the
+        <code>LLM_PROVIDER</code> env var and both switch
+        simultaneously.</em></p>
         <hr />
         <h3 id="flow-2-ingest-and-embedding">Flow 2 — Ingest and
         Embedding</h3>
@@ -877,11 +882,9 @@ the ground up</p>
     Embed-&gt;&gt;PG: initialize schema and pgvector extension
     PG--&gt;&gt;Embed: ready
     CLI-&gt;&gt;Embed: vector_store.add_documents(docs)
-    loop for each document
-        Embed-&gt;&gt;LLM: embed page_content
-        LLM--&gt;&gt;Embed: 1536-dim float vector
-        Embed-&gt;&gt;PG: INSERT embedding and JSONB metadata
-    end
+    Embed-&gt;&gt;LLM: batch embed page_content
+    LLM--&gt;&gt;Embed: vectors (1536-dim OpenAI, 768-dim nomic)
+    Embed-&gt;&gt;PG: INSERT embedding and JSONB metadata
     PG--&gt;&gt;CLI: 150 documents stored</code></pre>
         <p><em>Figure 5 — Ingest flow. One thing to note: there’s no
         deduplication guard. Running <code>--ingest</code> twice creates
@@ -891,7 +894,7 @@ the ground up</p>
         <hr />
         <h2 id="whats-coming">What’s Coming</h2>
         <p>This first post covered the architecture at a high level. The
-        next eight posts build the system layer by layer:</p>
+        next three posts build the system layer by layer:</p>
         <table>
         <colgroup>
         <col style="width: 33%" />
@@ -927,37 +930,6 @@ the ground up</p>
         running entirely local with Ollama; cost and privacy
         trade-offs</td>
         </tr>
-        <tr>
-        <td>05</td>
-        <td><a href="../05-built-to-last/">Built to Last</a></td>
-        <td>Infrastructure as code: Terraform/OpenTofu on Azure, App
-        Service, Entra Easy Auth pattern</td>
-        </tr>
-        <tr>
-        <td>06</td>
-        <td><a href="../06-what-should-we-measure/">What Should We
-        Measure?</a></td>
-        <td>LLM and RAG observability design: what metrics matter, what
-        Grafana and OpenTelemetry bring</td>
-        </tr>
-        <tr>
-        <td>07</td>
-        <td><a href="../07-wiring-it-up/">Wiring It Up</a></td>
-        <td>Implementing observability: OTel instrumentation,
-        docker-compose additions, live Grafana dashboards</td>
-        </tr>
-        <tr>
-        <td>08</td>
-        <td><a href="../08-trust-but-verify/">Trust, but Verify</a></td>
-        <td>Detecting RAG degradation: embedding drift, retrieval
-        quality signals, CSAT as ground truth, SLOs</td>
-        </tr>
-        <tr>
-        <td>09</td>
-        <td><a href="../09-whats-next/">What’s Next</a></td>
-        <td>The emerging landscape: Coding agents, LangGraph, Azure AI
-        Foundry — and how this MCP-first approach stays durable</td>
-        </tr>
         </tbody>
         </table>
         <hr />
@@ -978,16 +950,19 @@ the ground up</p>
 <span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a><span class="co"># Edit .env: set OPENAI_API_KEY (or set LLM_PROVIDER=ollama for no API key)</span></span>
 <span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a><span class="co"># 4. Generate synthetic data</span></span>
-<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> data/synthetic/generate_data.py</span>
+<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run python data/synthetic/generate_data.py</span>
 <span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a><span class="co"># 5. Embed and store in pgvector</span></span>
-<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> <span class="at">-m</span> rag.pipeline <span class="at">--ingest</span></span>
+<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a><span class="co"># 4a. Optional: drop any previously ingested data (run this if you&#39;ve ingested before)</span></span>
+<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run python <span class="at">-m</span> rag.pipeline <span class="at">--reset</span></span>
 <span id="cb6-17"><a href="#cb6-17" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-18"><a href="#cb6-18" aria-hidden="true" tabindex="-1"></a><span class="co"># 6. Test a query end-to-end</span></span>
-<span id="cb6-19"><a href="#cb6-19" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> <span class="at">-m</span> rag.pipeline <span class="at">--query</span> <span class="st">&quot;fraud disputes from last week&quot;</span></span>
+<span id="cb6-18"><a href="#cb6-18" aria-hidden="true" tabindex="-1"></a><span class="co"># 5. Embed and store in pgvector</span></span>
+<span id="cb6-19"><a href="#cb6-19" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run python <span class="at">-m</span> rag.pipeline <span class="at">--ingest</span></span>
 <span id="cb6-20"><a href="#cb6-20" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-21"><a href="#cb6-21" aria-hidden="true" tabindex="-1"></a><span class="co"># 7. Start the MCP server (connect with Claude Desktop)</span></span>
-<span id="cb6-22"><a href="#cb6-22" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> <span class="at">-m</span> ccai_mcp.server</span></code></pre></div>
+<span id="cb6-21"><a href="#cb6-21" aria-hidden="true" tabindex="-1"></a><span class="co"># 6. Test a query end-to-end</span></span>
+<span id="cb6-22"><a href="#cb6-22" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run python <span class="at">-m</span> rag.pipeline <span class="at">--query</span> <span class="st">&quot;fraud disputes where the member was frustrated&quot;</span></span>
+<span id="cb6-23"><a href="#cb6-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-24"><a href="#cb6-24" aria-hidden="true" tabindex="-1"></a><span class="co"># 7. Start the MCP server (normally Claude Desktop starts this for you; see Post 3)</span></span>
+<span id="cb6-25"><a href="#cb6-25" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run python <span class="at">-m</span> ccai_mcp.server</span></code></pre></div>
         <p>Post 2 goes much deeper on what each of these steps actually
         does — the data structures, the LangChain abstractions, the SQL
         that pgvector generates under the hood.</p>
