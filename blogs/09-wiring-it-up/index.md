@@ -17,7 +17,7 @@ next_title: "Trust, but Verify"
 
 ## What This Post Covers
 
-Post 6 designed the observability stack. This post builds it. We'll add OpenTelemetry instrumentation to `rag/pipeline.py` and `mcp/tools.py`, extend `docker-compose.yml` with a Grafana + Prometheus + OTel Collector stack, and wire up the dashboards described in Post 6.
+Post 6 designed the observability stack. This post builds it. We'll add OpenTelemetry instrumentation to `rag/pipeline.py` and `ccai_mcp/tools.py`, extend `docker-compose.yml` with a Grafana + Prometheus + OTel Collector stack, and wire up the dashboards described in Post 6.
 
 By the end, every MCP tool call is a traced span, every RAG query emits latency and retrieval score metrics, and every LLM call reports token counts to Grafana — all visible in a live dashboard.
 
@@ -61,7 +61,7 @@ grafana:
 1. **The plan** — what we're adding, where it goes, how it connects
 2. **Installing OTel** — `opentelemetry-sdk`, `opentelemetry-exporter-otlp`, the Python package list
 3. **Initializing the SDK** — where to call `TracerProvider`, `MeterProvider`, `LoggerProvider`; the `Resource` that identifies this service
-4. **Instrumenting `mcp/tools.py`** — spans for each tool call; tagging with tool name and input parameters
+4. **Instrumenting `ccai_mcp/tools.py`** — spans for each tool call; tagging with tool name and input parameters
 5. **Instrumenting `rag/pipeline.py`** — spans for `rag_query()` and `retrieve()`; emitting `rag_retrieval_score`, token counts, document counts
 6. **Instrumenting `rag/embeddings.py`** — timing the embedding API call; emitting `embedding_duration_seconds`
 7. **Docker Compose additions** — the three new service definitions; the OTel Collector config YAML; Prometheus scrape config
@@ -75,7 +75,7 @@ grafana:
 
 - Add OTel SDK to `pyproject.toml` dependencies
 - Add OTel initialization module (e.g., `rag/telemetry.py`)
-- Instrument `mcp/tools.py`, `rag/pipeline.py`, `rag/embeddings.py`
+- Instrument `ccai_mcp/tools.py`, `rag/pipeline.py`, `rag/embeddings.py`
 - Extend `docker-compose.yml` with otel-collector, prometheus, grafana services
 - Add `infra/otel/collector-config.yaml`, `infra/prometheus/prometheus.yml`
 - Add `infra/grafana/dashboards/anchoring-ai.json` (provisioned dashboard)

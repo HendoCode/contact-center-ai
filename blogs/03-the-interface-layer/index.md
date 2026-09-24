@@ -33,12 +33,12 @@ For our use case — multiple teams at a credit union all wanting access to the 
 
 ## The Server in 30 Lines
 
-The entire entry point is `mcp/server.py`. Here's the core of it:
+The entire entry point is `ccai_mcp/server.py`. Here's the core of it:
 
 ```python
 from mcp.server import Server
 from mcp.types import Tool, TextContent
-from mcp.tools import search_transcripts, get_call_summary, query_csat
+from ccai_mcp.tools import search_transcripts, get_call_summary, query_csat
 
 app = Server("contact-center-ai")
 
@@ -148,7 +148,7 @@ The `.get()` calls with defaults are intentional: they make the router tolerant 
 
 ## The Three Tool Implementations
 
-The actual work happens in `mcp/tools.py`. Let's look at each one honestly.
+The actual work happens in `ccai_mcp/tools.py`. Let's look at each one honestly.
 
 ### `search_transcripts` — the clean one
 
@@ -221,7 +221,7 @@ Second, this bypass is actually the *correct* architecture for structured data a
 
 ## How stdio Works
 
-Running `python -m mcp.server` starts the server and puts it into `stdio_server()` mode. The process reads MCP messages from stdin and writes responses to stdout. That's the entire transport.
+Running `python -m ccai_mcp.server` starts the server and puts it into `stdio_server()` mode. The process reads MCP messages from stdin and writes responses to stdout. That's the entire transport.
 
 Claude Desktop connects by spawning the server process directly. The `claude_desktop_config.json` entry for this server looks like:
 
@@ -230,7 +230,7 @@ Claude Desktop connects by spawning the server process directly. The `claude_des
   "mcpServers": {
     "contact-center-ai": {
       "command": "python",
-      "args": ["-m", "mcp.server"],
+      "args": ["-m", "ccai_mcp.server"],
       "cwd": "/path/to/contact-center-ai",
       "env": {
         "OPENAI_API_KEY": "sk-...",
@@ -271,7 +271,7 @@ If you want to connect Claude Desktop to this server right now:
 
 ```bash
 # Start the server (leave this running)
-python -m mcp.server
+python -m ccai_mcp.server
 
 # In claude_desktop_config.json, add the server entry above.
 # Restart Claude Desktop and the tools appear automatically.

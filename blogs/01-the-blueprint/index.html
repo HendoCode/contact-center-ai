@@ -792,12 +792,12 @@ the ground up</p>
         <code>server.py</code> is the async entry point;
         <code>tools.py</code> is where the actual work happens.</p>
         <pre class="mermaid"><code>flowchart LR
-    subgraph server [&quot;mcp/server.py&quot;]
+    subgraph server [&quot;ccai_mcp/server.py&quot;]
         listTools[&quot;list_tools handler&quot;]
         callTool[&quot;call_tool handler&quot;]
     end
 
-    subgraph tools [&quot;mcp/tools.py&quot;]
+    subgraph tools [&quot;ccai_mcp/tools.py&quot;]
         searchTool[&quot;search_transcripts&quot;]
         summaryTool[&quot;get_call_summary&quot;]
         csatTool[&quot;query_csat&quot;]
@@ -987,7 +987,7 @@ the ground up</p>
 <span id="cb6-19"><a href="#cb6-19" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> <span class="at">-m</span> rag.pipeline <span class="at">--query</span> <span class="st">&quot;fraud disputes from last week&quot;</span></span>
 <span id="cb6-20"><a href="#cb6-20" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb6-21"><a href="#cb6-21" aria-hidden="true" tabindex="-1"></a><span class="co"># 7. Start the MCP server (connect with Claude Desktop)</span></span>
-<span id="cb6-22"><a href="#cb6-22" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> <span class="at">-m</span> mcp.server</span></code></pre></div>
+<span id="cb6-22"><a href="#cb6-22" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> <span class="at">-m</span> ccai_mcp.server</span></code></pre></div>
         <p>Post 2 goes much deeper on what each of these steps actually
         does — the data structures, the LangChain abstractions, the SQL
         that pgvector generates under the hood.</p>

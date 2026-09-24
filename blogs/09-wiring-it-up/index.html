@@ -669,7 +669,7 @@ in docker-compose, and live LLM/RAG dashboards</p>
         <h2 id="what-this-post-covers">What This Post Covers</h2>
         <p>Post 6 designed the observability stack. This post builds it.
         We’ll add OpenTelemetry instrumentation to
-        <code>rag/pipeline.py</code> and <code>mcp/tools.py</code>,
+        <code>rag/pipeline.py</code> and <code>ccai_mcp/tools.py</code>,
         extend <code>docker-compose.yml</code> with a Grafana +
         Prometheus + OTel Collector stack, and wire up the dashboards
         described in Post 6.</p>
@@ -732,7 +732,7 @@ in docker-compose, and live LLM/RAG dashboards</p>
         <code>TracerProvider</code>, <code>MeterProvider</code>,
         <code>LoggerProvider</code>; the <code>Resource</code> that
         identifies this service</li>
-        <li><strong>Instrumenting <code>mcp/tools.py</code></strong> —
+        <li><strong>Instrumenting <code>ccai_mcp/tools.py</code></strong> —
         spans for each tool call; tagging with tool name and input
         parameters</li>
         <li><strong>Instrumenting <code>rag/pipeline.py</code></strong>
@@ -763,7 +763,7 @@ in docker-compose, and live LLM/RAG dashboards</p>
         dependencies</li>
         <li>Add OTel initialization module (e.g.,
         <code>rag/telemetry.py</code>)</li>
-        <li>Instrument <code>mcp/tools.py</code>,
+        <li>Instrument <code>ccai_mcp/tools.py</code>,
         <code>rag/pipeline.py</code>,
         <code>rag/embeddings.py</code></li>
         <li>Extend <code>docker-compose.yml</code> with otel-collector,

@@ -122,12 +122,12 @@ The MCP server is a single Python process. `server.py` is the async entry point;
 
 ```mermaid
 flowchart LR
-    subgraph server ["mcp/server.py"]
+    subgraph server ["ccai_mcp/server.py"]
         listTools["list_tools handler"]
         callTool["call_tool handler"]
     end
 
-    subgraph tools ["mcp/tools.py"]
+    subgraph tools ["ccai_mcp/tools.py"]
         searchTool["search_transcripts"]
         summaryTool["get_call_summary"]
         csatTool["query_csat"]
@@ -266,7 +266,7 @@ python -m rag.pipeline --ingest
 python -m rag.pipeline --query "fraud disputes from last week"
 
 # 7. Start the MCP server (connect with Claude Desktop)
-python -m mcp.server
+python -m ccai_mcp.server
 ```
 
 Post 2 goes much deeper on what each of these steps actually does — the data structures, the LangChain abstractions, the SQL that pgvector generates under the hood.

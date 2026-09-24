@@ -29,7 +29,7 @@ There's also something worth saying about authoring all of this — including th
 
 - **FastAPI** — async Python web framework; automatic OpenAPI 3.1 spec generation; Pydantic models as request/response schemas; why it's a natural fit alongside a LangChain-based backend
 - **OpenAPI/Swagger** — what the spec actually contains; the `/docs` and `/redoc` endpoints FastAPI generates automatically; using the spec as a contract for frontend or third-party integration
-- **Sharing tool logic** — the three MCP tools in `mcp/tools.py` become the same three REST endpoints; no duplication of business logic, just a new transport
+- **Sharing tool logic** — the three MCP tools in `ccai_mcp/tools.py` become the same three REST endpoints; no duplication of business logic, just a new transport
 - **PyCharm + Docker debugging** — attaching PyCharm's debugger to a running Docker container; setting breakpoints in `pipeline.py` during a live query; the Docker Compose service configuration for remote debugging
 - **JetBrains Junie** — AI-assisted unit test generation; PEP8 and idiomatic Python suggestions; the difference between "AI writes the test" and "AI writes a test worth keeping"; code review workflow inside the IDE
 - **HTTP Request files (`.http`)** — JetBrains' built-in HTTP client; `.http` files as living API documentation checked into the repo; running requests against local and production environments with environment variables
@@ -41,9 +41,9 @@ There's also something worth saying about authoring all of this — including th
 ## The New Architecture
 
 ```
-Claude Desktop ──(stdio)──► MCP Server (mcp/server.py)
+Claude Desktop ──(stdio)──► MCP Server (ccai_mcp/server.py)
                                 │
-HTTP Client ────(HTTP)───► REST API (api/server.py)  ─────► mcp/tools.py ──► rag_query()
+HTTP Client ────(HTTP)───► REST API (api/server.py)  ─────► ccai_mcp/tools.py ──► rag_query()
                                                                           └──► csat (JSON)
 
 Both surfaces share the same tool implementations.
@@ -73,7 +73,7 @@ Both surfaces share the same tool implementations.
 - Add `fastapi`, `uvicorn` to `pyproject.toml` dependencies
 - Add `api` service to `docker-compose.yml`
 - New `api/requests.http` — HTTP Request file for all three endpoints (checked into repo)
-- Unit tests for `mcp/tools.py` (generated with Junie, then reviewed + fixed)
+- Unit tests for `ccai_mcp/tools.py` (generated with Junie, then reviewed + fixed)
 - Fix the `query_csat` category filter bug (Bug 2 from Post 3, tested by new test)
 
 ---
