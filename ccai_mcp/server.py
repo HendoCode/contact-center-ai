@@ -5,7 +5,7 @@ Exposes call center RAG capabilities as MCP tools consumable by any
 MCP-compatible client (Claude Desktop, custom GenAI apps, etc.).
 
 Local dev:
-    python mcp/server.py
+    python -m ccai_mcp.server
 
 Production (Azure App Service):
     - Auth handled by Entra via App Service Easy Auth for MCP
@@ -19,7 +19,7 @@ from mcp.server.models import InitializationOptions
 from mcp.types import Tool, TextContent
 import mcp.types as types
 
-from mcp.tools import search_transcripts, get_call_summary, query_csat
+from ccai_mcp.tools import search_transcripts, get_call_summary, query_csat
 
 app = Server("contact-center-ai")
 

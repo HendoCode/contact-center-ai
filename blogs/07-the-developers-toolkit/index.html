@@ -629,7 +629,7 @@ debugging, and JetBrains AI in the same workflow</p>
         endpoints FastAPI generates automatically; using the spec as a
         contract for frontend or third-party integration</li>
         <li><strong>Sharing tool logic</strong> — the three MCP tools in
-        <code>mcp/tools.py</code> become the same three REST endpoints;
+        <code>ccai_mcp/tools.py</code> become the same three REST endpoints;
         no duplication of business logic, just a new transport</li>
         <li><strong>PyCharm + Docker debugging</strong> — attaching
         PyCharm’s debugger to a running Docker container; setting
@@ -656,9 +656,9 @@ debugging, and JetBrains AI in the same workflow</p>
         </ul>
         <hr />
         <h2 id="the-new-architecture">The New Architecture</h2>
-        <pre><code>Claude Desktop ──(stdio)──► MCP Server (mcp/server.py)
+        <pre><code>Claude Desktop ──(stdio)──► MCP Server (ccai_mcp/server.py)
                                 │
-HTTP Client ────(HTTP)───► REST API (api/server.py)  ─────► mcp/tools.py ──► rag_query()
+HTTP Client ────(HTTP)───► REST API (api/server.py)  ─────► ccai_mcp/tools.py ──► rag_query()
                                                                           └──► csat (JSON)
 
 Both surfaces share the same tool implementations.</code></pre>
@@ -722,7 +722,7 @@ Both surfaces share the same tool implementations.</code></pre>
         <code>docker-compose.yml</code></li>
         <li>New <code>api/requests.http</code> — HTTP Request file for
         all three endpoints (checked into repo)</li>
-        <li>Unit tests for <code>mcp/tools.py</code> (generated with
+        <li>Unit tests for <code>ccai_mcp/tools.py</code> (generated with
         Junie, then reviewed + fixed)</li>
         <li>Fix the <code>query_csat</code> category filter bug (Bug 2
         from Post 3, tested by new test)</li>

@@ -35,9 +35,6 @@ services:
       - "11434:11434"
 
   open-webui:
-    build:
-      context: .
-      dockerfile: Dockerfile
     image: ghcr.io/open-webui/open-webui:${WEBUI_DOCKER_TAG-main}
     container_name: open-webui
     volumes:

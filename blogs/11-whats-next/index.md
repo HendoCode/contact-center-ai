@@ -62,7 +62,7 @@ The short answer: yes. Here's why.
    | OpenAI Assistants | Mature API, good tooling; threads & runs | No Ollama fallback; OpenAI-only | ⚠️ If committing to OpenAI |
    | GitHub Copilot Workspace | Excellent for code-centric tasks | Not designed for domain data query | ❌ Wrong tool for call center RAG |
 
-5. **The MCP advantage** — MCP is an interface standard, not an implementation. Whichever orchestration layer wins in 12 months, the three tools defined in `mcp/tools.py` remain the stable API surface. The investment is durable in a way that rewriting to a specific framework's native tool format is not.
+5. **The MCP advantage** — MCP is an interface standard, not an implementation. Whichever orchestration layer wins in 12 months, the three tools defined in `ccai_mcp/tools.py` remain the stable API surface. The investment is durable in a way that rewriting to a specific framework's native tool format is not.
 
 6. **Criteria for the consolidation decision** — a decision matrix for Northgate Federal Credit Union (and any similar organization):
    - Team size and AI expertise (small team → managed > self-hosted)

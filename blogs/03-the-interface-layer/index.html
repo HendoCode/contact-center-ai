@@ -697,12 +697,12 @@ become a shared AI platform</p>
         it once and every team’s AI client can use it.</p>
         <hr />
         <h2 id="the-server-in-30-lines">The Server in 30 Lines</h2>
-        <p>The entire entry point is <code>mcp/server.py</code>. Here’s
+        <p>The entire entry point is <code>ccai_mcp/server.py</code>. Here’s
         the core of it:</p>
         <div class="sourceCode" id="cb1"><pre
         class="sourceCode python"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> mcp.server <span class="im">import</span> Server</span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> mcp.types <span class="im">import</span> Tool, TextContent</span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> mcp.tools <span class="im">import</span> search_transcripts, get_call_summary, query_csat</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> ccai_mcp.tools <span class="im">import</span> search_transcripts, get_call_summary, query_csat</span>
 <span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>app <span class="op">=</span> Server(<span class="st">&quot;contact-center-ai&quot;</span>)</span>
 <span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a></span>
@@ -828,7 +828,7 @@ become a shared AI platform</p>
         <hr />
         <h2 id="the-three-tool-implementations">The Three Tool
         Implementations</h2>
-        <p>The actual work happens in <code>mcp/tools.py</code>. Let’s
+        <p>The actual work happens in <code>ccai_mcp/tools.py</code>. Let’s
         look at each one honestly.</p>
         <h3
         id="search_transcripts-the-clean-one"><code>search_transcripts</code>
@@ -923,7 +923,7 @@ become a shared AI platform</p>
         loading a JSON file is the right call.</p>
         <hr />
         <h2 id="how-stdio-works">How stdio Works</h2>
-        <p>Running <code>python -m mcp.server</code> starts the server
+        <p>Running <code>python -m ccai_mcp.server</code> starts the server
         and puts it into <code>stdio_server()</code> mode. The process
         reads MCP messages from stdin and writes responses to stdout.
         That’s the entire transport.</p>
@@ -935,7 +935,7 @@ become a shared AI platform</p>
 <span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;mcpServers&quot;</span><span class="fu">:</span> <span class="fu">{</span></span>
 <span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;contact-center-ai&quot;</span><span class="fu">:</span> <span class="fu">{</span></span>
 <span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;command&quot;</span><span class="fu">:</span> <span class="st">&quot;python&quot;</span><span class="fu">,</span></span>
-<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;args&quot;</span><span class="fu">:</span> <span class="ot">[</span><span class="st">&quot;-m&quot;</span><span class="ot">,</span> <span class="st">&quot;mcp.server&quot;</span><span class="ot">]</span><span class="fu">,</span></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;args&quot;</span><span class="fu">:</span> <span class="ot">[</span><span class="st">&quot;-m&quot;</span><span class="ot">,</span> <span class="st">&quot;ccai_mcp.server&quot;</span><span class="ot">]</span><span class="fu">,</span></span>
 <span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;cwd&quot;</span><span class="fu">:</span> <span class="st">&quot;/path/to/contact-center-ai&quot;</span><span class="fu">,</span></span>
 <span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;env&quot;</span><span class="fu">:</span> <span class="fu">{</span></span>
 <span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>        <span class="dt">&quot;OPENAI_API_KEY&quot;</span><span class="fu">:</span> <span class="st">&quot;sk-...&quot;</span><span class="fu">,</span></span>
@@ -995,7 +995,7 @@ become a shared AI platform</p>
         now:</p>
         <div class="sourceCode" id="cb8"><pre
         class="sourceCode bash"><code class="sourceCode bash"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Start the server (leave this running)</span></span>
-<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> <span class="at">-m</span> mcp.server</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> <span class="at">-m</span> ccai_mcp.server</span>
 <span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a><span class="co"># In claude_desktop_config.json, add the server entry above.</span></span>
 <span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a><span class="co"># Restart Claude Desktop and the tools appear automatically.</span></span></code></pre></div>

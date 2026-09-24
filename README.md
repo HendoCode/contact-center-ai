@@ -81,7 +81,7 @@ python data/synthetic/generate_data.py
 python -m rag.pipeline --ingest
 
 # Start the MCP server
-python -m mcp.server
+python -m ccai_mcp.server
 ```
 
 ## Connecting a client
@@ -93,7 +93,7 @@ Once the MCP server is running locally, add it to your Claude Desktop config:
   "mcpServers": {
     "contact-center": {
       "command": "uv",
-      "args": ["run", "--directory", "/path/to/contact-center-ai", "python", "-m", "mcp.server"]
+      "args": ["run", "--directory", "/path/to/contact-center-ai", "python", "-m", "ccai_mcp.server"]
     }
   }
 }

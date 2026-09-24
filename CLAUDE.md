@@ -35,7 +35,7 @@ python -m rag.pipeline --ingest               # Embed and store in pgvector
 python -m rag.pipeline --query "fraud disputes from last week"
 
 # Start MCP server (stdio, for client connections)
-python -m mcp.server
+python -m ccai_mcp.server
 
 # Tests (framework installed, no tests written yet)
 pytest
@@ -56,15 +56,15 @@ generate_data.py → transcripts.json + csat.json
                         ↓
 pipeline.py --ingest → embed (OpenAI default / Ollama local) → pgvector (PostgreSQL)
                         ↓
-mcp/server.py (stdio) → 3 tools exposed to MCP clients
+ccai_mcp/server.py (stdio) → 3 tools exposed to MCP clients
 ```
 
 **Data flow across files:**
 - `data/synthetic/generate_data.py` outputs two JSON files: `transcripts.json` (150 calls with full_text) and `csat.json` (survey scores 1–5). These are the only data sources.
 - `rag/embeddings.py` owns pgvector setup — `get_embeddings()` and `get_vector_store()` are the only entry points for the vector store. To swap from OpenAI embeddings to Anthropic/Gemini, only this file needs to change.
 - `rag/pipeline.py` owns ingestion (`--ingest`) and querying (`rag_query()`). Ingestion has no deduplication — running `--ingest` twice will create duplicate documents.
-- `mcp/tools.py` implements the 3 MCP tools. `search_transcripts` and `get_call_summary` both go through `rag_query()`. `query_csat` bypasses the vector store entirely — it loads `csat.json` directly and filters in-memory.
-- `mcp/server.py` is a thin router: it receives MCP tool calls over stdio and dispatches to `mcp/tools.py`.
+- `ccai_mcp/tools.py` implements the 3 MCP tools. `search_transcripts` and `get_call_summary` both go through `rag_query()`. `query_csat` bypasses the vector store entirely — it loads `csat.json` directly and filters in-memory.
+- `ccai_mcp/server.py` is a thin router: it receives MCP tool calls over stdio and dispatches to `ccai_mcp/tools.py`.
 
 **Auth:** No authentication logic exists in Python code. In production, Azure App Service Easy Auth (Entra) intercepts all requests before they reach the server; the Python app sees authenticated traffic only. `AZURE_TENANT_ID` / `AZURE_CLIENT_ID` env vars are used by Terraform, not by the app.
 
@@ -128,8 +128,8 @@ Deployed via GitHub Actions → GitHub Pages at https://hendocode.github.io/cont
 | 12 | `12-agent-harness` | The Agent Harness (Claude Code, Pi, firstmate) | Placeholder |
 
 **Known bugs documented in the series (not yet fixed in code):**
-- `mcp/tools.py` `get_call_summary()`: retrieved document is never passed to the LLM — a second `rag_query()` call re-retrieves independently, so the specific call may not be summarized
-- `mcp/tools.py` `query_csat()`: `category` parameter is accepted in the schema and function signature but the filter is not implemented — the parameter is silently ignored
+- `ccai_mcp/tools.py` `get_call_summary()`: retrieved document is never passed to the LLM — a second `rag_query()` call re-retrieves independently, so the specific call may not be summarized
+- `ccai_mcp/tools.py` `query_csat()`: `category` parameter is accepted in the schema and function signature but the filter is not implemented — the parameter is silently ignored
 
 ## What's built vs. what's next
 

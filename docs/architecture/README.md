@@ -18,7 +18,7 @@ Structurizr Lite watches `workspace.dsl` and hot-reloads on save. No restart req
 |-----|------|-------------|
 | `SystemContext` | Level 1 | All actors and external systems |
 | `Containers` | Level 2 | Six runtime/storage containers |
-| `Components_MCP` | Level 3 | `mcp/server.py` handlers + `mcp/tools.py` functions |
+| `Components_MCP` | Level 3 | `ccai_mcp/server.py` handlers + `ccai_mcp/tools.py` functions |
 | `Components_RAG` | Level 3 | `rag/pipeline.py` functions |
 | `Components_Embeddings` | Level 3 | `rag/embeddings.py` — provider swap point |
 | `Dynamic_Ingest` | Dynamic | Data ingestion: generate → embed → pgvector |
