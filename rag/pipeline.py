@@ -23,7 +23,14 @@ from rag.embeddings import get_vector_store, get_embeddings
 
 def get_llm():
     """
-    Return the chat LLM based on LLM_PROVIDER env var."""
+    Return the chat LLM based on LLM_PROVIDER env var.
+
+    The default ("openai") branch targets any OpenAI-compatible chat
+    endpoint — OpenAI, OpenRouter, or a self-hosted gateway — using
+    LLM_BASE_URL + LLM_MODEL. The defaults route to a low-cost model on
+    OpenRouter, so no code change is needed to get a cheap model: only
+    OPENAI_API_KEY (already read from the environment) is required.
+    """
     provider = os.getenv("LLM_PROVIDER", "openai").lower()
     if provider == "ollama":
         from langchain_ollama import ChatOllama
@@ -33,8 +40,9 @@ def get_llm():
         )
     from langchain_openai import ChatOpenAI
     return ChatOpenAI(
-        model="gpt-4o-mini",
+        model=os.getenv("LLM_MODEL", "z-ai/glm-5.3-flash"),
         api_key=os.getenv("OPENAI_API_KEY"),
+        base_url=os.getenv("LLM_BASE_URL", "https://openrouter.ai/api/v1"),
     )
 
 

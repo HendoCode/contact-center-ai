@@ -74,14 +74,20 @@ ccai_mcp/server.py (stdio) → 5 tools exposed to MCP clients
 ## Key design constraints
 
 - **CSAT is not semantically searchable.** `query_csat()` reads the Postgres `f_csat` fact (SQL-backed), but CSAT is not embedded in pgvector, so it cannot be combined with semantic transcript search.
-- **Provider swaps are controlled by `LLM_PROVIDER` env var.** Set `LLM_PROVIDER=ollama` to use Ollama (via `langchain-ollama`) for both embeddings and completions — no code changes needed. Set `LLM_PROVIDER=openai` (or omit) for OpenAI. To add other providers (Anthropic, Vertex AI, etc.), only `rag/embeddings.py` and the LLM init in `rag/pipeline.py` need to change.
+- **Chat provider swaps are controlled by `LLM_PROVIDER` env var** (`"openai"`, default, or `"ollama"`). The `"openai"` branch is any OpenAI-compatible chat endpoint — its `LLM_BASE_URL` (default `https://openrouter.ai/api/v1`) and `LLM_MODEL` (default low-cost `z-ai/glm-5.3-flash`) are env-configurable; the key is read from `OPENAI_API_KEY`.
+- **Embeddings are decoupled via `EMBEDDING_PROVIDER`** (falling back to `LLM_PROVIDER`, so an unset value keeps the old single-provider behavior). OpenRouter currently serves **no embedding models**, so an OpenRouter chat setup must pair with `EMBEDDING_PROVIDER=ollama` (local, free `nomic-embed-text`) or an OpenAI-compatible `EMBEDDING_BASE_URL`/`EMBEDDING_MODEL`. To add other providers (Anthropic, Vertex AI, etc.), only `rag/embeddings.py` and the LLM init in `rag/pipeline.py` need to change.
 - **MCP server is stdio-only** (not HTTP). Claude Desktop and other clients connect via process I/O. The production Azure deployment adds HTTP transport via App Service.
 
 ## Environment variables
 
 ```
-LLM_PROVIDER=openai          # "openai" (default) or "ollama"
-OPENAI_API_KEY=              # required when LLM_PROVIDER=openai
+LLM_PROVIDER=openai      # chat provider: "openai" (OpenAI-compatible) or "ollama"
+OPENAI_API_KEY=          # required for the OpenAI-compatible chat branch (e.g. OpenRouter)
+LLM_BASE_URL=https://openrouter.ai/api/v1   # OpenAI-compatible chat endpoint
+LLM_MODEL=z-ai/glm-5.3-flash              # low-cost OpenRouter chat model (default)
+EMBEDDING_PROVIDER=ollama  # "openai" (OpenAI-compatible) or "ollama"; falls back to LLM_PROVIDER
+EMBEDDING_MODEL=text-embedding-3-small
+EMBEDDING_BASE_URL=https://api.openai.com/v1
 OLLAMA_BASE_URL=http://localhost:11434
 OLLAMA_MODEL=llama3.2
 OLLAMA_EMBEDDING_MODEL=nomic-embed-text
@@ -90,6 +96,17 @@ S3_BUCKET_NAME=
 S3_PREFIX=call-data/
 AZURE_TENANT_ID=        # used by Terraform, not the app
 AZURE_CLIENT_ID=        # used by Terraform, not the app
+```
+
+Low-cost demo shape (chat on OpenRouter, free local embeddings — no secrets, placeholders only):
+
+```
+LLM_PROVIDER=openai
+OPENAI_API_KEY=<your-scoped-openrouter-key>
+LLM_BASE_URL=https://openrouter.ai/api/v1
+LLM_MODEL=z-ai/glm-5.3-flash
+EMBEDDING_PROVIDER=ollama
+OLLAMA_EMBEDDING_MODEL=nomic-embed-text
 ```
 
 See `.env.example` for the full list including AWS credentials and MCP server host/port.
