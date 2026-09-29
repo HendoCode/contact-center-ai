@@ -7,8 +7,10 @@ Tools:
     query_csat           — query CSAT data with optional filters
 """
 
-import json
-from pathlib import Path
+import psycopg2
+from psycopg2 import errors as pg_errors
+
+from rag.embeddings import CONNECTION_STRING
 from rag.pipeline import rag_query, get_llm, get_vector_store
 
 
@@ -75,32 +77,50 @@ def query_csat(
     Returns:
         Summary of CSAT results matching the filters
     """
-    # Load CSAT data
-    csat_path = Path(__file__).parent.parent / "data" / "synthetic" / "csat.json"
-    if not csat_path.exists():
-        return "CSAT data not found. Run: python data/synthetic/generate_data.py"
-
-    with open(csat_path) as f:
-        csat_data = json.load(f)
-
-    # Apply filters
-    filtered = csat_data
+    # Load CSAT data from Postgres (the OLTP csat_survey source / the dbt
+    # f_csat fact), not from csat.json on disk.
+    where_clauses = []
+    params = []
     if min_score is not None:
-        filtered = [r for r in filtered if r["score"] >= min_score]
+        where_clauses.append("score >= %s")
+        params.append(min_score)
     if max_score is not None:
-        filtered = [r for r in filtered if r["score"] <= max_score]
+        where_clauses.append("score <= %s")
+        params.append(max_score)
     if category:
-        filtered = [r for r in filtered if r.get("category") == category]
+        where_clauses.append("category_code = %s")
+        params.append(category)
+    where_sql = (" WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
 
-    if not filtered:
+    with psycopg2.connect(CONNECTION_STRING) as conn:
+        with conn.cursor() as cur:
+            try:
+                cur.execute(
+                    "SELECT score, comment, category_code "
+                    f"FROM marts.f_csat{where_sql}",
+                    params,
+                )
+            except pg_errors.UndefinedTable:
+                # marts schema not built yet — fall back to the OLTP source
+                # (csat_survey joined to interaction for the category).
+                cur.execute(
+                    "SELECT c.score, c.comment, i.category_code "
+                    "FROM csat_survey AS c "
+                    "JOIN interaction AS i ON i.interaction_id = c.interaction_id"
+                    f"{where_sql}",
+                    params,
+                )
+            rows = cur.fetchall()
+
+    if not rows:
         return "No CSAT results found matching the given filters."
 
-    avg_score = sum(r["score"] for r in filtered) / len(filtered)
-    score_dist = {i: sum(1 for r in filtered if r["score"] == i) for i in range(1, 6)}
-    sample_comments = [r["comment"] for r in filtered[:5]]
+    avg_score = sum(r[0] for r in rows) / len(rows)
+    score_dist = {i: sum(1 for r in rows if r[0] == i) for i in range(1, 6)}
+    sample_comments = [r[1] for r in rows[:5] if r[1]]
 
     return (
-        f"CSAT Summary ({len(filtered)} responses)\n"
+        f"CSAT Summary ({len(rows)} responses)\n"
         f"Average score: {avg_score:.2f}/5\n"
         f"Score distribution: {score_dist}\n"
         f"Sample comments:\n" +

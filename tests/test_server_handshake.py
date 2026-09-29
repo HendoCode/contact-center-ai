@@ -13,7 +13,13 @@ from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-EXPECTED_TOOLS = {"search_transcripts", "get_call_summary", "query_csat"}
+EXPECTED_TOOLS = {
+    "search_transcripts",
+    "get_call_summary",
+    "query_csat",
+    "query_metric",
+    "ask_the_analyst",
+}
 
 
 @pytest.mark.asyncio

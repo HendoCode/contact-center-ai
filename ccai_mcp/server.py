@@ -21,6 +21,7 @@ from mcp.types import Tool, TextContent
 import mcp.types as types
 
 from ccai_mcp.tools import search_transcripts, get_call_summary, query_csat
+from ccai_mcp.metrics import query_metric, ask_the_analyst
 
 app = Server("contact-center-ai")
 
@@ -69,7 +70,7 @@ async def list_tools() -> list[Tool]:
         Tool(
             name="query_csat",
             description=(
-                "Query CSAT survey results. Filter by score range or call category. "
+                "Query CSAT survey results from Postgres. Filter by score range or call category. "
                 "Use this to understand member satisfaction trends."
             ),
             inputSchema={
@@ -94,6 +95,67 @@ async def list_tools() -> list[Tool]:
                 }
             }
         ),
+        Tool(
+            name="query_metric",
+            description=(
+                "Query one or more DECLARED metrics from the MetricFlow semantic layer "
+                "(olap/dbt/models/marts/semantic/metrics.yml) and return the result "
+                "table plus the SQL the semantic layer generated. There is no bare "
+                "ambiguous metric ('interest rate', 'balance', 'LCV'): resolve the "
+                "word to its specific lob-qualified metric names first, e.g. "
+                "average_mortgage_note_rate, average_deposit_apy, "
+                "banking_available_balance, net_member_liquidity, member_lifetime_value."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "metrics": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Metric name(s) from metrics.yml (e.g. average_mortgage_note_rate)"
+                    },
+                    "group_by": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Optional dimensions/entities to group by"
+                    },
+                    "decimals": {
+                        "type": "integer",
+                        "description": "Optional fixed-decimal rounding for displayed numbers"
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Optional row limit"
+                    }
+                },
+                "required": ["metrics"]
+            }
+        ),
+        Tool(
+            name="ask_the_analyst",
+            description=(
+                "Answer a natural-language analytics question by resolving it to one or "
+                "more DECLARED metrics (seeded with the metrics.yml descriptions), then "
+                "executing those metrics through the semantic layer and returning a "
+                "grounded answer with the generated SQL. Use this for aggregate metric "
+                "questions like 'what is our average interest rate?' — it will NOT "
+                "return a single blended number; it returns each declared metric."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "question": {
+                        "type": "string",
+                        "description": "Natural-language analytics question (e.g. 'what is our average interest rate?')"
+                    },
+                    "decimals": {
+                        "type": "integer",
+                        "description": "Optional fixed-decimal rounding for displayed numbers"
+                    }
+                },
+                "required": ["question"]
+            }
+        ),
     ]
 
 
@@ -115,6 +177,20 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             min_score=arguments.get("min_score"),
             max_score=arguments.get("max_score"),
             category=arguments.get("category"),
+        )
+    elif name == "query_metric":
+        result = await asyncio.to_thread(
+            query_metric,
+            metrics=arguments["metrics"],
+            group_by=arguments.get("group_by"),
+            decimals=arguments.get("decimals"),
+            limit=arguments.get("limit"),
+        )
+    elif name == "ask_the_analyst":
+        result = await asyncio.to_thread(
+            ask_the_analyst,
+            question=arguments["question"],
+            decimals=arguments.get("decimals"),
         )
     else:
         result = f"Unknown tool: {name}"
