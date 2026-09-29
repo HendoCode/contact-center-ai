@@ -1,0 +1,186 @@
+version: 2
+
+models:
+  - name: d_date
+    description: >
+      Conformed calendar, one row per day (2006-01-01 .. 2026-12-31). Feeds
+      metricflow_time_spine.
+    columns:
+      - name: date_day
+        description: Primary key; one row per calendar day.
+        tests:
+          - unique
+          - not_null
+      - name: date_key
+        description: Integer YYYYMMDD surrogate key.
+      - name: year_number
+        tests:
+          - not_null
+      - name: month_number
+        tests:
+          - not_null
+
+  - name: d_time
+    description: Degenerate of-day dimension, 24 one-hour buckets.
+    columns:
+      - name: time_key
+        tests:
+          - unique
+          - not_null
+
+  - name: d_household
+    description: Retail relationship grouping; business members have no household.
+    columns:
+      - name: household_id
+        tests:
+          - unique
+          - not_null
+      - name: income_band
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["<$50k", "$50-100k", "$100-200k", ">$200k"]
+
+  - name: d_member
+    description: >
+      SCD-less member dimension. `member_type='business'` rows are business
+      entities (no household); individual business *contacts* link back via
+      business_id (self-FK).
+    columns:
+      - name: member_id
+        tests:
+          - unique
+          - not_null
+      - name: member_type
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["individual", "business"]
+      - name: household_id
+        tests:
+          - relationships:
+              arguments:
+                to: ref('d_household')
+                field: household_id
+      - name: credit_score_band
+        tests:
+          - accepted_values:
+              arguments:
+                values: ["excellent", "good", "fair", "poor", null]
+
+  - name: d_team
+    description: Function area each staff group belongs to.
+    columns:
+      - name: team_id
+        tests:
+          - unique
+          - not_null
+      - name: function_area
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["loans", "insurance", "cards", "fraud", "servicing", "investments"]
+
+  - name: d_staff
+    description: Agents / specialists / supervisors; snowflakes to d_team.
+    columns:
+      - name: staff_id
+        tests:
+          - unique
+          - not_null
+      - name: team_id
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('d_team')
+                field: team_id
+      - name: role
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["agent", "specialist", "supervisor"]
+
+  - name: d_category
+    description: >
+      Interaction category. NB category != lob (lob_id is a loose hint and
+      often NULL); the account-level LOB discriminator lives on d_product.
+    columns:
+      - name: category_code
+        tests:
+          - unique
+          - not_null
+
+  - name: d_product
+    description: >
+      Product dimension carrying the LOB discriminator; the `product__lob`
+      filter that disambiguates every colliding metric.
+    columns:
+      - name: product_id
+        tests:
+          - unique
+          - not_null
+      - name: lob
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["mortgage", "home", "car_insurance", "banking", "cards", "investments"]
+
+  - name: d_account
+    description: >
+      Conformed account dimension, snowflaked to d_product. Per-LOB account
+      columns are de-normalized here as lob-qualified, null-per-type columns.
+    columns:
+      - name: account_id
+        tests:
+          - unique
+          - not_null
+      - name: product_id
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('d_product')
+                field: product_id
+      - name: primary_member_id
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('d_member')
+                field: member_id
+      - name: status
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["open", "closed", "delinquent", "charge_off"]
+
+  - name: d_channel
+    description: Degenerate dimension for interaction channel.
+    columns:
+      - name: channel_code
+        tests:
+          - unique
+          - not_null
+
+  - name: d_outcome
+    description: Degenerate dimension for interaction outcome.
+    columns:
+      - name: outcome_code
+        tests:
+          - unique
+          - not_null
+
+  - name: d_account_status
+    description: Degenerate dimension for account.status.
+    columns:
+      - name: account_status_code
+        tests:
+          - unique
+          - not_null

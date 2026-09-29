@@ -1,0 +1,17 @@
+# dbt profile. Run dbt/mf from this directory (olap/dbt/) so dbt picks this
+# file up from the CWD; or export DBT_PROFILES_DIR=`pwd`.
+#
+# Targets the docker-compose `db` service (pgvector/pgvector:pg16). Every value
+# can be overridden with an env var so the same file works in CI / Azure.
+ccai_semantic:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      host: "{{ env_var('DBT_HOST', 'localhost') }}"
+      port: "{{ env_var('DBT_PORT', '5432') | as_number }}"
+      user: "{{ env_var('DBT_USER', 'postgres') }}"
+      password: "{{ env_var('DBT_PASSWORD', 'postgres') }}"
+      dbname: "{{ env_var('DBT_DBNAME', 'contactcenter') }}"
+      schema: "{{ env_var('DBT_SCHEMA', 'marts') }}"
+      threads: 4

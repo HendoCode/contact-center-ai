@@ -1,0 +1,453 @@
+# MetricFlow semantic models (dbt Semantic Layer).
+#
+# One semantic model per fact (or per conformed dimension). The headline: there
+# is deliberately no measure named `balance`, `interest_rate`, `limit`, or
+# `lcv`. Every colliding spoken word maps to N lob-qualified measures, and the
+# public metric catalog (metrics.yml) is the only place they get a name a
+# business user may call. `metric_time` is provided automatically by MetricFlow
+# from each fact's `defaults.agg_time_dimension`.
+
+semantic_models:
+
+  # ── Conformed dimensions (joinable via entities) ──────────────────────────
+
+  - name: products
+    description: >
+      Product dimension carrying the LOB discriminator. The `lob` dimension on
+      this model is referenced as `Dimension('product__lob')` from every fact
+      that joins to it, and it is what turns "average interest rate" into four
+      different auditable metrics.
+    model: ref('d_product')
+    entities:
+      - name: product
+        type: primary
+        expr: product_id
+    dimensions:
+      - name: lob
+        type: categorical
+        expr: lob
+        description: Line of business — the discriminator for every colliding metric.
+      - name: product_code
+        type: categorical
+      - name: product_name
+        type: categorical
+      - name: is_active
+        type: categorical
+
+  - name: members
+    description: Member dimension (person or business entity).
+    model: ref('d_member')
+    entities:
+      - name: member
+        type: primary
+        expr: member_id
+      - name: household
+        type: foreign
+        expr: household_id
+    dimensions:
+      - name: member_type
+        type: categorical
+      - name: credit_score_band
+        type: categorical
+      - name: residence_state
+        type: categorical
+
+  - name: households
+    description: Household dimension (relationship pricing / household LCV).
+    model: ref('d_household')
+    entities:
+      - name: household
+        type: primary
+        expr: household_id
+    dimensions:
+      - name: income_band
+        type: categorical
+      - name: household_label
+        type: categorical
+
+  - name: staff
+    description: Staff (agent/specialist/supervisor) dimension.
+    model: ref('d_staff')
+    entities:
+      - name: staff
+        type: primary
+        expr: staff_id
+      - name: team
+        type: foreign
+        expr: team_id
+    dimensions:
+      - name: role
+        type: categorical
+
+  - name: teams
+    description: Team dimension (function area).
+    model: ref('d_team')
+    entities:
+      - name: team
+        type: primary
+        expr: team_id
+    dimensions:
+      - name: team_name
+        type: categorical
+      - name: function_area
+        type: categorical
+
+  # ── Facts ─────────────────────────────────────────────────────────────────
+
+  - name: account_snapshot
+    description: >
+      Account balance/rate snapshot at account x snapshot_date (monthly) grain.
+      Every measure is lob-qualified and null-per-type; each is declared
+      separately so none can be summed across LOBs into a garbage blended
+      number.
+    model: ref('f_account_snapshot')
+    defaults:
+      agg_time_dimension: snapshot_date
+    entities:
+      - name: account
+        type: primary
+        expr: account_id
+      - name: member
+        type: foreign
+        expr: member_id
+      - name: product
+        type: foreign
+        expr: product_id
+    dimensions:
+      - name: snapshot_date
+        type: time
+        type_params:
+          time_granularity: day
+        expr: snapshot_date
+      - name: account_status
+        type: categorical
+        expr: status
+    measures:
+      # ── "interest rate" meanings 1..5 + "return" (none keeps the bare word)
+      - name: mortgage_note_rate
+        agg: average
+        expr: mortgage_note_rate
+        description: Average rate members PAY on first-lien mortgages (paid, fixed).
+      - name: note_rate_times_balance
+        agg: sum
+        expr: mortgage_note_rate * mortgage_principal_balance
+        description: Numerator for the principal-weighted mortgage portfolio rate.
+      - name: mortgage_principal_balance
+        agg: sum
+        expr: mortgage_principal_balance
+        description: Outstanding first-lien principal (denominator for weighting).
+      - name: purchase_apr
+        agg: average
+        expr: purchase_apr
+        description: Average PURCHASE APR on cards (deliberately not cash-advance).
+      - name: cash_advance_apr
+        agg: average
+        expr: cash_advance_apr
+        description: Average cash-advance APR on cards (a different rate, same card).
+      - name: deposit_apy
+        agg: average
+        expr: deposit_apy
+        description: Average rate members EARN on deposits (sign flipped vs loans).
+      - name: heloc_base_rate
+        agg: average
+        expr: heloc_base_rate
+      - name: heloc_margin
+        agg: average
+        expr: heloc_margin
+      - name: heloc_current_rate
+        agg: average
+        expr: heloc_current_rate
+        description: HELOC effective rate = base_rate + margin (two source columns).
+      - name: investment_return_pct
+        agg: average
+        expr: investment_return_pct
+        description: Investment return — explicitly NOT interest.
+      - name: ltv_at_origination
+        agg: average
+        expr: ltv_at_origination
+        description: Loan-to-value at origination (underwriting risk; the LTV half of the homophone).
+
+      # ── "balance" meanings, asset vs liability signed by convention ────────
+      - name: banking_available_balance
+        agg: sum
+        expr: banking_available_balance
+        description: Total available balance on banking accounts (asset).
+      - name: banking_ledger_balance
+        agg: sum
+        expr: banking_ledger_balance
+      - name: checking_ledger_balance
+        agg: sum
+        expr: checking_ledger_balance
+      - name: checking_available_balance
+        agg: sum
+        expr: checking_available_balance
+      - name: savings_balance
+        agg: sum
+        expr: savings_balance
+      - name: card_outstanding_balance
+        agg: sum
+        expr: card_outstanding_balance
+        description: Total outstanding credit-card balance (LIABILITY sign).
+      - name: card_credit_limit
+        agg: sum
+        expr: card_credit_limit
+        description: Card credit capacity ("limit" meaning 3).
+      - name: card_available_credit
+        agg: sum
+        expr: card_available_credit
+      - name: heloc_drawn_balance
+        agg: sum
+        expr: heloc_drawn_balance
+      - name: heloc_credit_limit
+        agg: sum
+        expr: heloc_credit_limit
+        description: HELOC credit capacity ("limit" meaning 1).
+      - name: investment_market_value
+        agg: sum
+        expr: investment_market_value
+      - name: investment_cash_value
+        agg: sum
+        expr: investment_cash_value
+      - name: escrow_balance
+        agg: sum
+        expr: escrow_balance
+      - name: insurance_annual_premium
+        agg: sum
+        expr: insurance_annual_premium
+        description: Car-insurance premium (money moved, not a rate).
+      - name: insurance_monthly_premium
+        agg: sum
+        expr: insurance_monthly_premium
+      - name: insurance_deductible
+        agg: average
+        expr: insurance_deductible
+        description: Insurance coverage "limit" (not credit capacity).
+
+  - name: interactions
+    description: Contact fact at 1-interaction grain.
+    model: ref('f_interaction')
+    defaults:
+      agg_time_dimension: started_at
+    entities:
+      - name: interaction
+        type: primary
+        expr: interaction_id
+      - name: member
+        type: foreign
+        expr: member_id
+      - name: staff
+        type: foreign
+        expr: staff_id
+      - name: team
+        type: foreign
+        expr: team_id
+    dimensions:
+      - name: started_at
+        type: time
+        type_params:
+          time_granularity: day
+        expr: started_at
+      - name: channel
+        type: categorical
+      - name: direction
+        type: categorical
+      - name: outcome
+        type: categorical
+      - name: caller_type
+        type: categorical
+      - name: category_code
+        type: categorical
+      - name: hour_of_day
+        type: categorical
+        expr: hour_of_day
+    measures:
+      - name: interaction_count
+        agg: count
+        expr: 1
+        description: Call volume ("volume" meaning 1 of 4).
+      - name: duration_seconds
+        agg: sum
+        expr: duration_seconds
+        description: Total talk time in seconds (AHT is a derived ratio, not this).
+      - name: escalated_calls
+        agg: sum
+        expr: "case when outcome = 'escalated' then 1 else 0 end"
+      - name: first_contact_resolved_calls
+        agg: sum
+        expr: "case when first_contact_resolved then 1 else 0 end"
+
+  - name: csat_surveys
+    description: CSAT survey fact at 1-survey grain (~75% of interactions).
+    model: ref('f_csat')
+    defaults:
+      agg_time_dimension: surveyed_at
+    entities:
+      - name: survey
+        type: primary
+        expr: survey_id
+      - name: interaction
+        type: foreign
+        expr: interaction_id
+      - name: member
+        type: foreign
+        expr: member_id
+      - name: staff
+        type: foreign
+        expr: staff_id
+      - name: team
+        type: foreign
+        expr: team_id
+    dimensions:
+      - name: surveyed_at
+        type: time
+        type_params:
+          time_granularity: day
+        expr: surveyed_at
+      - name: question_code
+        type: categorical
+    measures:
+      - name: survey_count
+        agg: count
+        expr: 1
+      - name: score_sum
+        agg: sum
+        expr: score
+      - name: score_avg
+        agg: average
+        expr: score
+      - name: promoters_count
+        agg: sum
+        expr: is_promoter
+      - name: detractors_count
+        agg: sum
+        expr: is_detractor
+
+  - name: transactions
+    description: >
+      Ledger flow fact at 1-transaction grain. Amounts are signed — credits are
+      positive, debits are negative.
+    model: ref('f_transaction')
+    defaults:
+      agg_time_dimension: posted_at
+    entities:
+      - name: transaction
+        type: primary
+        expr: transaction_id
+      - name: account
+        type: foreign
+        expr: account_id
+      - name: member
+        type: foreign
+        expr: member_id
+      - name: product
+        type: foreign
+        expr: product_id
+    dimensions:
+      - name: posted_at
+        type: time
+        type_params:
+          time_granularity: day
+        expr: posted_at
+      - name: txn_type
+        type: categorical
+      - name: status
+        type: categorical
+    measures:
+      - name: amount
+        agg: sum
+        expr: amount
+        description: >
+          Net signed amount (a flow). Never compare it to a snapshot balance —
+          that is the stock-vs-flow collision.
+      - name: txn_count
+        agg: count
+        expr: 1
+      - name: fee_revenue
+        agg: sum
+        expr: fee_revenue_amount
+        description: Fee revenue to the CU (stored debits, negated).
+      - name: interest_income
+        agg: sum
+        expr: interest_earned_amount
+        description: Interest/dividends earned by members.
+      - name: interest_expense
+        agg: sum
+        expr: interest_paid_amount
+        description: Interest charged to members (seed currently emits none).
+      - name: premium_paid
+        agg: sum
+        expr: premium_paid_amount
+        description: Insurance premiums paid by members (a flow, not the rate premium).
+      - name: distinct_members
+        agg: count_distinct
+        expr: member_id
+
+  - name: rate_locks
+    description: Rate-lock pipeline fact at 1-lock grain.
+    model: ref('f_rate_lock')
+    defaults:
+      agg_time_dimension: locked_at
+    entities:
+      - name: rate_lock
+        type: primary
+        expr: lock_id
+      - name: member
+        type: foreign
+        expr: member_id
+      - name: product
+        type: foreign
+        expr: product_id
+    dimensions:
+      - name: locked_at
+        type: time
+        type_params:
+          time_granularity: day
+        expr: locked_at
+      - name: lock_status
+        type: categorical
+        expr: status
+      - name: lock_period_days
+        type: categorical
+    measures:
+      - name: locks_count
+        agg: count
+        expr: 1
+      - name: lock_volume
+        agg: sum
+        expr: loan_amount
+      - name: locks_exercised
+        agg: sum
+        expr: is_exercised
+      - name: locks_expired
+        agg: sum
+        expr: is_expired
+
+  - name: posted_rates
+    description: Posted product-level rate fact — the THIRD meaning of "rate".
+    model: ref('f_rate')
+    defaults:
+      agg_time_dimension: effective_date
+    entities:
+      - name: product_rate
+        type: primary
+        expr: product_rate_id
+      - name: product
+        type: foreign
+        expr: product_id
+    dimensions:
+      - name: effective_date
+        type: time
+        type_params:
+          time_granularity: day
+        expr: effective_date
+      - name: rate_type
+        type: categorical
+      - name: is_teaser
+        type: categorical
+    measures:
+      - name: posted_rate
+        agg: average
+        expr: rate_value
+      - name: posted_rate_count
+        agg: count
+        expr: 1

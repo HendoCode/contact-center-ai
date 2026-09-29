@@ -1,0 +1,32 @@
+version: 2
+
+sources:
+  - name: oltp
+    description: >
+      The OLTP foundation tables applied by olap/oltp/apply.sh and seeded by
+      olap/seed.py (schema olap/oltp/schema.sql, in the public schema of the
+      docker-compose `db` service). The star schema is a read-only projection
+      of these tables; dbt never writes back to them.
+    schema: public
+    tables:
+      - name: household
+      - name: member
+      - name: team
+      - name: staff
+      - name: product
+      - name: account
+      - name: account_owner
+      - name: mortgage_account
+      - name: home_equity_account
+      - name: auto_insurance_policy
+      - name: banking_account
+      - name: credit_card_account
+      - name: investment_account
+      - name: product_rate
+      - name: rate_lock
+      - name: interaction_category
+      - name: interaction
+      - name: interaction_account
+      - name: interaction_transcript
+      - name: csat_survey
+      - name: account_transaction
