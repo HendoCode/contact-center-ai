@@ -123,11 +123,34 @@ python -m rag.pipeline --ingest
 python -m rag.pipeline --query "fraud disputes from last week"
 ```
 
+### OpenRouter (low-cost, OpenAI-compatible — recommended default)
+
+The `openai` provider targets any OpenAI-compatible chat endpoint, and its
+defaults route to a low-cost model on OpenRouter — change `LLM_MODEL`/
+`LLM_BASE_URL` to point elsewhere without touching code:
+
+```bash
+LLM_PROVIDER=openai                    # or omit — openai is the default
+OPENAI_API_KEY=sk-or-...               # a scoped OpenRouter key
+LLM_BASE_URL=https://openrouter.ai/api/v1
+LLM_MODEL=z-ai/glm-5.3-flash           # low-cost; e.g. deepseek/deepseek-v4-flash-latest also works
+```
+
+OpenRouter currently serves **no embedding models**, so an OpenRouter chat
+setup pairs with the free local Ollama embeddings path:
+
+```bash
+EMBEDDING_PROVIDER=ollama
+OLLAMA_EMBEDDING_MODEL=nomic-embed-text
+```
+
 ### OpenAI (default)
 
 ```bash
 LLM_PROVIDER=openai   # or omit — openai is the default
 OPENAI_API_KEY=sk-...
+EMBEDDING_MODEL=text-embedding-3-small      # embedding model id (OpenAI-compatible)
+EMBEDDING_BASE_URL=https://api.openai.com/v1  # embedding endpoint (default)
 ```
 
 The pipeline is also designed so you can add other LangChain-supported providers (Anthropic, Google Vertex AI, etc.) by extending `rag/embeddings.py` and `rag/pipeline.py`.
