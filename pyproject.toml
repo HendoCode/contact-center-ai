@@ -29,3 +29,14 @@ dev = [
     "pytest>=8.0.0",
     "pytest-asyncio>=0.24.0",
 ]
+
+# Pinned dev dependency group for the OLAP / semantic layer (dbt + MetricFlow).
+# Install with:  uv sync --group dbt
+# dbt-postgres versioning is decoupled from dbt-core (adapter 1.11.x pairs with
+# core 1.12.x); dbt-metricflow provides the `mf` (MetricFlow) CLI.
+[dependency-groups]
+dbt = [
+    "dbt-core==1.12.5",
+    "dbt-postgres==1.11.0",
+    "dbt-metricflow==0.15.0",
+]

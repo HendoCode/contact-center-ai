@@ -1,0 +1,31 @@
+name: ccai_semantic
+version: "1.0.0"
+config-version: 2
+
+# This dbt project is the "T" in the OLTP -> OLAP ELT pipeline. It reads the
+# OLTP tables (olap/oltp/schema.sql) as sources and builds the §6 star schema
+# in the `marts` schema of the docker-compose `db` Postgres. The MetricFlow
+# semantic layer (models/marts/semantic/*.yml) sits on top of those stars.
+profile: ccai_semantic
+
+model-paths: ["models"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+
+target-path: "target"
+clean-targets: ["target", "dbt_packages"]
+
+require-dbt-version: [">=1.12.0", "<2.0.0"]
+
+# This is the dbt + MetricFlow headline tool of the semantic-layer demo, so the
+# stars are materialized tables (not views) that a BI tool or `mf` can query.
+models:
+  ccai_semantic:
+    # Throwaway join helper (the wide account row); compiled as a CTE only.
+    staging:
+      +materialized: ephemeral
+    marts:
+      +materialized: table
