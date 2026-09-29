@@ -46,6 +46,11 @@ Thumbs.db
 *.log
 logs/
 
+# dbt (generated at runtime; project source is olap/dbt/*.yml + models/)
+target/
+dbt_packages/
+.user.yml
+
 # Structurizr — generated at runtime, only workspace.dsl is source
 docs/architecture/workspace.json
 docs/architecture/.structurizr/

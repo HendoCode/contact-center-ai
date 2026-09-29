@@ -1,0 +1,410 @@
+# MetricFlow metric catalog — the public, auditable names for every metric.
+#
+# Rule enforced here: an ambiguous spoken word ("interest rate", "balance",
+# "limit", "LCV") maps to N DISTINCT metric names, and NONE of them keeps the
+# bare word. There is no `interest_rate`, no `balance`, no `limit` metric. A
+# supervisor asking "what is our average interest rate?" therefore gets four
+# side-by-side answers, each a declared metric with its own description and
+# commit history.
+
+metrics:
+
+  # ══════════════════════════ "interest rate" ══════════════════════════════
+
+  - name: average_mortgage_note_rate
+    label: Avg Mortgage Note Rate
+    description: >
+      Average interest rate members PAY on first-lien mortgages (paid, fixed).
+      "interest rate" meaning 1 of the collision.
+    type: simple
+    type_params:
+      measure: mortgage_note_rate
+    filter: "{{ Dimension('product__lob') }} = 'mortgage'"
+
+  - name: note_rate_times_balance
+    label: Note Rate x Principal
+    description: >
+      Intermediate numerator for the principal-weighted mortgage portfolio rate
+      (note_rate multiplied by outstanding principal, summed). Not a headline
+      metric on its own.
+    type: simple
+    type_params:
+      measure: note_rate_times_balance
+    filter: "{{ Dimension('product__lob') }} = 'mortgage'"
+
+  - name: weighted_mortgage_portfolio_rate
+    label: Weighted Mortgage Portfolio Rate
+    description: >
+      Mortgage note rate weighted by outstanding principal — the "what does our
+      book actually cost" number, a RATIO (note_rate x balance) / balance, not
+      a plain average. Numerator and denominator are declared metrics
+      (note_rate_times_balance / mortgage_principal_balance), each lob-filtered.
+    type: ratio
+    type_params:
+      numerator: note_rate_times_balance
+      denominator: mortgage_principal_balance
+
+  - name: average_heloc_current_rate
+    label: Avg HELOC Current Rate
+    description: >
+      Average HELOC effective rate = base_rate + margin (variable, two source
+      columns). "interest rate" meaning 2.
+    type: simple
+    type_params:
+      measure: heloc_current_rate
+    filter: "{{ Dimension('product__lob') }} = 'home'"
+
+  - name: average_credit_card_purchase_apr
+    label: Avg Credit Card Purchase APR
+    description: >
+      Average PURCHASE APR on cards — deliberately NOT the cash-advance APR on
+      the same card. "interest rate" meaning 4a.
+    type: simple
+    type_params:
+      measure: purchase_apr
+    filter: "{{ Dimension('product__lob') }} = 'cards'"
+
+  - name: average_credit_card_cash_advance_apr
+    label: Avg Credit Card Cash Advance APR
+    description: >
+      Average cash-advance APR on cards. "interest rate" meaning 4b — a
+      different rate on the same piece of plastic.
+    type: simple
+    type_params:
+      measure: cash_advance_apr
+    filter: "{{ Dimension('product__lob') }} = 'cards'"
+
+  - name: average_deposit_apy
+    label: Avg Deposit APY
+    description: >
+      Average rate members EARN on deposits (sign-flipped vs loans). "interest
+      rate" meaning 5.
+    type: simple
+    type_params:
+      measure: deposit_apy
+    filter: "{{ Dimension('product__lob') }} = 'banking'"
+
+  - name: average_investment_return_pct
+    label: Avg Investment Return %
+    description: >
+      Average investment return — explicitly NOT interest. "interest rate"
+      meaning 6, which is not interest at all.
+    type: simple
+    type_params:
+      measure: investment_return_pct
+    filter: "{{ Dimension('product__lob') }} = 'investments'"
+
+  # ═══════════════════════════════ "balance" ════════════════════════════════
+
+  - name: banking_available_balance
+    label: Banking Available Balance
+    description: >
+      Total AVAILABLE balance on banking accounts (asset; holds/pending
+      excluded). Additive across accounts. "balance" meaning 4b.
+    type: simple
+    type_params:
+      measure: banking_available_balance
+    filter: "{{ Dimension('product__lob') }} = 'banking'"
+
+  - name: banking_ledger_balance
+    label: Banking Ledger Balance
+    description: >
+      Total LEDGER balance on banking accounts (asset, gross of holds).
+      "balance" meaning 4a.
+    type: simple
+    type_params:
+      measure: banking_ledger_balance
+    filter: "{{ Dimension('product__lob') }} = 'banking'"
+
+  - name: checking_available_balance
+    label: Checking Available Balance
+    description: Available balance, checking accounts only.
+    type: simple
+    type_params:
+      measure: checking_available_balance
+    filter: "{{ Dimension('product__lob') }} = 'banking'"
+
+  - name: savings_balance
+    label: Savings Balance
+    description: Ledger balance on savings accounts only.
+    type: simple
+    type_params:
+      measure: savings_balance
+    filter: "{{ Dimension('product__lob') }} = 'banking'"
+
+  - name: credit_card_outstanding
+    label: Credit Card Outstanding
+    description: >
+      Total outstanding credit-card balance — the SAME word "balance", the
+      OPPOSITE sign (a liability, not an asset).
+    type: simple
+    type_params:
+      measure: card_outstanding_balance
+    filter: "{{ Dimension('product__lob') }} = 'cards'"
+
+  - name: mortgage_principal_balance
+    label: Mortgage Principal Balance
+    description: Outstanding first-lien principal. "balance" meaning 1.
+    type: simple
+    type_params:
+      measure: mortgage_principal_balance
+    filter: "{{ Dimension('product__lob') }} = 'mortgage'"
+
+  - name: heloc_drawn_balance
+    label: HELOC Drawn Balance
+    description: Drawn HELOC balance. "balance" meaning 3.
+    type: simple
+    type_params:
+      measure: heloc_drawn_balance
+    filter: "{{ Dimension('product__lob') }} = 'home'"
+
+  - name: investment_market_value
+    label: Investment Market Value
+    description: Total investment market value. "balance" meaning 6.
+    type: simple
+    type_params:
+      measure: investment_market_value
+    filter: "{{ Dimension('product__lob') }} = 'investments'"
+
+  - name: investment_cash_value
+    label: Investment Cash Value
+    description: Settled cash in investment accounts. "balance" meaning 7.
+    type: simple
+    type_params:
+      measure: investment_cash_value
+    filter: "{{ Dimension('product__lob') }} = 'investments'"
+
+  - name: escrow_balance
+    label: Escrow Balance
+    description: Mortgage escrow balance. "balance" meaning 2.
+    type: simple
+    type_params:
+      measure: escrow_balance
+    filter: "{{ Dimension('product__lob') }} = 'mortgage'"
+
+  - name: net_member_liquidity
+    label: Net Member Liquidity
+    description: >
+      DERIVED: banking available balance (asset) MINUS card outstanding
+      (liability). Only the semantic layer knows the sign conventions — raw SQL
+      SUM(balance) would add assets to liabilities; this declared formula is
+      the only place a blended relationship number is allowed to exist.
+    type: derived
+    type_params:
+      expr: banking_available_balance - credit_card_outstanding
+      metrics:
+        - banking_available_balance
+        - credit_card_outstanding
+
+  # ═══════════════════════════ "LCV" / "LTV" ════════════════════════════════
+
+  - name: loan_to_value
+    label: Loan to Value (LTV)
+    description: >
+      Loan-to-value at origination (underwriting RISK) — a fact stored on the
+      mortgage account, averaged. The "LTV" half of the homophone collision.
+    type: simple
+    type_params:
+      measure: ltv_at_origination
+    filter: "{{ Dimension('product__lob') }} = 'mortgage'"
+
+  - name: member_lifetime_value
+    label: Member Lifetime Value (LCV)
+    description: >
+      Lifetime customer value (marketing) — a DERIVED, PARAMETERIZED CONVENTION,
+      not a fact. Declared formula (see olap/dbt/README.md):
+      LCV = (relationship_revenue / active_members) x 24, where relationship
+      revenue is fee + interest income over the trailing ~6-month window,
+      x2 annualizes it, and x12 is the assumed relationship tenure in years
+      (24 = 2 x 12). Because the formula is a convention, it is declared here
+      once instead of being re-invented per dashboard.
+    type: derived
+    type_params:
+      expr: relationship_revenue * 24 / active_members
+      metrics:
+        - relationship_revenue
+        - active_members
+
+  # LCV building blocks (declared so the LCV formula is auditable end-to-end)
+  - name: total_fee_revenue
+    label: Total Fee Revenue
+    description: Fee revenue to the CU over the transaction window.
+    type: simple
+    type_params:
+      measure: fee_revenue
+
+  - name: total_interest_income
+    label: Total Interest Income
+    description: Interest/dividends earned by members over the transaction window.
+    type: simple
+    type_params:
+      measure: interest_income
+
+  - name: relationship_revenue
+    label: Relationship Revenue
+    description: Fee revenue + interest income (the numerator of the LCV convention).
+    type: derived
+    type_params:
+      expr: total_fee_revenue + total_interest_income
+      metrics:
+        - total_fee_revenue
+        - total_interest_income
+
+  - name: active_members
+    label: Active Members
+    description: Distinct members with ledger activity in the window.
+    type: simple
+    type_params:
+      measure: distinct_members
+
+  # ═══════════════════════════════ "limit" ══════════════════════════════════
+
+  - name: credit_card_credit_limit
+    label: Credit Card Credit Limit
+    description: Card credit capacity. "limit" meaning 3.
+    type: simple
+    type_params:
+      measure: card_credit_limit
+    filter: "{{ Dimension('product__lob') }} = 'cards'"
+
+  - name: heloc_credit_limit
+    label: HELOC Credit Limit
+    description: HELOC credit capacity. "limit" meaning 1.
+    type: simple
+    type_params:
+      measure: heloc_credit_limit
+    filter: "{{ Dimension('product__lob') }} = 'home'"
+
+  - name: insurance_coverage_limit
+    label: Insurance Coverage Limit
+    description: >
+      Car-insurance deductible (a coverage "limit" — NOT credit capacity).
+      "limit" meaning 2.
+    type: simple
+    type_params:
+      measure: insurance_deductible
+    filter: "{{ Dimension('product__lob') }} = 'car_insurance'"
+
+  # ══════════════════════════ "volume" / quality ════════════════════════════
+
+  - name: call_volume
+    label: Call Volume
+    description: Number of interactions (call volume — "volume" meaning 1 of 4).
+    type: simple
+    type_params:
+      measure: interaction_count
+
+  - name: total_duration_seconds
+    label: Total Handle Seconds
+    description: Sum of talk time. AHT is the derived ratio, not this.
+    type: simple
+    type_params:
+      measure: duration_seconds
+
+  - name: average_handle_time
+    label: Average Handle Time (AHT)
+    description: >
+      AHT = total talk time / number of calls — a derived RATIO, never a stored
+      column.
+    type: ratio
+    type_params:
+      numerator: total_duration_seconds
+      denominator: call_volume
+
+  - name: first_contact_resolved_calls
+    label: First Contact Resolved Calls
+    description: Count of interactions resolved on first contact.
+    type: simple
+    type_params:
+      measure: first_contact_resolved_calls
+
+  - name: first_contact_resolution_rate
+    label: First Contact Resolution Rate
+    description: Share of interactions resolved on first contact.
+    type: ratio
+    type_params:
+      numerator: first_contact_resolved_calls
+      denominator: call_volume
+
+  - name: csat_average_score
+    label: CSAT Average Score
+    description: Average CSAT survey score (1-5).
+    type: simple
+    type_params:
+      measure: score_avg
+
+  - name: nps
+    label: Net Promoter Score
+    description: >
+      NPS = (promoters - detractors) / responses x 100, on the 1-5 mapping
+      (5=promoter, 4/3=passive, 2/1=detractor). A derived metric, never stored.
+    type: derived
+    type_params:
+      expr: (promoters - detractors) / responses * 100
+      metrics:
+        - promoters
+        - detractors
+        - responses
+
+  - name: promoters
+    label: Promoters
+    description: Count of CSAT responses scored 5.
+    type: simple
+    type_params:
+      measure: promoters_count
+
+  - name: detractors
+    label: Detractors
+    description: Count of CSAT responses scored 1 or 2.
+    type: simple
+    type_params:
+      measure: detractors_count
+
+  - name: responses
+    label: Survey Responses
+    description: Count of completed CSAT surveys.
+    type: simple
+    type_params:
+      measure: survey_count
+
+  # ═══════════════════════ rate locks ("lock", not freeze) ══════════════════
+
+  - name: rate_locks_count
+    label: Rate Locks
+    description: >
+      Count of rate locks in the mortgage/home pipeline ("lock" as a financing
+      event — NOT a fraud account freeze).
+    type: simple
+    type_params:
+      measure: locks_count
+
+  - name: rate_lock_volume
+    label: Rate Lock Volume
+    description: Sum of loan_amount across rate locks.
+    type: simple
+    type_params:
+      measure: lock_volume
+
+  - name: rate_locks_exercised
+    label: Rate Locks Exercised
+    description: Count of rate locks whose status is 'exercised'.
+    type: simple
+    type_params:
+      measure: locks_exercised
+
+  - name: rate_locks_expired
+    label: Rate Locks Expired
+    description: Count of rate locks whose status is 'expired'.
+    type: simple
+    type_params:
+      measure: locks_expired
+
+  - name: rate_lock_fallout_pct
+    label: Rate Lock Fallout %
+    description: >
+      Share of rate locks that expired without exercising (fall-out) — a
+      derived ratio.
+    type: ratio
+    type_params:
+      numerator: rate_locks_expired
+      denominator: rate_locks_count

@@ -1,0 +1,196 @@
+version: 2
+
+models:
+  - name: f_interaction
+    description: >
+      Contact fact, grain = 1 interaction. Account-many-to-many is handled by
+      f_interaction_account (bridge), never here.
+    columns:
+      - name: interaction_id
+        tests:
+          - unique
+          - not_null
+      - name: member_id
+        tests:
+          - relationships:
+              arguments:
+                to: ref('d_member')
+                field: member_id
+      - name: staff_id
+        tests:
+          - relationships:
+              arguments:
+                to: ref('d_staff')
+                field: staff_id
+      - name: team_id
+        tests:
+          - relationships:
+              arguments:
+                to: ref('d_team')
+                field: team_id
+      - name: category_code
+        tests:
+          - relationships:
+              arguments:
+                to: ref('d_category')
+                field: category_code
+      - name: duration_seconds
+        tests:
+          - not_null
+
+  - name: f_interaction_account
+    description: >
+      Bridge at interaction x account grain; resolves the "which account was
+      this call about" many-to-many without double-counting.
+    columns:
+      - name: interaction_id
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('f_interaction')
+                field: interaction_id
+      - name: account_id
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('d_account')
+                field: account_id
+
+  - name: f_csat
+    description: CSAT survey fact, grain = 1 survey (~75% of interactions).
+    columns:
+      - name: survey_id
+        tests:
+          - unique
+          - not_null
+      - name: interaction_id
+        tests:
+          - unique
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('f_interaction')
+                field: interaction_id
+      - name: member_id
+        tests:
+          - relationships:
+              arguments:
+                to: ref('d_member')
+                field: member_id
+      - name: staff_id
+        tests:
+          - relationships:
+              arguments:
+                to: ref('d_staff')
+                field: staff_id
+      - name: score
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [1, 2, 3, 4, 5]
+
+  - name: f_account_snapshot
+    description: >
+      Account balance/rate snapshot, grain = account x snapshot_date (monthly).
+      Every balance/rate/limit column is lob-qualified and null-per-type.
+    columns:
+      - name: account_id
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('d_account')
+                field: account_id
+      - name: member_id
+        tests:
+          - relationships:
+              arguments:
+                to: ref('d_member')
+                field: member_id
+      - name: product_id
+        tests:
+          - relationships:
+              arguments:
+                to: ref('d_product')
+                field: product_id
+      - name: snapshot_date
+        tests:
+          - not_null
+
+  - name: f_transaction
+    description: >
+      Ledger flow fact, grain = 1 transaction. Signed amounts (credits +,
+      debits -).
+    columns:
+      - name: transaction_id
+        tests:
+          - unique
+          - not_null
+      - name: account_id
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('d_account')
+                field: account_id
+      - name: member_id
+        tests:
+          - relationships:
+              arguments:
+                to: ref('d_member')
+                field: member_id
+      - name: product_id
+        tests:
+          - relationships:
+              arguments:
+                to: ref('d_product')
+                field: product_id
+      - name: txn_type
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["deposit", "withdrawal", "payment", "purchase", "fee", "interest", "premium", "transfer"]
+
+  - name: f_rate_lock
+    description: Mortgage/home rate-lock pipeline fact, grain = 1 lock.
+    columns:
+      - name: lock_id
+        tests:
+          - unique
+          - not_null
+      - name: member_id
+        tests:
+          - relationships:
+              arguments:
+                to: ref('d_member')
+                field: member_id
+      - name: product_id
+        tests:
+          - relationships:
+              arguments:
+                to: ref('d_product')
+                field: product_id
+      - name: status
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["active", "expired", "exercised", "cancelled"]
+
+  - name: f_rate
+    description: Posted (product-level) rate fact, grain = 1 product_rate row.
+    columns:
+      - name: product_rate_id
+        tests:
+          - unique
+          - not_null
+      - name: product_id
+        tests:
+          - relationships:
+              arguments:
+                to: ref('d_product')
+                field: product_id
