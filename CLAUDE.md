@@ -74,17 +74,23 @@ ccai_mcp/server.py (stdio) → 5 tools exposed to MCP clients
 ## Key design constraints
 
 - **CSAT is not semantically searchable.** `query_csat()` reads the Postgres `f_csat` fact (SQL-backed), but CSAT is not embedded in pgvector, so it cannot be combined with semantic transcript search.
-- **Chat provider swaps are controlled by `LLM_PROVIDER` env var** (`"openai"`, default, or `"ollama"`). The `"openai"` branch is any OpenAI-compatible chat endpoint — its `LLM_BASE_URL` (default `https://openrouter.ai/api/v1`) and `LLM_MODEL` (default low-cost `z-ai/glm-5.3-flash`) are env-configurable; the key is read from `OPENAI_API_KEY`.
+- **Chat provider swaps are controlled by `LLM_PROVIDER` env var** (`"openai"`, default, or `"ollama"`, `"anthropic"`, `"fireworks"`, `"vllm"`). `get_llm(provider: str | None = None)` in `rag/pipeline.py` takes an explicit provider override so evals can loop providers in one process. The `"openai"` branch is any OpenAI-compatible chat endpoint — its `LLM_BASE_URL` (default `https://openrouter.ai/api/v1`) and `LLM_MODEL` (default low-cost `z-ai/glm-5.3-flash`) are env-configurable; the key is read from `OPENAI_API_KEY`. Fireworks and vLLM go through the OpenAI-compatible client (`FIREWORKS_API_KEY`/`FIREWORKS_MODEL`, `VLLM_BASE_URL`/`VLLM_MODEL`); Anthropic uses `ANTHROPIC_API_KEY`/`ANTHROPIC_MODEL`.
 - **Embeddings are decoupled via `EMBEDDING_PROVIDER`** (falling back to `LLM_PROVIDER`, so an unset value keeps the old single-provider behavior). OpenRouter currently serves **no embedding models**, so an OpenRouter chat setup must pair with `EMBEDDING_PROVIDER=ollama` (local, free `nomic-embed-text`) or an OpenAI-compatible `EMBEDDING_BASE_URL`/`EMBEDDING_MODEL`. To add other providers (Anthropic, Vertex AI, etc.), only `rag/embeddings.py` and the LLM init in `rag/pipeline.py` need to change.
 - **MCP server is stdio-only** (not HTTP). Claude Desktop and other clients connect via process I/O. The production Azure deployment adds HTTP transport via App Service.
 
 ## Environment variables
 
 ```
-LLM_PROVIDER=openai      # chat provider: "openai" (OpenAI-compatible) or "ollama"
+LLM_PROVIDER=openai      # chat provider: "openai" (OpenAI-compatible) | "ollama" | "anthropic" | "fireworks" | "vllm"
 OPENAI_API_KEY=          # required for the OpenAI-compatible chat branch (e.g. OpenRouter)
 LLM_BASE_URL=https://openrouter.ai/api/v1   # OpenAI-compatible chat endpoint
 LLM_MODEL=z-ai/glm-5.3-flash              # low-cost OpenRouter chat model (default)
+ANTHROPIC_API_KEY=       # required when LLM_PROVIDER=anthropic
+ANTHROPIC_MODEL=claude-sonnet-4-5
+FIREWORKS_API_KEY=       # required when LLM_PROVIDER=fireworks
+FIREWORKS_MODEL=accounts/fireworks/models/llama4-scout-instruct-basic
+VLLM_BASE_URL=http://localhost:8000/v1   # self-hosted vLLM server (OpenAI-compatible)
+VLLM_MODEL=meta-llama/Llama-3.2-3B-Instruct
 EMBEDDING_PROVIDER=ollama  # "openai" (OpenAI-compatible) or "ollama"; falls back to LLM_PROVIDER
 EMBEDDING_MODEL=text-embedding-3-small
 EMBEDDING_BASE_URL=https://api.openai.com/v1

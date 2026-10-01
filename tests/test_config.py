@@ -170,3 +170,63 @@ def test_transcripts_to_documents_carries_olap_ids(monkeypatch):
     assert meta["account_id"] == 42
     assert meta["account_ids"] == [42, 43]
     assert docs[0].page_content == "hello world"
+
+# ── P1 provider registry ──────────────────────────────────────────────────────
+
+def test_get_llm_anthropic_provider(monkeypatch):
+    monkeypatch.setenv("LLM_PROVIDER", "anthropic")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-" + "x" * 24)
+    monkeypatch.setenv("ANTHROPIC_MODEL", "claude-sonnet-4-5")
+
+    from langchain_anthropic import ChatAnthropic
+
+    llm = get_llm()
+
+    assert isinstance(llm, ChatAnthropic)
+    assert llm.model == "claude-sonnet-4-5"
+    assert llm.anthropic_api_key.get_secret_value() == "sk-ant-" + "x" * 24
+
+
+def test_get_llm_fireworks_provider(monkeypatch):
+    monkeypatch.setenv("LLM_PROVIDER", "fireworks")
+    monkeypatch.setenv("FIREWORKS_API_KEY", "fw-" + "x" * 24)
+    monkeypatch.setenv("FIREWORKS_MODEL", "accounts/fireworks/models/my-model")
+
+    from langchain_openai import ChatOpenAI
+
+    llm = get_llm()
+
+    assert isinstance(llm, ChatOpenAI)
+    assert llm.model_name == "accounts/fireworks/models/my-model"
+    assert llm.openai_api_base == "https://api.fireworks.ai/inference/v1"
+    # Fireworks uses its own key, never OPENAI_API_KEY.
+    assert llm.openai_api_key.get_secret_value() == "fw-" + "x" * 24
+
+
+def test_get_llm_vllm_provider(monkeypatch):
+    monkeypatch.setenv("LLM_PROVIDER", "vllm")
+    monkeypatch.setenv("VLLM_BASE_URL", "http://localhost:8000/v1")
+    monkeypatch.setenv("VLLM_MODEL", "meta-llama/Llama-3.2-3B-Instruct")
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+
+    from langchain_openai import ChatOpenAI
+
+    llm = get_llm()
+
+    assert isinstance(llm, ChatOpenAI)
+    assert llm.model_name == "meta-llama/Llama-3.2-3B-Instruct"
+    assert llm.openai_api_base == "http://localhost:8000/v1"
+
+
+def test_get_llm_explicit_provider_overrides_env(monkeypatch):
+    # Evals loop providers in one process via the `provider` argument,
+    # without mutating the environment.
+    monkeypatch.setenv("LLM_PROVIDER", "anthropic")
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+
+    from langchain_openai import ChatOpenAI
+
+    llm = get_llm("openai")
+
+    assert isinstance(llm, ChatOpenAI)
+    assert llm.openai_api_base == "https://openrouter.ai/api/v1"
