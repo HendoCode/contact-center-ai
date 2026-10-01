@@ -20,29 +20,16 @@ jobs:
   test:
     name: pytest (non-integration)
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: pgvector/pgvector:pg16
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: contactcenter
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 5
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
       - run: uv sync --extra dev
+      # Non-integration tests must pass offline with no DB/keys, matching local
+      # `make test`. The DB-backed tests in test_metrics.py self-skip when no
+      # Postgres is available, so no service is provided here.
       - name: Run non-integration tests
-        env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/contactcenter
         run: uv run pytest -m "not integration"
 
   gitleaks:
