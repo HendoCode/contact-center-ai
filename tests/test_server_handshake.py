@@ -29,10 +29,9 @@ async def test_server_handshake():
         args=["-m", "ccai_mcp.server"],
         cwd=str(REPO_ROOT),
     )
-    async with stdio_client(params) as (read, write):
-        async with ClientSession(read, write) as session:
-            init = await session.initialize()
-            assert init.serverInfo.name == "contact-center-ai"
+    async with stdio_client(params) as (read, write), ClientSession(read, write) as session:
+        init = await session.initialize()
+        assert init.serverInfo.name == "contact-center-ai"
 
-            tools = await session.list_tools()
-            assert {t.name for t in tools.tools} == EXPECTED_TOOLS
+        tools = await session.list_tools()
+        assert {t.name for t in tools.tools} == EXPECTED_TOOLS
