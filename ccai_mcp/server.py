@@ -18,7 +18,6 @@ import mcp.server.stdio
 from mcp.server import Server, NotificationOptions
 from mcp.server.models import InitializationOptions
 from mcp.types import Tool, TextContent
-import mcp.types as types
 
 from ccai_mcp.tools import search_transcripts, get_call_summary, query_csat
 from ccai_mcp.metrics import query_metric, ask_the_analyst

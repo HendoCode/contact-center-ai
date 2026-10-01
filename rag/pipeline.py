@@ -16,7 +16,7 @@ from pathlib import Path
 
 from langchain_core.documents import Document
 
-from rag.embeddings import get_vector_store, get_embeddings
+from rag.embeddings import get_vector_store
 
 
 # ── LLM ───────────────────────────────────────────────────────────────────────

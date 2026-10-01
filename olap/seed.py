@@ -311,12 +311,11 @@ def main():
     db_url = os.getenv("DATABASE_URL", DEFAULT_DB_URL)
     conn = psycopg2.connect(db_url)
     try:
-        with conn:
-            with conn.cursor() as cur:
-                for table, columns, pk, preparer, source in TABLES:
-                    rows = list(preparer(load_json(source)))
-                    n = upsert(cur, table, rows, columns, pk)
-                    print(f"  {table:<24} {n:>7} rows")
+        with conn, conn.cursor() as cur:
+            for table, columns, pk, preparer, source in TABLES:
+                rows = list(preparer(load_json(source)))
+                n = upsert(cur, table, rows, columns, pk)
+                print(f"  {table:<24} {n:>7} rows")
 
         print("\nPost-load row counts (Postgres):")
         with conn.cursor() as cur:

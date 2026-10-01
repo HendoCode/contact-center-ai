@@ -37,8 +37,8 @@ python -m rag.pipeline --query "fraud disputes from last week"
 # Start MCP server (stdio, for client connections)
 python -m ccai_mcp.server
 
-# Tests (framework installed, no tests written yet)
-pytest
+# Tests (framework + Make target live in the repo)
+make test                              # == uv run pytest -m "not integration"
 pytest tests/path/to/test_file.py::test_name  # single test
 
 # Terraform (Azure infra)
@@ -47,7 +47,8 @@ terraform plan -var-file=prod.tfvars
 terraform apply
 ```
 
-No linting or formatting is configured yet (no Makefile, ruff, black, or pre-commit hooks).
+Ruff linting and the shared task targets live in the root `Makefile` and `pyproject.toml`
+(see `make lint`, `make test`, and `make check-public`).
 
 ## Architecture
 
@@ -60,7 +61,7 @@ ccai_mcp/server.py (stdio) → 5 tools exposed to MCP clients
 ```
 
 **Data flow across files:**
-- `data/synthetic/generate_data.py` outputs two JSON files: `transcripts.json` (150 calls with full_text) and `csat.json` (survey scores 1–5). These are the only data sources.
+- `data/synthetic/generate_data.py` outputs `transcripts.json` (1,250 calls with full_text), `csat.json` (survey scores 1–5), and the OLTP JSON files loaded by `olap/seed.py`.
 - `rag/embeddings.py` owns pgvector setup — `get_embeddings()` and `get_vector_store()` are the only entry points for the vector store. To swap from OpenAI embeddings to Anthropic/Gemini, only this file needs to change.
 - `rag/pipeline.py` owns ingestion (`--ingest`) and querying (`rag_query()`). Ingestion has no deduplication — running `--ingest` twice will create duplicate documents.
 - `ccai_mcp/tools.py` implements the RAG/CSAT tools (`search_transcripts`, `get_call_summary`, `query_csat`). `search_transcripts` and `get_call_summary` go through `rag_query()`; `query_csat` reads the Postgres `f_csat` fact (falling back to the `csat_survey` source), not `csat.json`.
@@ -155,4 +156,4 @@ Deployed via GitHub Actions → GitHub Pages at https://hendocode.github.io/cont
 
 **Built:** synthetic data generator, full RAG ingest/retrieve/respond pipeline, pgvector + OpenAI integration, Ollama as local provider alternative (no API key), 5-tool MCP server (RAG/CSAT + semantic-layer metric tools), Terraform for Azure (App Service + PostgreSQL Flexible Server), Docker Compose for local dev.
 
-**Not yet implemented:** S3 ingestion, CSAT → vector store (currently SQL-backed via `f_csat`, not embedded), test suite, linting/formatting, observability, CI/CD.
+**Not yet implemented:** S3 ingestion, CSAT → vector store (currently SQL-backed via `f_csat`, not embedded), observability, end-to-end deployment of the CI workflow.

@@ -29,6 +29,7 @@ include = ["rag*", "ccai_mcp*"]
 dev = [
     "pytest>=8.0.0",
     "pytest-asyncio>=0.24.0",
+    "ruff>=0.16.10",
 ]
 
 # Pinned dev dependency group for the OLAP / semantic layer (dbt + MetricFlow).
@@ -40,4 +41,33 @@ dbt = [
     "dbt-core==1.12.5",
     "dbt-postgres==1.11.0",
     "dbt-metricflow==0.15.0",
+]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+extend-exclude = ["blogs/"]
+
+[tool.ruff.lint]
+# Pragmatic default set; individual rules can be refined on future tickets.
+select = ["E", "F", "W", "I", "UP", "B", "SIM"]
+ignore = [
+    # Existing modules are not import-sorted yet; sort in a later hygiene pass.
+    "I001",
+    # Common, intentional patterns in the current codebase.
+    "B008",  # function-call defaults in argument positions
+    "SIM102",  # collapsible if
+    "SIM108",  # ternary refactor
+    # Pre-existing in the seeded generator / pipeline. Left alone so the generator
+    # output stays byte-identical; tighten these rules on future tickets.
+    "E501",  # long dialogue-template lines in data/synthetic/generate_data.py
+    "B007",  # unused loop-control variables
+    "B905",  # zip() without explicit strict (intentional, pre-dating the check)
+    "F841",  # unused local assignments
+    "F811",  # redefined import (PGVector in rag/embeddings.py)
+]
+
+[tool.pytest.ini_options]
+markers = [
+    "integration: requires network, API keys, or a reachable database; skipped by default",
 ]
