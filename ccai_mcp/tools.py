@@ -92,25 +92,24 @@ def query_csat(
         params.append(category)
     where_sql = (" WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
 
-    with psycopg2.connect(CONNECTION_STRING) as conn:
-        with conn.cursor() as cur:
-            try:
-                cur.execute(
-                    "SELECT score, comment, category_code "
-                    f"FROM marts.f_csat{where_sql}",
-                    params,
-                )
-            except pg_errors.UndefinedTable:
-                # marts schema not built yet — fall back to the OLTP source
-                # (csat_survey joined to interaction for the category).
-                cur.execute(
-                    "SELECT c.score, c.comment, i.category_code "
-                    "FROM csat_survey AS c "
-                    "JOIN interaction AS i ON i.interaction_id = c.interaction_id"
-                    f"{where_sql}",
-                    params,
-                )
-            rows = cur.fetchall()
+    with psycopg2.connect(CONNECTION_STRING) as conn, conn.cursor() as cur:
+        try:
+            cur.execute(
+                "SELECT score, comment, category_code "
+                f"FROM marts.f_csat{where_sql}",
+                params,
+            )
+        except pg_errors.UndefinedTable:
+            # marts schema not built yet — fall back to the OLTP source
+            # (csat_survey joined to interaction for the category).
+            cur.execute(
+                "SELECT c.score, c.comment, i.category_code "
+                "FROM csat_survey AS c "
+                "JOIN interaction AS i ON i.interaction_id = c.interaction_id"
+                f"{where_sql}",
+                params,
+            )
+        rows = cur.fetchall()
 
     if not rows:
         return "No CSAT results found matching the given filters."

@@ -6,6 +6,9 @@ data/synthetic/*.json
 .env.*
 !.env.example
 
+# Local public-safety deny-list (private to the repo owner — never committed)
+.forbidden_strings.local
+
 # Python
 __pycache__/
 *.py[cod]
