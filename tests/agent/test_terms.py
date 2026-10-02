@@ -29,3 +29,17 @@ def test_qualifiers_narrow_candidates():
     assert match.candidates == ["average_mortgage_note_rate", "weighted_mortgage_portfolio_rate"]
     (match,) = match_terms("what is the average rate")
     assert len(match.candidates) == 7
+
+
+def test_a_metric_named_by_its_label_wins_over_qualifier_ties():
+    (match,) = match_terms("What is the banking ledger balance?")
+    assert match.candidates == ["banking_ledger_balance"]
+    (match,) = match_terms("What is the checking available balance?")
+    assert match.candidates == ["checking_available_balance"]
+
+
+def test_genuinely_ambiguous_questions_still_offer_every_candidate():
+    (match,) = match_terms("what is the balance?")
+    assert len(match.candidates) > 1
+    (match,) = match_terms("what is the savings or checking balance?")
+    assert len(match.candidates) > 1
