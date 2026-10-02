@@ -82,7 +82,8 @@ ignore = [
 
 [tool.pytest.ini_options]
 # Repo root on sys.path so tests/agent and tests/retrieval (no __init__.py) cannot
-# shadow the real `agent` and `retrieval` packages as namespace packages.
+# shadow the real `agent` and `retrieval` packages as namespace packages, and so
+# tests can import the top-level `tools` package.
 pythonpath = ["."]
 markers = [
     "integration: requires network, API keys, or a reachable database; skipped by default",
