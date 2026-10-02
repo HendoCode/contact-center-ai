@@ -16,7 +16,7 @@ from pathlib import Path
 
 from langchain_core.documents import Document
 
-from rag.embeddings import get_vector_store
+from retrieval import Hit, get_retriever
 
 
 # ── LLM ───────────────────────────────────────────────────────────────────────
@@ -185,18 +185,20 @@ def ingest(source: str = "synthetic"):
     docs = transcripts_to_documents(transcripts)
     print(f"Embedding and storing {len(docs)} documents...")
 
-    vector_store = get_vector_store()
-    vector_store.add_documents(docs)
+    retriever = get_retriever()
+    written = retriever.ingest(
+        [{"call_id": d.metadata["call_id"], "text": d.page_content, "metadata": d.metadata}
+         for d in docs]
+    )
 
-    print(f"Ingestion complete. {len(docs)} documents stored in pgvector.")
+    print(f"Ingestion complete. {written} documents upserted ({retriever.count()} total, {retriever.name}).")
 
 
 # ── Retrieve ──────────────────────────────────────────────────────────────────
 
-def retrieve(query: str, k: int = 5) -> list[Document]:
+def retrieve(query: str, k: int = 5, where: dict | None = None) -> list[Hit]:
     """Retrieve the top-k most relevant call transcripts for a query."""
-    vector_store = get_vector_store()
-    return vector_store.similarity_search(query, k=k)
+    return get_retriever().search(query, k=k, where=where)
 
 
 # ── RAG query ─────────────────────────────────────────────────────────────────
@@ -207,15 +209,15 @@ def rag_query(query: str, k: int = 5) -> str:
 
     This is the core function exposed by the MCP tools.
     """
-    docs = retrieve(query, k=k)
+    hits = retrieve(query, k=k)
 
     context = "\n\n---\n\n".join(
-        f"Call ID: {doc.metadata['call_id']}\n"
-        f"Date: {doc.metadata['date']}\n"
-        f"Category: {doc.metadata['category']}\n"
-        f"Outcome: {doc.metadata['outcome']}\n\n"
-        f"{doc.page_content}"
-        for doc in docs
+        f"Call ID: {hit.call_id}\n"
+        f"Date: {hit.metadata['date']}\n"
+        f"Category: {hit.metadata['category']}\n"
+        f"Outcome: {hit.metadata['outcome']}\n\n"
+        f"{hit.text}"
+        for hit in hits
     )
 
     llm = get_llm()
@@ -246,6 +248,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.reset:
+        from rag.embeddings import get_vector_store
         get_vector_store().delete_collection()
         print("Collection deleted. Re-run --ingest to rebuild it.")
     elif args.ingest:
