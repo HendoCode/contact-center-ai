@@ -18,7 +18,9 @@ Every number, SQL string and call id in the output is read from the running syst
   answers as illustrative in the output.
 - Allison Hill's account figures come from direct SQL on the marts, labelled as such.
 
-No state is written: the script only reads.
+The notes about what was not captured describe the run that committed docs/demo-chat.md (no chat
+or embedding model, placeholder embeddings in pgvector); edit them if you regenerate with real
+models. No state is written: the script only reads.
 """
 
 import argparse
@@ -234,7 +236,7 @@ follows one member, **{member['name']}** (`MBR-{member['member_id']:06d}`, seed-
 data), through that member's calls.
 
 Generated {env['date']} from commit `{env['sha']}` by `tools/demo_chat.py`, against Postgres
-{env['postgres']}, {env['calls']:,} calls and {env['csat']} CSAT responses, `dbt build` passing,
+{env['postgres']}, {env['calls']:,} calls and {env['csat']} CSAT responses, marts built by `dbt build`,
 Python {env['python']}, {', '.join(f"{p} {v}" for p, v in env['versions'].items())}.
 
 ## How to read it
@@ -284,9 +286,9 @@ uv run --group agent --group dbt python -m tools.demo_chat
     'rates?\', k=5))"')}
 
 `search_transcripts` embeds the query, takes the five nearest transcripts from pgvector and has
-the chat model answer from them. It is not captured here: the embeddings in the vector store
-for this capture are a placeholder (no embedding model was available), which is enough for the
-metadata lookup in turn 2 but would rank results meaninglessly.
+the chat model answer from them. It is not captured here: the run that produced this page had no embedding or
+chat model, and its vector store held placeholder embeddings, which is enough for the metadata
+lookup in turn 2 but would rank results meaninglessly.
 
 ## Turn 2: summarize that call
 
