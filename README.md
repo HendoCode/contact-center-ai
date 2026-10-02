@@ -51,6 +51,8 @@ Call recordings / transcripts / CSAT surveys
 
 ## Quick start
 
+For a guided walk-through of every layer, with what runs offline and a code map, see [docs/TOUR.md](docs/TOUR.md).
+
 ### Prerequisites
 - Docker and Docker Compose
 - [uv](https://docs.astral.sh/uv/) (manages Python 3.12 automatically)
