@@ -79,7 +79,7 @@ jobs:
         run: terraform fmt -check -recursive
       - name: validate (no backend)
         run: |
-          for root in bootstrap envs/dev; do
+          for root in bootstrap envs/dev envs/snowflake; do
             (cd "$root" && terraform init -backend=false -input=false && terraform validate)
           done
       - uses: terraform-linters/setup-tflint@v4

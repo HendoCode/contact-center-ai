@@ -1,0 +1,9 @@
+# Copy to backend.hcl (gitignored). Same values as ../dev/backend.hcl except `key`:
+#   sed 's/dev.tfstate/snowflake.tfstate/' ../dev/backend.hcl > backend.hcl
+tenant_id            = "00000000-0000-0000-0000-000000000000"
+subscription_id      = "00000000-0000-0000-0000-000000000000"
+resource_group_name  = "rg-ccai-bootstrap"
+storage_account_name = "stccaitfxxxxxx"
+container_name       = "tfstate"
+key                  = "snowflake.tfstate"
+use_azuread_auth     = true
