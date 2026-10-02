@@ -23,7 +23,7 @@ dependencies = [
 ]
 
 [tool.setuptools.packages.find]
-include = ["rag*", "ccai_mcp*"]
+include = ["rag*", "ccai_mcp*", "retrieval*"]
 
 [project.optional-dependencies]
 dev = [

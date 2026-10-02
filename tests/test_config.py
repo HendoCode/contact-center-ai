@@ -13,6 +13,7 @@ from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 
 import ccai_mcp.tools as tools
 import rag.pipeline as pipeline
+from retrieval import Hit
 from rag.embeddings import get_embeddings
 from rag.pipeline import get_llm
 
@@ -117,18 +118,17 @@ def test_get_call_summary_grounds_prompt_in_retrieved_doc(monkeypatch):
 
     captured = {}
 
-    class _VectorStore:
-        def similarity_search(self, query, k=1, filter=None):
-            assert query == "CALL-00042"
-            assert filter == {"call_id": {"$eq": "CALL-00042"}}
-            return [doc]
+    class _Retriever:
+        def get_by_id(self, call_id):
+            assert call_id == "CALL-00042"
+            return Hit(call_id=call_id, text=doc.page_content, score=1.0, metadata=doc.metadata)
 
     class _LLM:
         def invoke(self, prompt):
             captured["prompt"] = prompt
             return SimpleNamespace(content="summarised")
 
-    monkeypatch.setattr(tools, "get_vector_store", lambda: _VectorStore())
+    monkeypatch.setattr(tools, "get_retriever", lambda: _Retriever())
     monkeypatch.setattr(tools, "get_llm", lambda: _LLM())
 
     result = tools.get_call_summary("CALL-00042")

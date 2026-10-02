@@ -62,9 +62,9 @@ ccai_mcp/server.py (stdio) → 5 tools exposed to MCP clients
 
 **Data flow across files:**
 - `data/synthetic/generate_data.py` outputs `transcripts.json` (1,250 calls with full_text), `csat.json` (survey scores 1–5), and the OLTP JSON files loaded by `olap/seed.py`.
-- `rag/embeddings.py` owns pgvector setup — `get_embeddings()` and `get_vector_store()` are the only entry points for the vector store. To swap from OpenAI embeddings to Anthropic/Gemini, only this file needs to change.
-- `rag/pipeline.py` owns ingestion (`--ingest`) and querying (`rag_query()`). Ingestion has no deduplication — running `--ingest` twice will create duplicate documents.
-- `ccai_mcp/tools.py` implements the RAG/CSAT tools (`search_transcripts`, `get_call_summary`, `query_csat`). `search_transcripts` and `get_call_summary` go through `rag_query()`; `query_csat` reads the Postgres `f_csat` fact (falling back to the `csat_survey` source), not `csat.json`.
+- `rag/embeddings.py` owns pgvector setup and the shared `get_embeddings()`; `retrieval/` (`get_retriever()`, `Hit`, `Retriever`) is the only entry point for search/ingest — `retrieval/pgvector_backend.py` is the sole caller of `get_vector_store()` apart from `--reset`. To swap from OpenAI embeddings to Anthropic/Gemini, only this file needs to change.
+- `rag/pipeline.py` owns ingestion (`--ingest`) and querying (`rag_query()`). Ingestion upserts by `call_id`, so re-running `--ingest` is idempotent (rows ingested before this change have UUID ids and need `--reset` first).
+- `ccai_mcp/tools.py` implements the RAG/CSAT tools (`search_transcripts`, `get_call_summary`, `query_csat`). `search_transcripts` goes through `rag_query()` and `get_call_summary` uses `get_retriever().get_by_id()`; `query_csat` reads the Postgres `f_csat` fact (falling back to the `csat_survey` source), not `csat.json`.
 - `ccai_mcp/metrics.py` implements the semantic-layer tools (`query_metric`, `ask_the_analyst`), which shell out to the committed `mf` (MetricFlow) CLI over the `metrics.yml` catalog.
 - `ccai_mcp/server.py` is a thin router: it receives MCP tool calls over stdio and dispatches to `ccai_mcp/tools.py` and `ccai_mcp/metrics.py`.
 
@@ -82,6 +82,7 @@ ccai_mcp/server.py (stdio) → 5 tools exposed to MCP clients
 ## Environment variables
 
 ```
+RETRIEVER_BACKEND=pgvector  # retrieval backend behind get_retriever(); only "pgvector" exists today
 LLM_PROVIDER=openai      # chat provider: "openai" (OpenAI-compatible) | "ollama" | "anthropic" | "fireworks" | "vllm"
 OPENAI_API_KEY=          # required for the OpenAI-compatible chat branch (e.g. OpenRouter)
 LLM_BASE_URL=https://openrouter.ai/api/v1   # OpenAI-compatible chat endpoint
