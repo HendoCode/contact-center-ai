@@ -70,13 +70,45 @@ caps out of the base lock), so install one at a time. Versions were checked agai
 Each target reads only environment variables (placeholders in `.env.example`, listed in the
 root `CLAUDE.md`). Snowflake authenticates with a key pair: `SNOWFLAKE_PRIVATE_KEY_PATH` points at
 a PKCS#8 PEM file and `SNOWFLAKE_PRIVATE_KEY_PASSPHRASE` is only for an encrypted key; there is
-no password field. The raw OLTP tables must already exist on the target (the loaders are a
-separate ticket); sources are read from the `public` schema.
+no password field. The raw OLTP tables must already exist on the target: load them with the
+loaders below. On Postgres the sources are read from `public`; on Snowflake and Databricks from
+`SNOWFLAKE_RAW_SCHEMA` / `DATABRICKS_RAW_SCHEMA` (default `raw`) in the target's database or catalog.
 
 ```bash
 dbt parse --target snowflake      # offline: renders the profile, connects to nothing
 dbt build --target snowflake      # needs the loaded data and a running warehouse
 ```
+
+### Loaders (`olap/dbt/loaders/`)
+
+`olap/seed.py` loads Postgres. The loaders put the same rows (same table list, columns and
+preparers, imported from `seed.py`) into raw tables on a warehouse. Column types come from
+`olap/oltp/schema.sql`, mapped per warehouse (`NUMERIC(p,s)` to `NUMBER(p,s)` / `DECIMAL(p,s)`,
+`TIMESTAMPTZ` to `TIMESTAMP_TZ` / `TIMESTAMP`, `JSONB` to `VARIANT` / `STRING`); an unmapped type
+raises. The tables carry no primary-key or check constraints, since the warehouses do not enforce them.
+
+| Warehouse | How the file gets there | Load |
+|---|---|---|
+| Snowflake | `PUT` to an internal stage (`<db>.<raw schema>.ccai_loader_stage`) | `COPY INTO` with explicit `$1:col::TYPE` casts |
+| Databricks | `PUT` into a Unity Catalog volume (`/Volumes/<catalog>/<raw schema>/ccai_loader_stage`) | `COPY INTO` with explicit `cast(col AS TYPE)` over JSON read as strings |
+
+Each table runs `CREATE TABLE IF NOT EXISTS`, `PUT`, `TRUNCATE`, `COPY INTO` (forced), then a
+`count(*)` that must equal the rows sent. Truncate-and-load makes a re-run land on the same counts
+with no duplicates. If a `COPY` fails, that table is left empty and the next run repairs it. The
+database (Snowflake) or catalog (Databricks), the warehouse and the role must already exist; the
+raw schema and the stage or volume are created. Timestamps are sent with an explicit UTC offset,
+matching the Compose Postgres (a UTC server). Run each in its own env:
+
+```bash
+python data/synthetic/generate_data.py               # the JSON, if not already generated
+make load-dry-run                                    # print every statement, connect to nothing
+make load-snowflake                                  # uv run --group dbt --group snowflake python -m olap.dbt.loaders snowflake
+make load-databricks                                 # uv run --group dbt --group databricks python -m olap.dbt.loaders databricks
+```
+
+The loaders read the same `SNOWFLAKE_*` / `DATABRICKS_*` variables as the dbt targets, plus
+`SNOWFLAKE_RAW_SCHEMA` and `DATABRICKS_RAW_SCHEMA`. Neither loader has been run against a real
+warehouse; the offline tests use a fake that interprets the generated statements.
 
 Portability rules the models follow, so a new model should too: no `::` casts (use
 `cast(... as ...)` and `{{ dbt.type_int() }}`), no `to_char`, `isodow`, `doy` or

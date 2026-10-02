@@ -5,9 +5,11 @@ sources:
     description: >
       The OLTP foundation tables applied by olap/oltp/apply.sh and seeded by
       olap/seed.py (schema olap/oltp/schema.sql, in the public schema of the
-      docker-compose `db` service). The star schema is a read-only projection
-      of these tables; dbt never writes back to them.
-    schema: public
+      docker-compose `db` service). On Snowflake and Databricks they are loaded by
+      olap/dbt/loaders into SNOWFLAKE_RAW_SCHEMA / DATABRICKS_RAW_SCHEMA (default
+      `raw`) of the target's database / catalog. The star schema is a read-only
+      projection of these tables; dbt never writes back to them.
+    schema: "{% if target.type == 'snowflake' %}{{ env_var('SNOWFLAKE_RAW_SCHEMA', 'raw') }}{% elif target.type == 'databricks' %}{{ env_var('DATABRICKS_RAW_SCHEMA', 'raw') }}{% else %}public{% endif %}"
     tables:
       - name: household
       - name: member
