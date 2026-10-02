@@ -40,6 +40,19 @@ infra/terraform/*.tfstate.backup
 infra/terraform/.terraform.lock.hcl
 infra/terraform/terraform.tfvars
 
+# Terraform (infra/azure): lock files ARE committed per root; state, backend
+# config and real tfvars are not. Copy the *.example files to fill them in.
+infra/azure/**/.terraform/
+infra/azure/**/*.tfstate
+infra/azure/**/*.tfstate.*
+infra/azure/**/backend.hcl
+infra/azure/**/*.tfvars
+infra/azure/**/*.tfvars.json
+!infra/azure/**/*.tfvars.example
+infra/azure/**/crash.log
+# only roots (bootstrap, envs/*) pin providers; modules inherit from the root
+infra/azure/modules/**/.terraform.lock.hcl
+
 # Claude Code local settings
 .claude/settings.local.json
 
