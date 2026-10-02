@@ -43,6 +43,17 @@ dbt = [
     "dbt-postgres==1.11.0",
     "dbt-metricflow==0.15.0",
 ]
+# Warehouse adapters for the portable dbt project (S1). Layer on top of the `dbt` group:
+#   uv sync --group dbt --group snowflake     # or --group databricks (or both)
+# Never in the base install. Versions checked against PyPI on 2026-10-02:
+#   dbt-snowflake 1.12.1 needs dbt-core>=1.10; dbt-databricks 1.12.6 needs dbt-core>=1.11.2,<1.12.6
+#   (1.12.5 caps core below 1.12.4, so it cannot sit next to the dbt-core 1.12.5 pin).
+snowflake = [
+    "dbt-snowflake==1.12.1",
+]
+databricks = [
+    "dbt-databricks==1.12.6",
+]
 lance = [
     "lancedb>=0.39.0",
     "pyarrow>=25.0.1",
@@ -88,4 +99,9 @@ ignore = [
 pythonpath = ["."]
 markers = [
     "integration: requires network, API keys, or a reachable database; skipped by default",
+]
+
+[tool.uv]
+conflicts = [
+    [{ group = "snowflake" }, { group = "databricks" }],
 ]
