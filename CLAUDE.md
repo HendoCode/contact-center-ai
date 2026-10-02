@@ -120,6 +120,11 @@ DATABRICKS_HTTP_PATH=   # SQL warehouse HTTP path
 DATABRICKS_TOKEN=
 DATABRICKS_CATALOG=
 DATABRICKS_SCHEMA=marts
+LANGSMITH_TRACING=false  # "true" turns LangSmith tracing on; forced off in tests and offline `make evals`
+LANGSMITH_API_KEY=       # LangSmith key: traces when tracing is on; required by `make evals-live`
+LANGSMITH_PROJECT=contact-center-ai  # LangSmith project for traces
+EVAL_JUDGE_PROVIDER=anthropic  # `make evals-live` judge: "anthropic" | "openai" (OpenAI-compatible)
+EVAL_JUDGE_MODEL=claude-opus-5-5  # judge model; must differ from the agent's model
 ```
 
 Low-cost demo shape (chat on OpenRouter, free local embeddings — no secrets, placeholders only):

@@ -3,9 +3,10 @@
 # `up` / `down` / `seed` / `ingest` mirror the quickstart and the published
 # "Anchoring AI" post commands. `test` / `lint` / `check-public` are the CI
 # gates. `bench` is the R3 retrieval benchmark. `demo` is the L3 Compose demo.
-# `evals` belongs to a not-yet-landed ticket (L2) and prints "not yet" until it lands.
+# `evals` is the L2 agent golden set offline (a CI gate); `evals-live` is the same set
+# against real models, uploaded to LangSmith.
 
-.PHONY: up down seed ingest test lint check-public demo bench evals finetune-data finetune-label
+.PHONY: up down seed ingest test lint check-public demo bench evals evals-live finetune-data finetune-label
 
 PYTHON := uv run python
 
@@ -78,8 +79,17 @@ finetune-data:
 finetune-label:
 	$(PYTHON) -m models.finetune.data_gen label $(ARGS)
 
-# ── Placeholder until its owning ticket lands (L2 evals) ──────────────────────
-# L2 replaces this. Until then `$(COMPOSE_APP) run --rm evals` runs the deterministic agent
-# tests as a clearly labeled stub; it is not an eval set.
+# ── Agent evals (L2) ──────────────────────────────────────────────────────────
+
+# The golden set (evals/datasets/agent_golden.jsonl) through the real graph with a scripted
+# classifier and stub tools: no keys, no DB, no network. Fails on any failure not listed in
+# evals/known_failures.json, or on a listed one that now passes. CI runs it.
 evals:
-	@echo "not yet: $@"
+	uv run --group agent python -m evals.run
+
+# The same set against the real models and MCP tools, as a LangSmith experiment with an
+# LLM-as-judge; writes results/evals/. Needs the stack (`make up seed ingest`, dbt build),
+# provider keys, LANGSMITH_API_KEY and a judge model unlike the agent's. Costs API money.
+# Pass flags with ARGS, e.g. ARGS="--limit 5".
+evals-live:
+	uv run --group agent python -m evals.run --live $(ARGS)

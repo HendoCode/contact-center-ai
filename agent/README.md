@@ -40,3 +40,7 @@ result = await graph.ainvoke(Command(resume={"choices": ["average_deposit_apy"]}
 ## Tools
 
 `agent/tools.py` starts `python -m ccai_mcp.server` over stdio and calls the five tools through `langchain.mcp` (`MCPAdapter`, on fastmcp 4 and mcp 2.x). No tool logic lives here.
+
+## Tracing
+
+LangSmith tracing is on by env and off otherwise (`agent/tracing.py`). Set `LANGSMITH_TRACING=true`, `LANGSMITH_API_KEY` and `LANGSMITH_PROJECT` in `.env`, and every graph run, from `make demo`, `langgraph dev` or `make evals-live`, lands in that project. A key alone does not trace. The test suite and the offline `make evals` force tracing off whatever `.env` says. Evals for the graph are in [evals/](../evals/README.md).

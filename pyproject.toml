@@ -24,7 +24,7 @@ dependencies = [
 ]
 
 [tool.setuptools.packages.find]
-include = ["rag*", "ccai_mcp*", "retrieval*", "agent*", "models*"]
+include = ["rag*", "ccai_mcp*", "retrieval*", "agent*", "models*", "evals*"]
 
 [project.optional-dependencies]
 dev = [
@@ -66,6 +66,8 @@ agent = [
     "langgraph-cli[inmem]>=0.4.32",
     "langchain[mcp]>=1.4.3",
     "psycopg[binary]>=3.2",
+    # Tracing and evals (evals/): LangSmith client, already in the lock via langchain-core.
+    "langsmith>=0.8.9",
 ]
 
 [tool.ruff]

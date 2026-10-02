@@ -1,0 +1,16 @@
+{
+  "about": "Golden-set failures the agent shows today, found by the offline run (make evals). The gate fails on any failure not listed here and on any listed one that now passes. These are findings about agent behavior, not about the golden set; fixing them is a separate ticket. Remove an entry when its fix lands.",
+  "failures": {
+    "g24": {
+      "interrupt": "A question that names banking_ledger_balance by its label interrupts: in agent/data/ambiguous_terms.yml 'banking' is a qualifier of banking_available_balance and 'ledger' of banking_ledger_balance, so the two tie on votes and the graph asks."
+    },
+    "g25": {
+      "interrupt": "Same tie for checking_available_balance: 'available' votes for banking_available_balance and 'checking' for checking_available_balance, so naming the metric by its label still interrupts."
+    },
+    "g38": {
+      "route": "A lowercase call id ('call-00025') does not match CALL_ID_RE in agent/nodes/classify.py, which is case-sensitive, so the question never reaches summarize_call.",
+      "citations": "Follows from the route: on retrieve, the offline search stub has nothing to cite for a call lookup.",
+      "call_id": "Follows from the route: CALL-00025 is never looked up."
+    }
+  }
+}
