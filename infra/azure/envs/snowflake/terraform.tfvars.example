@@ -1,0 +1,21 @@
+# Copy to terraform.tfvars (gitignored) and fill in your own values.
+# Every value below is a placeholder; CI and offline checks never read the real file.
+
+# Account identifier is <organization_name>-<account_name>, shown in Snowsight under
+# Admin > Accounts. Terraform never creates or moves the account.
+organization_name = "EXAMPLEORG"
+account_name      = "EXAMPLEACCOUNT"
+
+# Existing user Terraform signs in as (key-pair auth; holds ACCOUNTADMIN, SYSADMIN,
+# SECURITYADMIN). Its private key is read from SNOWFLAKE_PRIVATE_KEY, not from here.
+admin_user = "TERRAFORM_ADMIN"
+
+# The dbt user's PUBLIC key as one line, no BEGIN/END lines. Prefer
+#   export TF_VAR_dbt_rsa_public_key="$(...)"   (see README) so it is not written to disk.
+dbt_rsa_public_key = "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAexampleexampleexampleexampleexampleexampleexample"
+
+# Defaults, shown for reference:
+# name_prefix          = "CCAI"
+# warehouse_size       = "XSMALL"
+# auto_suspend_seconds = 60
+# monthly_credit_quota = 5
