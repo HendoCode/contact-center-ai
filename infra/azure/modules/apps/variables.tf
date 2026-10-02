@@ -51,7 +51,7 @@ variable "entra_client_id" {
 }
 
 variable "enable_mcp_server" {
-  description = "Create the mcp-server container app. Off until M1 gives the MCP server a streamable-HTTP transport (it is stdio-only today)."
+  description = "Create the mcp-server container app. Runs `python -m ccai_mcp.server --http` (streamable HTTP at /mcp) behind Easy Auth. Off by default."
   type        = bool
   default     = false
 }

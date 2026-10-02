@@ -1,12 +1,21 @@
 locals {
   # Both apps are cost-guarded the same way: scale to zero, one replica max.
+  # mcp-server runs the streamable-HTTP transport (/mcp, /healthz); the image has no CMD, so
+  # `command` is set. Easy Auth (below) is the only way in, so MCP_AUTH_UPSTREAM lets the
+  # server bind 0.0.0.0 without a static token; an Entra token would not match one anyway.
   apps = {
     mcp-server = {
       enabled = var.enable_mcp_server
       image   = coalesce(var.mcp_server_image, "${azurerm_container_registry.main.login_server}/mcp-server:latest")
       port    = var.mcp_server_port
+      command = ["python", "-m", "ccai_mcp.server", "--http"]
       env = merge(
-        { MCP_SERVER_HOST = "0.0.0.0", MCP_SERVER_PORT = tostring(var.mcp_server_port) },
+        {
+          MCP_TRANSPORT     = "http"
+          MCP_SERVER_HOST   = "0.0.0.0"
+          MCP_SERVER_PORT   = tostring(var.mcp_server_port)
+          MCP_AUTH_UPSTREAM = "true"
+        },
         var.mcp_server_env,
       )
     }
@@ -14,6 +23,7 @@ locals {
       enabled = var.enable_agent_api
       image   = coalesce(var.agent_api_image, "${azurerm_container_registry.main.login_server}/agent-api:latest")
       port    = var.agent_api_port
+      command = null # the image default
       env     = var.agent_api_env
     }
   }
@@ -115,10 +125,11 @@ resource "azurerm_container_app" "this" {
     max_replicas = 1
 
     container {
-      name   = each.key
-      image  = each.value.image
-      cpu    = var.cpu
-      memory = var.memory
+      name    = each.key
+      image   = each.value.image
+      command = each.value.command
+      cpu     = var.cpu
+      memory  = var.memory
 
       env {
         name        = "DATABASE_URL"

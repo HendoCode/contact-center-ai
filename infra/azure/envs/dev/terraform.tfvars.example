@@ -15,7 +15,7 @@ operator_object_id = "00000000-0000-0000-0000-000000000000"
 # Cost guardrails: everything below is off by default.
 enable_gpu        = false
 enable_databricks = false
-enable_mcp_server = false # wait for M1
+enable_mcp_server = false # M1 shipped; enabling it bills (see modules/apps/README.md)
 enable_agent_api  = false # wait for L4
 
 # gpu_location         = "centralus" # Spot-quota fallback

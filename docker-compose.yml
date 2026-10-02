@@ -3,8 +3,11 @@
 #   (no profile)  db, ollama, open-webui, structurizr
 #                                    what `docker compose up -d` starts, as the published
 #                                    posts describe it. Unchanged by L3.
-#   app           ollama-pull, seed, dbt, langgraph-api, demo, evals
+#   app           ollama-pull, seed, dbt, langgraph-api, mcp-server, demo, evals
 #                                    the L3 stack. `make demo` runs it end to end.
+#                                    mcp-server is the opt-in HTTP MCP endpoint (M1); it needs
+#                                    MCP_AUTH_TOKEN in .env, and only `docker compose --profile app
+#                                    up -d mcp-server` (or the whole profile) starts it.
 #   gpu           vllm               needs an NVIDIA GPU and the container toolkit.
 #
 # Profiles combine: `docker compose --profile app --profile gpu up -d`.
@@ -13,8 +16,8 @@
 # (a finished job must stay finished). Ordering uses `depends_on: condition`, so a
 # dependent starts only once its dependency is healthy or has exited 0.
 #
-# There is no mcp-server service: the MCP server is stdio-only, so the agent spawns it as
-# a subprocess inside the app image. A service arrives with M1 (streamable HTTP).
+# The agent still spawns the MCP server as a stdio subprocess inside the app image; the
+# `mcp-server` service is the separate streamable-HTTP endpoint for clients on other machines.
 
 x-app: &app
   # One image for every app service. All of them name the same build, so the first
@@ -159,6 +162,45 @@ services:
         - python
         - -c
         - import urllib.request; urllib.request.urlopen('http://localhost:2024/ok', timeout=3)
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    depends_on:
+      db:
+        condition: service_healthy
+      dbt:
+        condition: service_completed_successfully
+
+  # The MCP server over streamable HTTP (M1): http://127.0.0.1:8000/mcp for Claude Desktop,
+  # Cursor, open-webui and the like (ccai_mcp/README.md has the registration snippets). It
+  # serves database-backed tools, so it is safe by default: published on 127.0.0.1 only, and
+  # the server refuses to start in a container (it must bind 0.0.0.0) until MCP_AUTH_TOKEN is
+  # set in .env (MCP_PUBLISH_HOST=0.0.0.0 publishes it beyond this machine). A static bearer token is demo-grade; put TLS in front of any non-local use.
+  # The compose `environment` block must repeat the app defaults: a YAML merge replaces it.
+  mcp-server:
+    <<: *app
+    command: ["python", "-m", "ccai_mcp.server", "--http"]
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/contactcenter
+      OLLAMA_BASE_URL: http://ollama:11434
+      LLM_PROVIDER: ${LLM_PROVIDER:-ollama}
+      EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-ollama}
+      MCP_TRANSPORT: http
+      MCP_SERVER_HOST: 0.0.0.0
+      MCP_SERVER_PORT: "8000"
+      MCP_AUTH_TOKEN: ${MCP_AUTH_TOKEN:-}
+    ports:
+      - "${MCP_PUBLISH_HOST:-127.0.0.1}:${MCP_SERVER_PORT:-8000}:8000"
+    volumes:
+      - dbt-target:/app/olap/dbt/target
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz', timeout=3)
       interval: 5s
       timeout: 5s
       retries: 12
