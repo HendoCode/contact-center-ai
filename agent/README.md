@@ -39,4 +39,4 @@ result = await graph.ainvoke(Command(resume={"choices": ["average_deposit_apy"]}
 
 ## Tools
 
-`agent/tools.py` starts `python -m ccai_mcp.server` over stdio and calls the five tools through `langchain-mcp-adapters` 0.3.2. No tool logic lives here. Pinned at 0.3.2 until the server moves to mcp 2.x.
+`agent/tools.py` starts `python -m ccai_mcp.server` over stdio and calls the five tools through `langchain.mcp` (`MCPAdapter`, on fastmcp 4 and mcp 2.x). No tool logic lives here.

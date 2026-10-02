@@ -1,0 +1,113 @@
+{
+  "ask_the_analyst": {
+    "description": "Answer a natural-language analytics question by resolving it to one or more DECLARED metrics (seeded with the metrics.yml descriptions), then executing those metrics through the semantic layer and returning a grounded answer with the generated SQL. Use this for aggregate metric questions like 'what is our average interest rate?' \u2014 it will NOT return a single blended number; it returns each declared metric.",
+    "inputSchema": {
+      "properties": {
+        "decimals": {
+          "description": "Optional fixed-decimal rounding for displayed numbers",
+          "type": "integer"
+        },
+        "question": {
+          "description": "Natural-language analytics question (e.g. 'what is our average interest rate?')",
+          "type": "string"
+        }
+      },
+      "required": [
+        "question"
+      ],
+      "type": "object"
+    }
+  },
+  "get_call_summary": {
+    "description": "Get a summary of a specific call by its ID.",
+    "inputSchema": {
+      "properties": {
+        "call_id": {
+          "description": "The call ID (e.g. CALL-00042)",
+          "type": "string"
+        }
+      },
+      "required": [
+        "call_id"
+      ],
+      "type": "object"
+    }
+  },
+  "query_csat": {
+    "description": "Query CSAT survey results from Postgres. Filter by score range or call category. Use this to understand member satisfaction trends.",
+    "inputSchema": {
+      "properties": {
+        "category": {
+          "description": "Filter by call category (e.g. fraud_dispute, loan_inquiry)",
+          "type": "string"
+        },
+        "max_score": {
+          "description": "Maximum CSAT score (1-5)",
+          "maximum": 5,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "min_score": {
+          "description": "Minimum CSAT score (1-5)",
+          "maximum": 5,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "query_metric": {
+    "description": "Query one or more DECLARED metrics from the MetricFlow semantic layer (olap/dbt/models/marts/semantic/metrics.yml) and return the result table plus the SQL the semantic layer generated. There is no bare ambiguous metric ('interest rate', 'balance', 'LCV'): resolve the word to its specific lob-qualified metric names first, e.g. average_mortgage_note_rate, average_deposit_apy, banking_available_balance, net_member_liquidity, member_lifetime_value.",
+    "inputSchema": {
+      "properties": {
+        "decimals": {
+          "description": "Optional fixed-decimal rounding for displayed numbers",
+          "type": "integer"
+        },
+        "group_by": {
+          "description": "Optional dimensions/entities to group by",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "limit": {
+          "description": "Optional row limit",
+          "type": "integer"
+        },
+        "metrics": {
+          "description": "Metric name(s) from metrics.yml (e.g. average_mortgage_note_rate)",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "metrics"
+      ],
+      "type": "object"
+    }
+  },
+  "search_transcripts": {
+    "description": "Search call transcripts using natural language. Use this to find calls about specific topics, issues, or patterns. Examples: 'calls where members complained about fees', 'fraud disputes where the member was frustrated', 'calls that were escalated'.",
+    "inputSchema": {
+      "properties": {
+        "k": {
+          "default": 5,
+          "description": "Number of transcripts to retrieve (default: 5)",
+          "type": "integer"
+        },
+        "query": {
+          "description": "Natural language search query",
+          "type": "string"
+        }
+      },
+      "required": [
+        "query"
+      ],
+      "type": "object"
+    }
+  }
+}
