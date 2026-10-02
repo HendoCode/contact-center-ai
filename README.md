@@ -99,10 +99,9 @@ one through `ask_the_analyst`, and one that interrupts to ask which "rate" you m
 resumes. The first run downloads a couple of GB of models and embeds 1,250 transcripts on
 CPU. `make down` stops everything.
 
-Compose profiles: a bare `docker compose up -d` starts `db` and `ollama`; `app` is the
-demo stack; `ui` adds Open WebUI (`localhost:9090`) and Structurizr (`localhost:8080`);
-`gpu` declares a vLLM server. To keep the UIs on a bare `up -d`, set `COMPOSE_PROFILES=ui`
-in `.env`.
+Compose profiles: a bare `docker compose up -d` is unchanged (`db`, `ollama`, Open WebUI
+on `localhost:9090`, Structurizr on `localhost:8080`); `app` is the demo stack; `gpu`
+declares a vLLM server.
 
 ## Connecting a client
 

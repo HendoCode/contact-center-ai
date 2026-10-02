@@ -1,14 +1,13 @@
 # Compose stack. Three tiers, selected by profile:
 #
-#   (no profile)  db, ollama         what `docker compose up -d` starts: the published
-#                                    posts' commands need exactly these two.
+#   (no profile)  db, ollama, open-webui, structurizr
+#                                    what `docker compose up -d` starts, as the published
+#                                    posts describe it. Unchanged by L3.
 #   app           ollama-pull, seed, dbt, langgraph-api, demo, evals
 #                                    the L3 stack. `make demo` runs it end to end.
-#   ui            open-webui, structurizr
 #   gpu           vllm               needs an NVIDIA GPU and the container toolkit.
 #
-# Profiles combine: `docker compose --profile app --profile ui up -d`, or set
-# COMPOSE_PROFILES=ui in .env so a bare `docker compose up -d` also starts the UIs.
+# Profiles combine: `docker compose --profile app --profile gpu up -d`.
 #
 # Restart policy: long-running servers use `unless-stopped`; one-shot jobs use "no"
 # (a finished job must stay finished). Ordering uses `depends_on: condition`, so a
@@ -191,13 +190,12 @@ services:
     <<: *app
     command: ["pytest", "-m", "not integration", "tests/agent"]
 
-  # ── ui profile ──────────────────────────────────────────────────────────────
+  # ── default tier: UIs (no profile, as before L3) ────────────────────────────
 
   # The open-webui image ships its own HEALTHCHECK. structurizr has none: nothing depends
   # on it and its image has no known probe tool, so none is invented here.
   structurizr:
     image: structurizr/structurizr:latest
-    profiles: [ui]
     command: playground
     restart: unless-stopped
     ports:
@@ -207,7 +205,6 @@ services:
 
   open-webui:
     image: ghcr.io/open-webui/open-webui:${WEBUI_DOCKER_TAG-main}
-    profiles: [ui]
     container_name: open-webui
     volumes:
       - open-webui:/app/backend/data
