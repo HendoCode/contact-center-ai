@@ -55,6 +55,7 @@ databricks = [
     "dbt-databricks==1.12.6",
 ]
 lance = [
+    "duckdb>=1.5.6",
     "lancedb>=0.39.0",
     "pyarrow>=25.0.1",
 ]
