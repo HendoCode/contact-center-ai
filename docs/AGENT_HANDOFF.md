@@ -210,7 +210,7 @@ Follows `docs/design/agent-graph.md`.
 
 **L1 · LangGraph agent** · S · deps: D0.2, R1
 - `agent/`: `classify → (retrieve | resolve_metric | summarize_call) → ground → answer`, with a `clarify` node. When the question uses an ambiguous term (start with "rate," "balance," "LCV"; the list is data, not code), the graph **interrupts** and asks instead of guessing. `ask_the_analyst` is a subgraph. Postgres or SQLite checkpointer, so an interrupted run resumes by thread id.
-- Tools come from the existing MCP server through `langchain-mcp-adapters`, so Claude Desktop and the graph share one tool implementation. No duplicate tool code in `agent/`.
+- Tools come from the existing MCP server through `langchain.mcp`, so Claude Desktop and the graph share one tool implementation. No duplicate tool code in `agent/`.
 - **Verify:** unit tests with a fake LLM covering each route and the interrupt/resume path; `langgraph dev` starts.
 
 **L2 · LangSmith tracing and evals** · dataset O, build S · deps: L1
