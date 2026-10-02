@@ -19,8 +19,8 @@ select
     i.first_contact_resolved,
 
     -- degenerate time-of-day bucket (join to d_time)
-    extract(hour from i.started_at)::int as hour_of_day,
-    i.started_at::date                  as interaction_date
+    cast(extract(hour from i.started_at) as {{ dbt.type_int() }}) as hour_of_day,
+    cast(i.started_at as date)                                   as interaction_date
 from {{ source('oltp', 'interaction') }} as i
 join {{ source('oltp', 'staff') }} as s
     on s.staff_id = i.staff_id

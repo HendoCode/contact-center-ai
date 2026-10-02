@@ -10,7 +10,7 @@ select
     a.product_id,
     p.lob,
     t.posted_at,
-    t.posted_at::date                                     as transaction_date,
+    cast(t.posted_at as date)                                 as transaction_date,
     t.amount,
     t.txn_type,
     t.status,

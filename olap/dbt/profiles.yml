@@ -1,8 +1,16 @@
 # dbt profile. Run dbt/mf from this directory (olap/dbt/) so dbt picks this
 # file up from the CWD; or export DBT_PROFILES_DIR=`pwd`.
 #
-# Targets the docker-compose `db` service (pgvector/pgvector:pg16). Every value
-# can be overridden with an env var so the same file works in CI / Azure.
+# Three targets, one project (the S1 "portable dbt" ticket):
+#   dev         Postgres, the docker-compose `db` service (pgvector/pgvector:pg16). The default.
+#   snowflake   Snowflake, key-pair auth (no password).
+#   databricks  Databricks SQL warehouse / Unity Catalog.
+# Every value comes from an env var. dev keeps its local-Compose defaults so a bare
+# `dbt build` is unchanged. The warehouse targets have no default for anything that
+# identifies an account or a secret, so they fail loudly when unset instead of guessing.
+# Only the selected target is rendered, so `--target dev` never needs the other two's
+# variables. Install the adapters with `uv sync --group dbt --group snowflake` (or
+# `--group databricks`); see the dependency-groups comment in pyproject.toml.
 ccai_semantic:
   target: dev
   outputs:
@@ -14,4 +22,28 @@ ccai_semantic:
       password: "{{ env_var('DBT_PASSWORD', 'postgres') }}"
       dbname: "{{ env_var('DBT_DBNAME', 'contactcenter') }}"
       schema: "{{ env_var('DBT_SCHEMA', 'marts') }}"
+      threads: 4
+
+    snowflake:
+      type: snowflake
+      account: "{{ env_var('SNOWFLAKE_ACCOUNT') }}"
+      user: "{{ env_var('SNOWFLAKE_USER') }}"
+      # Key-pair auth: the dbt user holds the public key, this is the matching private
+      # key file (PEM, PKCS#8). The passphrase is only for an encrypted key; leave it
+      # empty for an unencrypted one. There is deliberately no password field.
+      private_key_path: "{{ env_var('SNOWFLAKE_PRIVATE_KEY_PATH') }}"
+      private_key_passphrase: "{{ env_var('SNOWFLAKE_PRIVATE_KEY_PASSPHRASE', '') }}"
+      role: "{{ env_var('SNOWFLAKE_ROLE') }}"
+      warehouse: "{{ env_var('SNOWFLAKE_WAREHOUSE') }}"
+      database: "{{ env_var('SNOWFLAKE_DATABASE') }}"
+      schema: "{{ env_var('SNOWFLAKE_SCHEMA', 'marts') }}"
+      threads: 4
+
+    databricks:
+      type: databricks
+      host: "{{ env_var('DATABRICKS_HOST') }}"
+      http_path: "{{ env_var('DATABRICKS_HTTP_PATH') }}"
+      token: "{{ env_var('DATABRICKS_TOKEN') }}"
+      catalog: "{{ env_var('DATABRICKS_CATALOG') }}"
+      schema: "{{ env_var('DATABRICKS_SCHEMA', 'marts') }}"
       threads: 4

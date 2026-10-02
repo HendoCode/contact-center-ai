@@ -107,6 +107,19 @@ AZURE_TENANT_ID=        # used by Terraform, not the app
 AZURE_CLIENT_ID=        # used by Terraform, not the app
 DEMO_LLM_PROVIDER=ollama  # `make demo` chat provider (shell/make variable, not read from .env); embeddings stay on Ollama
 HF_TOKEN=               # Hugging Face token for gated models under the Compose `gpu` profile (vllm)
+SNOWFLAKE_ACCOUNT=      # dbt `snowflake` target (olap/dbt/profiles.yml; `uv sync --group dbt --group snowflake`); key-pair auth, no password
+SNOWFLAKE_USER=         # the dbt user that holds the public key
+SNOWFLAKE_PRIVATE_KEY_PATH=   # path to the PKCS#8 PEM private key file
+SNOWFLAKE_PRIVATE_KEY_PASSPHRASE=   # optional, only for an encrypted key
+SNOWFLAKE_ROLE=
+SNOWFLAKE_WAREHOUSE=
+SNOWFLAKE_DATABASE=
+SNOWFLAKE_SCHEMA=marts
+DATABRICKS_HOST=        # dbt `databricks` target (`uv sync --group dbt --group databricks`)
+DATABRICKS_HTTP_PATH=   # SQL warehouse HTTP path
+DATABRICKS_TOKEN=
+DATABRICKS_CATALOG=
+DATABRICKS_SCHEMA=marts
 ```
 
 Low-cost demo shape (chat on OpenRouter, free local embeddings — no secrets, placeholders only):

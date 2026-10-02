@@ -13,7 +13,7 @@ select
     rl.expires_at,
     rl.lock_period_days,
     rl.status,
-    rl.locked_at::date                     as lock_date,
+    cast(rl.locked_at as date)                as lock_date,
     case when rl.status = 'exercised' then 1 else 0 end as is_exercised,
     case when rl.status = 'expired'   then 1 else 0 end as is_expired,
     case when rl.status = 'active'    then 1 else 0 end as is_active,

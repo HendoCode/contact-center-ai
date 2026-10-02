@@ -12,7 +12,7 @@ the OLTP schema/seed.
 | Path | Purpose |
 |---|---|
 | `dbt_project.yml` | dbt project; `marts/` models materialized as tables, staging compiled ephemeral |
-| `profiles.yml` | targets the docker-compose `db` Postgres (env-var overridable) |
+| `profiles.yml` | three targets, every value from env: `dev` (the docker-compose `db` Postgres, the default), `snowflake` (key-pair auth) and `databricks` |
 | `models/staging/stg_account_lob.sql` | Wide per-LOB account row (CTE only) — the polymorphism that fuels the demo |
 | `models/marts/dim/` | `d_date`, `d_time`, `d_member`, `d_household`, `d_staff`, `d_team`, `d_category`, `d_product`, `d_account` (snowflake→`d_product`), degenerate `d_channel`/`d_outcome`/`d_account_status` |
 | `models/marts/fact/` | `f_interaction`, `f_interaction_account` (bridge), `f_csat`, `f_account_snapshot`, `f_transaction`, `f_rate_lock`, `f_rate` |
@@ -49,6 +49,40 @@ uv sync --group dbt        # installs the pinned dbt + MetricFlow CLI into .venv
 Pinned versions (verified together): `dbt-core==1.12.5`,
 `dbt-postgres==1.11.0` (adapter versioning is decoupled from core),
 `dbt-metricflow==0.15.0` (provides the `mf` CLI).
+
+### Other warehouses (Snowflake, Databricks)
+
+The models are written to run unchanged on three warehouses. The warehouse adapters are
+separate dependency groups, layered on top of `dbt`, never in the base install:
+
+```bash
+uv sync --group dbt --group snowflake      # dbt-snowflake==1.12.1
+uv sync --group dbt --group databricks     # dbt-databricks==1.12.6
+```
+
+The two groups are declared as conflicting in `pyproject.toml` (the Databricks adapter caps
+`pydantic`/`packaging` and the Snowflake adapter caps `certifi`, and the conflict keeps those
+caps out of the base lock), so install one at a time. Versions were checked against PyPI on
+2026-10-02: `dbt-snowflake` 1.12.1 requires `dbt-core>=1.10`; `dbt-databricks` 1.12.6 requires
+`dbt-core>=1.11.2,<1.12.6` (1.12.5 caps core below 1.12.4, so it cannot pair with the pinned
+`dbt-core==1.12.5`).
+
+Each target reads only environment variables (placeholders in `.env.example`, listed in the
+root `CLAUDE.md`). Snowflake authenticates with a key pair: `SNOWFLAKE_PRIVATE_KEY_PATH` points at
+a PKCS#8 PEM file and `SNOWFLAKE_PRIVATE_KEY_PASSPHRASE` is only for an encrypted key; there is
+no password field. The raw OLTP tables must already exist on the target (the loaders are a
+separate ticket); sources are read from the `public` schema.
+
+```bash
+dbt parse --target snowflake      # offline: renders the profile, connects to nothing
+dbt build --target snowflake      # needs the loaded data and a running warehouse
+```
+
+Portability rules the models follow, so a new model should too: no `::` casts (use
+`cast(... as ...)` and `{{ dbt.type_int() }}`), no `to_char`, `isodow`, `doy` or
+`generate_series` (use `dbt.date_spine`, `dbt.generate_series`, `dbt.dateadd`,
+`dbt.datediff`, `dbt.date_trunc`, `dbt.concat`, and `case` for day and month names), and ISO
+week arithmetic that does not depend on a session's week-start setting.
 
 ## Prerequisites
 
