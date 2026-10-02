@@ -64,7 +64,40 @@ def test_blank_token_counts_as_unset():
 
 def test_non_loopback_with_a_token_or_declared_upstream_auth_is_allowed():
     assert HttpSettings.from_env({"MCP_SERVER_HOST": "0.0.0.0", "MCP_AUTH_TOKEN": TOKEN}).token == TOKEN
-    assert HttpSettings.from_env({"MCP_SERVER_HOST": "0.0.0.0", "MCP_AUTH_UPSTREAM": "true"}).auth_upstream
+    assert HttpSettings.from_env({**UPSTREAM_ENV, **ACA_SIGNAL}).auth_upstream
+
+
+ACA_SIGNAL = {"CONTAINER_APP_NAME": "mcp-server", "CONTAINER_APP_REVISION": "mcp-server--abc123"}
+UPSTREAM_ENV = {"MCP_SERVER_HOST": "0.0.0.0", "MCP_AUTH_UPSTREAM": "true"}
+
+
+def test_upstream_flag_without_platform_signal_is_refused():
+    with pytest.raises(ConfigError, match="CONTAINER_APP_NAME"):
+        HttpSettings.from_env(UPSTREAM_ENV)
+
+
+def test_platform_signal_without_the_flag_still_needs_a_token():
+    with pytest.raises(ConfigError, match="MCP_AUTH_TOKEN"):
+        HttpSettings.from_env({"MCP_SERVER_HOST": "0.0.0.0", **ACA_SIGNAL})
+
+
+@pytest.mark.parametrize(
+    "partial",
+    [{"CONTAINER_APP_NAME": "mcp-server"}, {"CONTAINER_APP_NAME": "mcp-server", "CONTAINER_APP_REVISION": "  "}],
+)
+def test_upstream_flag_with_a_partial_signal_is_refused(partial):
+    with pytest.raises(ConfigError, match="at least 2"):
+        HttpSettings.from_env({**UPSTREAM_ENV, **partial})
+
+
+def test_upstream_flag_with_full_signal_records_which_variables_matched():
+    s = HttpSettings.from_env({**UPSTREAM_ENV, **ACA_SIGNAL})
+    assert s.platform_signal == ("CONTAINER_APP_NAME", "CONTAINER_APP_REVISION")
+    assert s.auth_mode == "upstream proxy"
+
+
+def test_a_token_still_works_without_any_signal():
+    assert HttpSettings.from_env({"MCP_SERVER_HOST": "0.0.0.0", "MCP_AUTH_TOKEN": TOKEN}).auth_mode == "bearer token"
 
 
 @pytest.mark.parametrize("host", ["127.0.0.1", "127.0.0.2", "::1", "[::1]", "localhost"])
@@ -255,7 +288,7 @@ def _free_port() -> int:
 
 
 def _run_module(env_extra: dict[str, str], *args: str) -> subprocess.Popen:
-    env = {k: v for k, v in os.environ.items() if not k.startswith("MCP_")}
+    env = {k: v for k, v in os.environ.items() if not k.startswith(("MCP_", "CONTAINER_APP"))}
     env.update(env_extra)
     return subprocess.Popen(
         [sys.executable, "-m", "ccai_mcp.server", *args],
@@ -273,6 +306,49 @@ def test_entrypoint_refuses_a_non_loopback_bind_without_a_token():
     assert proc.returncode != 0
     assert "MCP_AUTH_TOKEN" in err
     assert "refusing to start" in err
+
+
+def test_entrypoint_refuses_upstream_flag_without_platform_signal():
+    proc = _run_module({"MCP_TRANSPORT": "http", "MCP_SERVER_HOST": "0.0.0.0", "MCP_AUTH_UPSTREAM": "true"})
+    _, err = proc.communicate(timeout=60)
+    assert proc.returncode != 0
+    assert "CONTAINER_APP_NAME" in err
+    assert "refusing to start" in err
+
+
+@pytest.mark.asyncio
+async def test_entrypoint_serves_tokenless_with_upstream_flag_and_platform_signal():
+    port = _free_port()
+    env = {
+        "MCP_TRANSPORT": "http",
+        "MCP_SERVER_HOST": "0.0.0.0",
+        "MCP_SERVER_PORT": str(port),
+        "MCP_AUTH_UPSTREAM": "true",
+        **ACA_SIGNAL,
+    }
+    proc = _run_module(env)
+    base = f"http://127.0.0.1:{port}"
+    try:
+        for _ in range(300):
+            if proc.poll() is not None:
+                pytest.fail(f"server exited early: {proc.stderr.read()}")
+            try:
+                with urllib.request.urlopen(f"{base}/healthz", timeout=1):
+                    break
+            except OSError:
+                await asyncio.sleep(0.1)
+        else:
+            pytest.fail("server did not come up")
+        async with _session(base, None) as session:
+            assert {t.name for t in (await session.list_tools()).tools} == EXPECTED_TOOLS
+    finally:
+        proc.terminate()
+        try:
+            _, err = proc.communicate(timeout=15)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            _, err = proc.communicate()
+    assert "Azure Container Apps signal present" in err
 
 
 def test_entrypoint_rejects_an_unknown_transport():
