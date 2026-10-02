@@ -25,7 +25,7 @@ jobs:
       - uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
-      - run: uv sync --extra dev --group lance
+      - run: uv sync --extra dev --group lance --group agent
       # Non-integration tests must pass offline with no DB/keys, matching local
       # `make test`. The DB-backed tests in test_metrics.py self-skip when no
       # Postgres is available, so no service is provided here.

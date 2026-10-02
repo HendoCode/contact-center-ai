@@ -1,0 +1,52 @@
+# Ambiguous business terms the agent must ask about instead of guessing.
+#
+# Data, not code: add a term here and the graph interrupts on it. Every candidate
+# must be a declared metric in olap/dbt/models/marts/semantic/metrics.yml
+# (tests/agent/test_terms.py enforces this).
+#
+# term:
+#   aliases:    words in the question that trigger the term (whole-word, case-insensitive)
+#   unless:     phrases that contain an alias but mean something else; they are removed
+#               from the question before matching
+#   candidates: metric name -> qualifiers. A qualifier is a word or phrase that, when
+#               present in the question, votes for that metric. The candidates with
+#               the most votes remain; with no votes, every candidate is offered.
+terms:
+  rate:
+    aliases: [rate, rates]
+    unless:
+      - first contact resolution rate
+      - resolution rate
+      - rate lock
+      - rate locks
+      - response rate
+    candidates:
+      average_mortgage_note_rate: [mortgage note, note rate, mortgage]
+      weighted_mortgage_portfolio_rate: [weighted, portfolio, mortgage]
+      average_heloc_current_rate: [heloc]
+      average_credit_card_purchase_apr: [purchase, credit card]
+      average_credit_card_cash_advance_apr: [cash advance]
+      average_deposit_apy: [deposit, apy, savings]
+      average_investment_return_pct: [investment, return]
+
+  balance:
+    aliases: [balance, balances]
+    unless: []
+    candidates:
+      mortgage_principal_balance: [mortgage, principal]
+      escrow_balance: [escrow]
+      heloc_drawn_balance: [heloc, drawn]
+      banking_ledger_balance: [ledger]
+      banking_available_balance: [banking, available]
+      checking_available_balance: [checking]
+      savings_balance: [savings]
+      credit_card_outstanding: [credit card, outstanding]
+      investment_market_value: [market value]
+      investment_cash_value: [investment cash, settled cash]
+
+  lcv:
+    aliases: [lcv, ltv]
+    unless: []
+    candidates:
+      member_lifetime_value: [lifetime, customer value, member value]
+      loan_to_value: [loan to value, underwriting, origination]
