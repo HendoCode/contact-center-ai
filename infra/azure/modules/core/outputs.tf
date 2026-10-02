@@ -19,8 +19,10 @@ output "log_analytics_workspace_id" {
 }
 
 output "app_identity_id" {
-  description = "Resource ID of the app user-assigned identity."
+  description = "Resource ID of the app user-assigned identity. Waits for its Key Vault role so Key Vault secret references resolve on first start."
   value       = azurerm_user_assigned_identity.app.id
+
+  depends_on = [azurerm_role_assignment.app_key_vault_secrets_user]
 }
 
 output "app_identity_principal_id" {
