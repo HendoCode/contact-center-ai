@@ -6,9 +6,10 @@ Opt in with `MCP_TRANSPORT=http` or `python -m ccai_mcp.server --http`. The endp
 
 Safe by default, because this puts database-backed tools on a network:
   * binds 127.0.0.1 unless `MCP_SERVER_HOST` says otherwise;
-  * a non-loopback bind refuses to start unless `MCP_AUTH_TOKEN` is set (or
+  * a non-loopback bind refuses to start unless `MCP_AUTH_TOKEN` is set, or
     `MCP_AUTH_UPSTREAM=true` declares that an authenticating proxy such as Azure Easy Auth
-    fronts the container);
+    fronts the container AND the process is running on Azure Container Apps (at least two of
+    the platform's injected variables are present; see `PLATFORM_SIGNAL_VARS`);
   * with a token set, every request except `/healthz` needs `Authorization: Bearer <token>`,
     compared in constant time, and is rejected with 401 before MCP sees it. The token is never
     logged.
@@ -40,6 +41,23 @@ HEALTH_PATH = "/healthz"
 
 _TRUE = {"1", "true", "yes", "on"}
 
+# Variables Azure Container Apps injects into every app container.
+# Source: https://learn.microsoft.com/en-us/azure/container-apps/environment-variables
+# ("Built-in environment variables" > Apps; page ms.date 2026-03-31, checked 2026-10-02).
+# `CONTAINER_NAME` (managed function/logic apps) and the `CONTAINER_APP_JOB_*` variables (jobs)
+# are deliberately left out. Two or more non-empty ones are required before
+# MCP_AUTH_UPSTREAM may skip the token. This is a misconfiguration guard, not a security
+# boundary: anyone who controls the environment can set these. Easy Auth is the real control.
+PLATFORM_SIGNAL_VARS = (
+    "CONTAINER_APP_NAME",
+    "CONTAINER_APP_REVISION",
+    "CONTAINER_APP_HOSTNAME",
+    "CONTAINER_APP_ENV_DNS_SUFFIX",
+    "CONTAINER_APP_PORT",
+    "CONTAINER_APP_REPLICA_NAME",
+)
+PLATFORM_SIGNAL_MIN = 2
+
 
 class ConfigError(ValueError):
     """The HTTP settings are unsafe or malformed; the server must not start."""
@@ -61,6 +79,7 @@ class HttpSettings:
     port: int = DEFAULT_PORT
     token: str | None = None
     auth_upstream: bool = False
+    platform_signal: tuple[str, ...] = ()  # names (never values) of the ACA variables found
 
     @classmethod
     def from_env(cls, environ: Mapping[str, str] | None = None) -> "HttpSettings":
@@ -74,6 +93,7 @@ class HttpSettings:
             port=port,
             token=(env.get("MCP_AUTH_TOKEN") or "").strip() or None,
             auth_upstream=(env.get("MCP_AUTH_UPSTREAM") or "").strip().lower() in _TRUE,
+            platform_signal=tuple(n for n in PLATFORM_SIGNAL_VARS if (env.get(n) or "").strip()),
         )
         settings.validate()
         return settings
@@ -81,12 +101,23 @@ class HttpSettings:
     def validate(self) -> None:
         if not 0 <= self.port <= 65535:
             raise ConfigError(f"MCP_SERVER_PORT out of range: {self.port}")
-        if not is_loopback(self.host) and not self.token and not self.auth_upstream:
+        if is_loopback(self.host) or self.token:
+            return
+        if not self.auth_upstream:
             raise ConfigError(
                 f"MCP_SERVER_HOST={self.host!r} is not a loopback address and MCP_AUTH_TOKEN is "
                 "not set. Set MCP_AUTH_TOKEN (for example `openssl rand -hex 32`) or bind "
                 f"{DEFAULT_HOST}. If an authenticating proxy such as Azure Easy Auth is the only "
-                "way to reach this server, set MCP_AUTH_UPSTREAM=true instead."
+                "way to reach this server on Azure Container Apps, set MCP_AUTH_UPSTREAM=true instead."
+            )
+        if len(self.platform_signal) < PLATFORM_SIGNAL_MIN:
+            missing = [n for n in PLATFORM_SIGNAL_VARS if n not in self.platform_signal]
+            raise ConfigError(
+                f"MCP_AUTH_UPSTREAM=true on a non-loopback bind (MCP_SERVER_HOST={self.host!r}) needs "
+                f"proof of Azure Container Apps: at least {PLATFORM_SIGNAL_MIN} of "
+                f"{', '.join(PLATFORM_SIGNAL_VARS)} must be set and non-empty (found "
+                f"{len(self.platform_signal)}; missing {', '.join(missing)}). Set MCP_AUTH_TOKEN "
+                "instead if this is not Azure Container Apps."
             )
 
     @property
@@ -192,6 +223,12 @@ async def serve_http(server: Server, settings: HttpSettings) -> None:
     import uvicorn
 
     app = build_app(server, settings)
+    if settings.auth_mode == "upstream proxy":
+        logger.info(
+            "tokenless non-loopback bind allowed: MCP_AUTH_UPSTREAM=true and Azure Container Apps "
+            "signal present (%s)",
+            ", ".join(settings.platform_signal),
+        )
     logger.info(
         "serving MCP over streamable HTTP at http://%s:%s%s (auth: %s)",
         settings.host,
