@@ -46,9 +46,9 @@ snowflake  = { source = "snowflakedb/snowflake", version = "~> 2.21" }
 - `rbac_authorization_enabled` on Key Vault.
 
 Snowflake authenticates with `SNOWFLAKE_JWT` through three role aliases:
-- `ACCOUNTADMIN` for the resource monitor, which its docs require.
-- `SYSADMIN` for the warehouse and database.
-- `SECURITYADMIN` for users and grants.
+- `ACCOUNTADMIN` for the resource monitor and the warehouse. Snowflake lets only ACCOUNTADMIN assign a warehouse to a monitor, and the provider sets that on the warehouse resource itself.
+- `SYSADMIN` for the database.
+- `SECURITYADMIN` for the role, user, and grants.
 
 Terraform only sees the public key.
 
