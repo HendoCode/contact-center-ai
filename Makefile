@@ -5,7 +5,7 @@
 # gates. `bench` is the R3 retrieval benchmark. `demo` / `evals` belong to
 # not-yet-landed tickets (L3, L2) and print "not yet" until those land.
 
-.PHONY: up down seed ingest test lint check-public demo bench evals
+.PHONY: up down seed ingest test lint check-public demo bench evals finetune-data finetune-label
 
 PYTHON := uv run python
 
@@ -43,6 +43,17 @@ check-public:
 # flags with ARGS, e.g. `make bench ARGS="--backends lancedb"` or `ARGS="--scale 80"`.
 bench:
 	uv run --group lance python -m retrieval.bench $(ARGS)
+
+# ── Fine-tune dataset (F1) ────────────────────────────────────────────────────
+
+# Gold labels, the 800/150/300 split and test.jsonl under data/finetune/. Offline, no API.
+finetune-data:
+	$(PYTHON) -m models.finetune.data_gen build
+
+# Teacher labels for train and dev. Calls the LLM_PROVIDER model and costs API money;
+# resumable. Pass flags with ARGS, e.g. ARGS="--limit 5" or ARGS="--dry-run".
+finetune-label:
+	$(PYTHON) -m models.finetune.data_gen label $(ARGS)
 
 # ── Placeholders until their owning tickets land (L3 demo, L2 evals) ──────────
 demo evals:
