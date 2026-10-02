@@ -1,0 +1,25 @@
+# Copy to terraform.tfvars (gitignored) and fill in your own values.
+# Every ID below is a placeholder, not a real one; CI and offline checks use it as-is.
+subscription_id = "00000000-0000-0000-0000-000000000000"
+tenant_id       = "00000000-0000-0000-0000-000000000000"
+key_vault_id    = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-ccai-bootstrap/providers/Microsoft.KeyVault/vaults/kv-ccai-xxxxxx"
+entra_client_id = "00000000-0000-0000-0000-000000000000"
+
+# Destroy by this date; it is tagged on every resource.
+session_expires = "2026-10-03"
+
+# Your public IPv4 (Postgres firewall, GPU SSH) and Entra object ID (ADLS access).
+operator_ip        = "203.0.113.10"
+operator_object_id = "00000000-0000-0000-0000-000000000000"
+
+# Cost guardrails: everything below is off by default.
+enable_gpu        = false
+enable_databricks = false
+enable_mcp_server = false # wait for M1
+enable_agent_api  = false # wait for L4
+
+# gpu_location         = "centralus" # Spot-quota fallback
+# admin_ssh_public_key = "ssh-ed25519 AAAA... you@example.com"
+# key_vault_secrets = {
+#   OPENAI_API_KEY = "https://kv-ccai-xxxxxx.vault.azure.net/secrets/openai-api-key"
+# }

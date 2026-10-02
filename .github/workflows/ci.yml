@@ -50,3 +50,35 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: tools/check_public.sh
+
+  terraform:
+    name: terraform (fmt, validate, tflint)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra/azure
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.16.4
+      - name: fmt
+        run: terraform fmt -check -recursive
+      - name: validate (no backend)
+        run: |
+          for root in bootstrap envs/dev; do
+            (cd "$root" && terraform init -backend=false -input=false && terraform validate)
+          done
+      - uses: terraform-linters/setup-tflint@v4
+        with:
+          tflint_version: v0.64.0
+      - uses: actions/cache@v4
+        with:
+          path: ~/.tflint.d/plugins
+          key: tflint-${{ hashFiles('infra/azure/.tflint.hcl') }}
+      - name: tflint
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tflint --init --config="$PWD/.tflint.hcl"
+          tflint --recursive --config="$PWD/.tflint.hcl"
