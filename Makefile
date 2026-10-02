@@ -6,7 +6,7 @@
 # `evals` is the L2 agent golden set offline (a CI gate); `evals-live` is the same set
 # against real models, uploaded to LangSmith.
 
-.PHONY: up down seed ingest test lint check-public demo bench evals evals-live finetune-data finetune-label
+.PHONY: up down seed ingest test lint check-public demo bench evals evals-live finetune-data finetune-label load-snowflake load-databricks load-dry-run
 
 PYTHON := uv run python
 
@@ -78,6 +78,22 @@ finetune-data:
 # resumable. Pass flags with ARGS, e.g. ARGS="--limit 5" or ARGS="--dry-run".
 finetune-label:
 	$(PYTHON) -m models.finetune.data_gen label $(ARGS)
+
+# ── Warehouse loaders (S2) ────────────────────────────────────────────────────
+
+# Load the OLTP JSON into raw tables on Snowflake or Databricks. Each warehouse's adapter
+# group lives in its own uv env (the two groups conflict), hence one target each. They connect
+# to a real warehouse, so they read the SNOWFLAKE_* / DATABRICKS_* variables from the shell.
+# `make load-dry-run` prints every statement for both and connects to nothing.
+load-snowflake:
+	uv run --group dbt --group snowflake python -m olap.dbt.loaders snowflake
+
+load-databricks:
+	uv run --group dbt --group databricks python -m olap.dbt.loaders databricks
+
+load-dry-run:
+	$(PYTHON) -m olap.dbt.loaders snowflake --dry-run
+	$(PYTHON) -m olap.dbt.loaders databricks --dry-run
 
 # ── Agent evals (L2) ──────────────────────────────────────────────────────────
 
