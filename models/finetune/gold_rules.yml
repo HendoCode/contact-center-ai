@@ -1,0 +1,90 @@
+# Gold-label rules for summary_v1. Gold labels are built by code from the
+# generator's output plus this file; no model is involved (docs/design/finetune.md).
+#
+# Per category:
+#   product_line  `subject_lob` = the line of business of the call's subject account
+#                 (interaction_accounts.json), or `unknown` when it has none; any other
+#                 value is a fixed answer. account_opening has no subject account yet,
+#                 so it is banking. rate_lock_status text carries no LOB cue, so it is
+#                 unknown even though the lock belongs to a mortgage or home account.
+#   metrics       the generator fact keys the dialogue template speaks, in spoken order.
+#                 The value is read from the transcript turn, so it is verbatim.
+#   resolution    what the agent did in the dialogue (never the `outcome` column, which
+#                 the text does not reveal).
+#   follow_up     the action still pending when the call ends; null means none needed.
+#
+# Template facts that are not account figures: identifiers, and the descriptive words
+# (`balance_kind`, `rate_label`, ...) that name which kind of figure follows.
+ignored_facts: [member_id, member_name, account_last4, balance_kind, secondary_kind, rate_label, payment_label]
+
+categories:
+  account_balance:
+    product_line: subject_lob
+    metrics: [balance, secondary_balance]
+    resolution: information_provided
+    follow_up: null
+  online_banking_support:
+    product_line: subject_lob
+    metrics: [ledger_balance]
+    resolution: action_completed
+    follow_up: null
+  card_services:
+    product_line: subject_lob
+    metrics: [credit_limit, outstanding_balance, purchase_apr, available_credit]
+    resolution: information_provided
+    follow_up: null
+  fraud_dispute:
+    product_line: subject_lob
+    metrics: [balance]
+    resolution: dispute_opened
+    follow_up: Investigate the disputed charge; the member gets the full resolution in about 10 business days.
+  payment_assistance:
+    product_line: subject_lob
+    metrics: [payment_amount]
+    resolution: request_submitted
+    follow_up: Process the hardship deferral request and email the member a confirmation.
+  rate_inquiry:
+    product_line: subject_lob
+    metrics: [rate, balance]
+    resolution: information_provided
+    follow_up: null
+  loan_inquiry:
+    product_line: subject_lob
+    metrics: [rate, balance]
+    resolution: offer_pending
+    follow_up: Start a pre-qualification if the member wants one.
+  mortgage_inquiry:
+    product_line: subject_lob
+    metrics: [note_rate, current_principal, ltv, escrow_balance]
+    resolution: information_provided
+    follow_up: null
+  insurance_service:
+    product_line: subject_lob
+    metrics: [annual_premium, monthly_premium, deductible]
+    resolution: offer_pending
+    follow_up: Quote full coverage for the member's vehicle if the member wants it.
+  investment_review:
+    product_line: subject_lob
+    metrics: [market_value, cash_value, ytd_return]
+    resolution: information_provided
+    follow_up: null
+  account_opening:
+    product_line: banking
+    metrics: [new_account_apy]
+    resolution: request_submitted
+    follow_up: Finish opening the savings account and send the member the account details.
+  fee_dispute:
+    product_line: subject_lob
+    metrics: [monthly_fee, waiver_min_balance]
+    resolution: action_completed
+    follow_up: null
+  escrow_analysis:
+    product_line: subject_lob
+    metrics: [escrow_balance, monthly_pi]
+    resolution: review_needed
+    follow_up: Review the escrow adjustment caused by the change in property taxes.
+  rate_lock_status:
+    product_line: unknown
+    metrics: [locked_rate, expires_at, loan_amount]
+    resolution: information_provided
+    follow_up: null
