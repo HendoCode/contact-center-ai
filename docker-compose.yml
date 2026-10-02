@@ -1,3 +1,43 @@
+# Compose stack. Three tiers, selected by profile:
+#
+#   (no profile)  db, ollama         what `docker compose up -d` starts: the published
+#                                    posts' commands need exactly these two.
+#   app           ollama-pull, seed, dbt, langgraph-api, demo, evals
+#                                    the L3 stack. `make demo` runs it end to end.
+#   ui            open-webui, structurizr
+#   gpu           vllm               needs an NVIDIA GPU and the container toolkit.
+#
+# Profiles combine: `docker compose --profile app --profile ui up -d`, or set
+# COMPOSE_PROFILES=ui in .env so a bare `docker compose up -d` also starts the UIs.
+#
+# Restart policy: long-running servers use `unless-stopped`; one-shot jobs use "no"
+# (a finished job must stay finished). Ordering uses `depends_on: condition`, so a
+# dependent starts only once its dependency is healthy or has exited 0.
+#
+# There is no mcp-server service: the MCP server is stdio-only, so the agent spawns it as
+# a subprocess inside the app image. A service arrives with M1 (streamable HTTP).
+
+x-app: &app
+  # One image for every app service. All of them name the same build, so the first
+  # build is the only real one.
+  build:
+    context: .
+    dockerfile: Dockerfile
+  image: ccai-app:local
+  # `.env` is optional; the environment block below wins over it, rewiring hosts for
+  # the Compose network (inside a container `localhost` is the container itself).
+  env_file:
+    - path: .env
+      required: false
+  environment:
+    DATABASE_URL: postgresql://postgres:postgres@db:5432/contactcenter
+    DBT_HOST: db
+    OLLAMA_BASE_URL: http://ollama:11434
+    LLM_PROVIDER: ${LLM_PROVIDER:-ollama}
+    EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-ollama}
+  profiles: [app]
+  restart: "no"
+
 services:
   db:
     image: pgvector/pgvector:pg16
@@ -11,19 +51,10 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d contactcenter"]
       interval: 5s
       timeout: 5s
       retries: 5
-
-  structurizr:
-    image: structurizr/structurizr:latest
-    command: playground
-    restart: unless-stopped
-    ports:
-      - "8080:8080"
-    volumes:
-      - ./docs/architecture:/usr/local/structurizr
 
   ollama:
     volumes:
@@ -35,14 +66,154 @@ services:
     image: ollama/ollama:${OLLAMA_DOCKER_TAG-latest}
     ports:
       - "11434:11434"
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 5s
+
+  # ── app profile ─────────────────────────────────────────────────────────────
+
+  # One-shot: pull the models the local path needs. nomic-embed-text (~270 MB) always,
+  # because the stack embeds locally; the chat model (llama3.2, 3B, ~2 GB) only when
+  # LLM_PROVIDER=ollama. Pulls are idempotent and cached in the `ollama` volume.
+  ollama-pull:
+    image: ollama/ollama:${OLLAMA_DOCKER_TAG-latest}
+    profiles: [app]
+    restart: "no"
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        ollama pull "$$OLLAMA_EMBEDDING_MODEL"
+        if [ "$$LLM_PROVIDER" = "ollama" ]; then ollama pull "$$OLLAMA_MODEL"; fi
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+      OLLAMA_EMBEDDING_MODEL: ${OLLAMA_EMBEDDING_MODEL:-nomic-embed-text}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2}
+      LLM_PROVIDER: ${LLM_PROVIDER:-ollama}
+    depends_on:
+      ollama:
+        condition: service_healthy
+
+  # One-shot: OLTP schema, deterministic synthetic data, load into Postgres, embed the
+  # transcripts into the vector store. Every step is idempotent, so a re-run changes nothing.
+  seed:
+    <<: *app
+    command:
+      - sh
+      - -ec
+      - |
+        olap/oltp/apply.sh
+        python data/synthetic/generate_data.py
+        python olap/seed.py
+        python -m rag.pipeline --ingest
+    depends_on:
+      db:
+        condition: service_healthy
+      ollama-pull:
+        condition: service_completed_successfully
+
+  # One-shot: build the star schema and run the data tests. `dbt build` also emits
+  # target/semantic_manifest.json, which `mf` (the metric tools) reads, so `target/` is a
+  # named volume the consumers mount.
+  dbt:
+    <<: *app
+    working_dir: /app/olap/dbt
+    command: ["dbt", "build"]
+    environment:
+      DBT_HOST: db
+      DBT_PROFILES_DIR: /app/olap/dbt
+    volumes:
+      - dbt-target:/app/olap/dbt/target
+    depends_on:
+      seed:
+        condition: service_completed_successfully
+
+  # DEV SERVER, not production: `langgraph dev` (in-memory runtime, no checkpointer, no
+  # auth) so Studio and the HTTP API are reachable on localhost:2024. The standalone Agent
+  # Server needs Redis and license keys, which would break the no-keys path; L4 serves
+  # Azure. `--allow-blocking` because the dev server's blocking-call guard (blockbuster)
+  # raises on the one-time, cached read of agent/data/ambiguous_terms.yml inside a node.
+  langgraph-api:
+    <<: *app
+    command:
+      - langgraph
+      - dev
+      - --config
+      - agent/langgraph.json
+      - --host
+      - 0.0.0.0
+      - --port
+      - "2024"
+      - --no-browser
+      - --no-reload
+      - --allow-blocking
+    ports:
+      - "127.0.0.1:2024:2024"
+    volumes:
+      - dbt-target:/app/olap/dbt/target
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://localhost:2024/ok', timeout=3)
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    depends_on:
+      db:
+        condition: service_healthy
+      dbt:
+        condition: service_completed_successfully
+
+  # One-shot: the five scripted questions (`make demo`). Runs the graph in-process on the
+  # Postgres checkpointer; it waits for the dev server so the stack is up when it prints.
+  demo:
+    <<: *app
+    command: ["python", "-m", "agent.demo"]
+    volumes:
+      - dbt-target:/app/olap/dbt/target
+    depends_on:
+      db:
+        condition: service_healthy
+      dbt:
+        condition: service_completed_successfully
+      langgraph-api:
+        condition: service_healthy
+
+  # One-shot STUB until L2 lands. It runs the existing deterministic agent tests (fake
+  # LLM, stub tools), not an eval set; there is no golden set or evaluator in this repo yet.
+  evals:
+    <<: *app
+    command: ["pytest", "-m", "not integration", "tests/agent"]
+
+  # ── ui profile ──────────────────────────────────────────────────────────────
+
+  # The open-webui image ships its own HEALTHCHECK. structurizr has none: nothing depends
+  # on it and its image has no known probe tool, so none is invented here.
+  structurizr:
+    image: structurizr/structurizr:latest
+    profiles: [ui]
+    command: playground
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./docs/architecture:/usr/local/structurizr
 
   open-webui:
     image: ghcr.io/open-webui/open-webui:${WEBUI_DOCKER_TAG-main}
+    profiles: [ui]
     container_name: open-webui
     volumes:
       - open-webui:/app/backend/data
     depends_on:
-      - ollama
+      ollama:
+        condition: service_healthy
     ports:
       - "9090:8080"
     environment:
@@ -52,7 +223,40 @@ services:
       - host.docker.internal:host-gateway
     restart: unless-stopped
 
+  # ── gpu profile ─────────────────────────────────────────────────────────────
+
+  # Self-hosted OpenAI-compatible endpoint for LLM_PROVIDER=vllm (VLLM_BASE_URL points at
+  # localhost:8000/v1). Declared only: serving configs belong to a later ticket. Gated
+  # models (the Llama family) need HF_TOKEN.
+  vllm:
+    image: vllm/vllm-openai:latest
+    profiles: [gpu]
+    command: ["--model", "${VLLM_MODEL:-meta-llama/Llama-3.2-3B-Instruct}"]
+    environment:
+      HF_TOKEN: ${HF_TOKEN:-}
+    ports:
+      - "8000:8000"
+    ipc: host
+    volumes:
+      - hf-cache:/root/.cache/huggingface
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 120s
+
 volumes:
   ollama: {}
   open-webui: {}
   pgdata: {}
+  dbt-target: {}
+  hf-cache: {}

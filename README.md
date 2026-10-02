@@ -84,6 +84,26 @@ python -m rag.pipeline --ingest
 python -m ccai_mcp.server
 ```
 
+### Run the demo stack (Docker only, no API key)
+
+```bash
+cp .env.example .env
+make demo
+```
+
+`make demo` runs the whole stack in Docker Compose on local models (Ollama): it pulls
+`llama3.2` and `nomic-embed-text`, seeds Postgres, embeds the transcripts, builds the dbt
+star schema, starts the LangGraph dev server (`localhost:2024`, a dev server rather than
+a production one), and runs five scripted questions through the agent: one per route,
+one through `ask_the_analyst`, and one that interrupts to ask which "rate" you mean and
+resumes. The first run downloads a couple of GB of models and embeds 1,250 transcripts on
+CPU. `make down` stops everything.
+
+Compose profiles: a bare `docker compose up -d` starts `db` and `ollama`; `app` is the
+demo stack; `ui` adds Open WebUI (`localhost:9090`) and Structurizr (`localhost:8080`);
+`gpu` declares a vLLM server. To keep the UIs on a bare `up -d`, set `COMPOSE_PROFILES=ui`
+in `.env`.
+
 ## Connecting a client
 
 Once the MCP server is running locally, add it to your Claude Desktop config:

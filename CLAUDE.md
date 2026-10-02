@@ -105,6 +105,9 @@ S3_BUCKET_NAME=
 S3_PREFIX=call-data/
 AZURE_TENANT_ID=        # used by Terraform, not the app
 AZURE_CLIENT_ID=        # used by Terraform, not the app
+COMPOSE_PROFILES=       # Compose profiles a bare `docker compose up -d` also starts: "ui" (open-webui, structurizr), "app", "gpu"
+DEMO_LLM_PROVIDER=ollama  # `make demo` chat provider (shell/make variable, not read from .env); embeddings stay on Ollama
+HF_TOKEN=               # Hugging Face token for gated models under the Compose `gpu` profile (vllm)
 ```
 
 Low-cost demo shape (chat on OpenRouter, free local embeddings — no secrets, placeholders only):
