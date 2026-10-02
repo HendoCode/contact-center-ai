@@ -184,11 +184,12 @@ services:
       langgraph-api:
         condition: service_healthy
 
-  # One-shot STUB until L2 lands. It runs the existing deterministic agent tests (fake
-  # LLM, stub tools), not an eval set; there is no golden set or evaluator in this repo yet.
+  # One-shot: the L2 golden set offline (`make evals`): the real graph with a scripted
+  # classifier and stub tools, so it needs no other service. `make evals-live` is not run
+  # here; it needs keys and spends money.
   evals:
     <<: *app
-    command: ["pytest", "-m", "not integration", "tests/agent"]
+    command: ["python", "-m", "evals.run"]
 
   # ── default tier: UIs (no profile, as before L3) ────────────────────────────
 

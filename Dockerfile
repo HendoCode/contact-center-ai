@@ -4,8 +4,8 @@
 # runs from it with a different command; the MCP server is spawned inside it as a
 # stdio subprocess by the agent (there is no separate mcp-server service until M1).
 #
-# Dependencies come from uv.lock: the base install, the dev extra (pytest, for the
-# evals stub) and the agent and dbt groups. The lance and finetune groups stay out.
+# Dependencies come from uv.lock: the base install, the dev extra (pytest) and the
+# agent and dbt groups. The lance and finetune groups stay out.
 FROM python:3.12-slim
 
 # psql is for olap/oltp/apply.sh, which falls back to `psql $DATABASE_URL` when there is

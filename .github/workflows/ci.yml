@@ -32,6 +32,19 @@ jobs:
       - name: Run non-integration tests
         run: uv run pytest -m "not integration"
 
+  evals:
+    name: agent evals (offline regression gate)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv sync --extra dev --group agent
+      # The deterministic evaluators over the golden set: fake classifier, stub tools, no
+      # keys, no DB. The LLM-as-judge runs only in `make evals-live`.
+      - run: make evals
+
   gitleaks:
     name: gitleaks
     runs-on: ubuntu-latest
