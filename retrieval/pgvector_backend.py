@@ -5,7 +5,7 @@ import psycopg2
 from rag.embeddings import COLLECTION_NAME, CONNECTION_STRING, get_vector_store
 from retrieval.base import Hit, validate_where
 
-_PG_OPS = {"eq": "$eq", "in": "$in", "gte": "$gte", "lte": "$lte"}
+_PG_OPS = {"eq": "$eq", "in": "$in", "gte": "$gte", "lte": "$lte", "lt": "$lt"}
 
 _ROW_SQL = (
     "SELECT e.document, e.cmetadata FROM langchain_pg_embedding AS e "

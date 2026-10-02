@@ -102,7 +102,7 @@ class Retriever(Protocol):
 
 def get_retriever(backend: str | None = None) -> Retriever   # RETRIEVER_BACKEND env, default "pgvector"
 ```
-- `where` uses a small portable subset: equality, `in`, and date ranges on `category`, `outcome`, `date`, `call_id`. Each backend translates it.
+- `where` uses a small portable subset: equality, `in`, and date ranges (`gte`, `lte`, `lt`) on `category`, `outcome`, `date`, `call_id`. A date-only bound means the whole day (stored `date` is a datetime); `validate_where` normalizes it once. Each backend translates it.
 - A backend that can't do `fts` or `hybrid` raises `NotImplementedError` with a clear message.
 - Both backends use the **same embedding function** from `rag/embeddings.get_embeddings()`, so the comparison is fair.
 

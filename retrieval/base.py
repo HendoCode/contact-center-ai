@@ -12,19 +12,25 @@ A dict of ANDed conditions over the fields `category`, `outcome`, `date` and
 
     {"category": "fraud_dispute"}                      # equality
     {"outcome": {"in": ["resolved", "escalated"]}}     # membership
-    {"date": {"gte": "2026-08-01", "lte": "2026-08-31"}}  # inclusive range (date only)
+    {"date": {"gte": "2026-08-01", "lte": "2026-08-31"}}  # range: gte, lte, lt
 
-Dates are ISO `YYYY-MM-DD` strings, so lexicographic order is date order.
-Anything outside this subset raises ValueError. Each backend translates it.
+Stored `date` is an ISO datetime ("2026-03-31T15:00:00"); bounds are ISO strings,
+compared lexicographically. A date-only bound (`YYYY-MM-DD`) means the whole day:
+`gte` starts at 00:00, `lte` includes the full day, `lt` excludes it. A datetime
+bound keeps its exact meaning. `validate_where` does this normalization once, so
+both backends see the same triples. Anything outside this subset raises
+ValueError. Each backend translates it.
 """
 
 import os
+from datetime import date, datetime, timedelta
 from dataclasses import dataclass, field
 from typing import Literal, Protocol, runtime_checkable
 
 WHERE_FIELDS = ("category", "outcome", "date", "call_id")
 RANGE_FIELDS = ("date",)
-_OPERATORS = ("eq", "in", "gte", "lte")
+_OPERATORS = ("eq", "in", "gte", "lte", "lt")
+_RANGE_OPS = ("gte", "lte", "lt")
 
 
 @dataclass(frozen=True)
@@ -62,6 +68,21 @@ class Retriever(Protocol):
     def count(self) -> int: ...
 
 
+def _normalize_bound(op: str, value: object) -> tuple[str, object]:
+    """Validate an ISO date/datetime bound; widen a date-only `lte` to `lt` next day."""
+    if not isinstance(value, str):
+        raise ValueError(f"Date bound must be an ISO string, got {value!r}")
+    try:
+        day = date.fromisoformat(value) if len(value) == 10 else None
+        if day is None:
+            datetime.fromisoformat(value)
+    except ValueError:
+        raise ValueError(f"Invalid ISO date or datetime bound {value!r}") from None
+    if day is not None and op == "lte":
+        return "lt", (day + timedelta(days=1)).isoformat()
+    return op, value
+
+
 def validate_where(where: dict | None) -> list[tuple[str, str, object]]:
     """Validate a portable `where` and flatten it to (field, op, value) triples."""
     triples: list[tuple[str, str, object]] = []
@@ -76,10 +97,12 @@ def validate_where(where: dict | None) -> list[tuple[str, str, object]]:
         for op, value in cond.items():
             if op not in _OPERATORS:
                 raise ValueError(f"Unsupported where operator {op!r}; allowed: {_OPERATORS}")
-            if op in ("gte", "lte") and fld not in RANGE_FIELDS:
+            if op in _RANGE_OPS and fld not in RANGE_FIELDS:
                 raise ValueError(f"Range operator {op!r} is only supported on {RANGE_FIELDS}")
             if op == "in" and not isinstance(value, (list, tuple, set)):
                 raise ValueError("'in' expects a list of values")
+            if op in _RANGE_OPS:
+                op, value = _normalize_bound(op, value)
             triples.append((fld, op, list(value) if op == "in" else value))
     return triples
 

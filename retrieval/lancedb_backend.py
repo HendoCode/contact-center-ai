@@ -57,7 +57,7 @@ VECTOR_INDEX_MIN_ROWS = 100_000
 RRF_K = 60
 EMBED_BATCH = 64
 
-_SQL_OPS = {"gte": ">=", "lte": "<="}
+_SQL_OPS = {"gte": ">=", "lte": "<=", "lt": "<"}
 
 
 def _literal(value: object) -> str:

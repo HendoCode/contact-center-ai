@@ -23,7 +23,7 @@ def test_where_equality_in_range_and_quote_escaping():
     assert translate_where({"call_id": "x' OR '1'='1"}) == "call_id = 'x'' OR ''1''=''1'"
     assert translate_where(
         {"category": "fraud", "date": {"gte": "2026-08-01", "lte": "2026-08-31"}}
-    ) == "category = 'fraud' AND date >= '2026-08-01' AND date <= '2026-08-31'"
+    ) == "category = 'fraud' AND date >= '2026-08-01' AND date < '2026-09-01'"
 
 
 @pytest.mark.parametrize("bad", [{"member_id": "x"}, {"category": {"gte": "a"}}, {"category": {}}])
@@ -174,6 +174,23 @@ def test_where_in_and_date_range_and_combination(retriever, docs):
 def test_where_no_match_returns_empty(retriever):
     assert retriever.search(QUERY, where={"category": "nope"}) == []
     assert retriever.search(QUERY, where={"outcome": {"in": []}}) == []
+
+
+def test_where_date_only_bounds_cover_whole_day_of_datetime_rows(retriever, docs):
+    # A call at 2026-03-31T15:00 is in `lte: 2026-03-31`, out of `lt: 2026-03-31`.
+    retriever.ingest([{**docs[0], "call_id": "BOUNDARY",
+                       "metadata": {**docs[0]["metadata"], "date": "2026-03-31T15:00:00"}}])
+
+    def ids(cond):
+        return [h.call_id for h in retriever.search(QUERY, k=100, where={"date": cond})]
+
+    assert "BOUNDARY" in ids({"lte": "2026-03-31"})
+    assert "BOUNDARY" not in ids({"lt": "2026-03-31"})
+    assert "BOUNDARY" in ids({"gte": "2026-03-31"})
+    assert "BOUNDARY" not in ids({"gte": "2026-04-01"})
+    assert "BOUNDARY" not in ids({"lte": "2026-03-30"})
+    assert "BOUNDARY" in ids({"lte": "2026-03-31T15:00:00"})
+    assert "BOUNDARY" not in ids({"lte": "2026-03-31T14:59:59"})
 
 
 def test_where_with_quote_is_not_injectable(retriever):

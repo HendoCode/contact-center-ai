@@ -63,9 +63,36 @@ def test_where_equality_in_and_date_range():
         "$and": [
             {"category": {"$eq": "fraud"}},
             {"date": {"$gte": "2026-08-01"}},
-            {"date": {"$lte": "2026-08-31"}},
+            {"date": {"$lt": "2026-09-01"}},
         ]
     }
+
+
+def test_where_date_only_bounds_cover_whole_days():
+    # Stored dates are datetimes: a date-only `lte` must include the whole day, so it
+    # becomes `lt` the next day; `lt`/`gte` date-only and datetime bounds are unchanged.
+    assert validate_where({"date": {"lte": "2026-03-31"}}) == [("date", "lt", "2026-04-01")]
+    assert validate_where({"date": {"lte": "2026-12-31"}}) == [("date", "lt", "2027-01-01")]
+    assert validate_where({"date": {"lt": "2026-03-31"}}) == [("date", "lt", "2026-03-31")]
+    assert validate_where({"date": {"gte": "2026-03-31"}}) == [("date", "gte", "2026-03-31")]
+    assert validate_where({"date": {"lte": "2026-03-31T23:59:59"}}) == [
+        ("date", "lte", "2026-03-31T23:59:59")
+    ]
+
+
+def test_pgvector_filter_boundary_day_at_15h():
+    assert translate_where({"date": {"lte": "2026-03-31"}}) == {"date": {"$lt": "2026-04-01"}}
+    assert translate_where({"date": {"lt": "2026-03-31"}}) == {"date": {"$lt": "2026-03-31"}}
+    assert translate_where({"date": {"gte": "2026-03-31"}}) == {"date": {"$gte": "2026-03-31"}}
+    # PGVector compares these as strings: 15:00 on the 31st is in `lte`, out of `lt`.
+    stored = "2026-03-31T15:00:00"
+    assert stored < "2026-04-01" and not stored < "2026-03-31" and stored >= "2026-03-31"
+
+
+@pytest.mark.parametrize("bad", ["2026-3-31", "yesterday", 20260331, None])
+def test_where_rejects_bad_date_bounds(bad):
+    with pytest.raises(ValueError):
+        validate_where({"date": {"lte": bad}})
 
 
 @pytest.mark.parametrize(
