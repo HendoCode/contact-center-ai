@@ -90,4 +90,7 @@ def get_retriever(backend: str | None = None) -> Retriever:
     if backend == "pgvector":
         from retrieval.pgvector_backend import PgVectorRetriever
         return PgVectorRetriever()
-    raise ValueError(f"Unknown retriever backend: {backend!r} (available: pgvector)")
+    if backend == "lancedb":
+        from retrieval.lancedb_backend import LanceDBRetriever
+        return LanceDBRetriever()
+    raise ValueError(f"Unknown retriever backend: {backend!r} (available: pgvector, lancedb)")

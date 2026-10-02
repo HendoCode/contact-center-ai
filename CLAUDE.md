@@ -82,7 +82,8 @@ ccai_mcp/server.py (stdio) → 5 tools exposed to MCP clients
 ## Environment variables
 
 ```
-RETRIEVER_BACKEND=pgvector  # retrieval backend behind get_retriever(); only "pgvector" exists today
+RETRIEVER_BACKEND=pgvector  # retrieval backend behind get_retriever(): "pgvector" (default) | "lancedb" (needs `uv sync --group lance`)
+LANCE_URI=data/lance        # LanceDB location: local dir (gitignored) or az:// / s3:// URI; embedded, no server
 LLM_PROVIDER=openai      # chat provider: "openai" (OpenAI-compatible) | "ollama" | "anthropic" | "fireworks" | "vllm"
 OPENAI_API_KEY=          # required for the OpenAI-compatible chat branch (e.g. OpenRouter)
 LLM_BASE_URL=https://openrouter.ai/api/v1   # OpenAI-compatible chat endpoint
