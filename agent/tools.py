@@ -6,6 +6,7 @@ logic lives in `agent/`. Nodes depend on the small `Toolbox` protocol; tests pas
 stub, runtime uses `MCPToolbox`. Only this module imports the MCP client.
 """
 
+import os
 import sys
 from pathlib import Path
 from typing import Any, Protocol
@@ -25,12 +26,16 @@ def server_connection() -> StdioTransport:
     """Stdio launch spec for `python -m ccai_mcp.server`, run from the repo root.
 
     `keep_alive=False` closes the server process when a call's session ends, so no
-    child outlives the run.
+    child outlives the run. The child gets the caller's whole environment: with `env=None`
+    the MCP client passes only a safe subset (PATH, HOME, ...), so DATABASE_URL, the
+    provider settings and OLLAMA_BASE_URL would silently fall back to localhost defaults,
+    which is wrong anywhere but a laptop (a Compose container, for one).
     """
     return StdioTransport(
         command=sys.executable,
         args=["-m", "ccai_mcp.server"],
         cwd=str(REPO_ROOT),
+        env=dict(os.environ),
         keep_alive=False,
     )
 
