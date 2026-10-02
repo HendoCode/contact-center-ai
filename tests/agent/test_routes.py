@@ -109,3 +109,14 @@ async def test_reusing_a_thread_does_not_carry_state_between_questions(make):
 
     assert first["metric_names"] == ["average_mortgage_note_rate"]
     assert second["metric_names"] == ["call_volume", "average_handle_time"]
+
+
+@pytest.mark.asyncio
+async def test_lowercase_call_id_is_normalized_before_lookup(make, toolbox):
+    graph, llm = make("retrieve")
+    out = await graph.ainvoke({"question": "what happened on call-00042?"}, config())
+
+    assert out["route"] == "summarize_call"
+    assert llm.prompts == []
+    assert toolbox.tool_calls("get_call_summary") == [{"call_id": "CALL-00042"}]
+    assert out["citations"] == ["CALL-00042"]

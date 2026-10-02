@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from agent.state import AgentState, Route
 
 CALL_ID_RE = re.compile(r"CALL-\d{5}")
+_QUESTION_CALL_ID_RE = re.compile(CALL_ID_RE.pattern, re.IGNORECASE)  # people type "call-00025"
 PROMPT = (Path(__file__).parent.parent / "prompts" / "classify.md").read_text(encoding="utf-8")
 
 
@@ -25,9 +26,9 @@ def make_classify(get_llm: Callable[[], object]):
             "resolved_terms": [], "clarify_attempts": 0, "tool_output": "", "sql": None,
             "citations": [], "grounded": False, "answer": "",
         }
-        call_id = CALL_ID_RE.search(question)
+        call_id = _QUESTION_CALL_ID_RE.search(question)
         if call_id:
-            return {**fresh, "route": "summarize_call", "call_id": call_id.group(0)}
+            return {**fresh, "route": "summarize_call", "call_id": call_id.group(0).upper()}
 
         llm = get_llm().with_structured_output(RouteDecision)
         decision = await llm.ainvoke(PROMPT.format(question=question))

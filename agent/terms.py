@@ -48,7 +48,15 @@ def _phrase(text: str) -> re.Pattern[str]:
 
 
 def _narrow(term: Term, question: str) -> list[str]:
-    """Keep the candidates whose qualifiers match most; all of them if none match."""
+    """Keep the candidates whose qualifiers match most; all of them if none match.
+
+    A candidate named in full (its label, e.g. "banking ledger balance") wins outright:
+    the question already says which metric it means.
+    """
+    named = [m for m in term.candidates if _phrase(option_label(m)).search(question)]
+    if named:
+        longest = max(len(m) for m in named)
+        return [m for m in named if len(m) == longest]
     scores = {
         metric: sum(1 for q in qualifiers if _phrase(q).search(question))
         for metric, qualifiers in term.candidates.items()
