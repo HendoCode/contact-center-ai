@@ -1,8 +1,8 @@
 # syntax=docker/dockerfile:1
 #
-# The one app image. Every Compose app service (seed, dbt, langgraph-api, demo, evals)
-# runs from it with a different command; the MCP server is spawned inside it as a
-# stdio subprocess by the agent (there is no separate mcp-server service until M1).
+# The one app image. Every Compose app service (seed, dbt, langgraph-api, mcp-server, demo,
+# evals) runs from it with a different command. The agent spawns the MCP server inside it
+# as a stdio subprocess; the `mcp-server` service runs `python -m ccai_mcp.server --http`.
 #
 # Dependencies come from uv.lock: the base install, the dev extra (pytest) and the
 # agent and dbt groups. The lance and finetune groups stay out.

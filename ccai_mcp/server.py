@@ -4,8 +4,12 @@ MCP server entry point.
 Exposes call center RAG capabilities as MCP tools consumable by any
 MCP-compatible client (Claude Desktop, custom GenAI apps, etc.).
 
-Local dev:
+Local dev (stdio, the default):
     python -m ccai_mcp.server
+
+Streamable HTTP for clients on other machines (opt in; see ccai_mcp/README.md):
+    python -m ccai_mcp.server --http          # or MCP_TRANSPORT=http
+    -> http://127.0.0.1:8000/mcp; a non-loopback MCP_SERVER_HOST requires MCP_AUTH_TOKEN
 
 Production (Azure App Service):
     - Auth handled by Entra via App Service Easy Auth for MCP
@@ -13,7 +17,11 @@ Production (Azure App Service):
     - Infra: infra/terraform/main.tf
 """
 
+import argparse
 import asyncio
+import logging
+import os
+import sys
 
 import jsonschema
 import mcp.server.stdio
@@ -238,5 +246,36 @@ async def main():
         await app.run(read_stream, write_stream, app.create_initialization_options())
 
 
+def _parse_args(argv: list[str] | None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        prog="python -m ccai_mcp.server",
+        description="Contact-center MCP server. stdio by default; streamable HTTP when asked.",
+    )
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument("--http", action="store_true", help="serve streamable HTTP (same as MCP_TRANSPORT=http)")
+    group.add_argument("--stdio", action="store_true", help="serve stdio (the default)")
+    return parser.parse_args(argv)
+
+
+def run(argv: list[str] | None = None) -> None:
+    """Pick the transport: a flag wins, then MCP_TRANSPORT, then stdio."""
+    args = _parse_args(argv)
+    transport = "http" if args.http else "stdio" if args.stdio else (os.environ.get("MCP_TRANSPORT") or "stdio")
+    transport = transport.strip().lower()
+    if transport == "stdio":
+        asyncio.run(main())
+    elif transport == "http":
+        from ccai_mcp.http_transport import ConfigError, HttpSettings, serve_http
+
+        try:
+            settings = HttpSettings.from_env()
+        except ConfigError as e:
+            sys.exit(f"ccai_mcp.server: refusing to start HTTP transport: {e}")
+        logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
+        asyncio.run(serve_http(app, settings))
+    else:
+        sys.exit(f"ccai_mcp.server: MCP_TRANSPORT must be 'stdio' or 'http', got {transport!r}")
+
+
 if __name__ == "__main__":
-    asyncio.run(main())
+    run()

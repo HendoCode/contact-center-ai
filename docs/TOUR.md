@@ -115,6 +115,18 @@ uv run --group agent python -c "import asyncio; from agent.tools import MCPToolb
 (Ctrl-C to stop); `tests/test_server_handshake.py` checks the handshake and the five names.
 Calling a tool for real needs B (a database, and a chat model for the summarizing tools).
 
+**A4b. MCP over streamable HTTP (opt in).** For clients on other machines: Claude Desktop (via
+`mcp-remote`), Cursor, open-webui. Off unless asked; loopback-bound, and a non-loopback bind
+refuses to start without `MCP_AUTH_TOKEN`.
+
+```bash
+MCP_AUTH_TOKEN=demo-token uv run python -m ccai_mcp.server --http &      # http://127.0.0.1:8000/mcp
+MCP_AUTH_TOKEN=demo-token uv run python -m ccai_mcp.http_smoke           # lists the five tools
+```
+
+`ccai_mcp/README.md` has the URL shape, the safety rules, and the registration snippets. A tool
+that reads Postgres needs B; the listing does not.
+
 **A5. LangGraph dev server.** Starts without a model or database. Questions need a chat
 model, so running one is B.
 
@@ -449,7 +461,8 @@ Azure backend, under its own state key. Cross-cloud traffic is the few MB of loa
 | Warehouse targets | `olap/dbt/profiles.yml` | `dev` (Postgres), `snowflake` (key pair, no password), `databricks`; every value from env |
 | Warehouse loaders | `olap/dbt/loaders/` | `__main__.py` (CLI), `snowflake_loader.py` (PUT + `COPY INTO`), `databricks_loader.py` (volume + `COPY INTO`), `schema.py` (DDL type mapping), `plan.py` |
 | Portability guards | `tests/test_dbt_portability.py`, `tests/test_warehouse_loaders.py` | no Postgres-only SQL; loader plans checked against a fake |
-| MCP server | `ccai_mcp/server.py` | the five `Tool(...)` declarations and `call_tool` dispatch (mcp 2.x low-level server) |
+| MCP server | `ccai_mcp/server.py` | the five `Tool(...)` declarations and `call_tool` dispatch (mcp 2.x low-level server); stdio by default |
+| MCP over HTTP | `ccai_mcp/http_transport.py`, `ccai_mcp/http_smoke.py`, `ccai_mcp/README.md` | settings and the non-loopback refusal, constant-time bearer check, `/healthz`; smoke client; client snippets |
 | Metric tools | `ccai_mcp/metrics.py` | `run_metricflow` (shells out to `mf`), `query_metric`, `resolve_metrics` + `ask_the_analyst` |
 | LangGraph graph | `agent/graph.py`, `agent/state.py`, `agent/nodes/` | `build_graph`: classify → retrieve / summarize_call / resolve_metric → ground → answer |
 | Interrupt | `agent/subgraphs/analyst.py`, `agent/data/ambiguous_terms.yml` | `clarify` is the only `interrupt()`; terms and candidates are data |
@@ -542,8 +555,8 @@ Grounded in `olap/dbt/models/marts/semantic/metrics.yml`:
 ## Known limits and not built yet
 
 - **Not built yet:** S3 parity (`make parity`); fine-tune F2–F6; S3 (AWS) ingestion
-  (`rag.pipeline --source s3` raises `NotImplementedError`); CSAT in the vector store; MCP over HTTP
-  (M1; the server is stdio-only); an agent HTTP endpoint (L4).
+  (`rag.pipeline --source s3` raises `NotImplementedError`); CSAT in the vector store; the agent
+  talking to the MCP server over HTTP (it still spawns it over stdio); an agent HTTP endpoint (L4).
 - **No results yet:** `results/retrieval/` and `results/evals/` both render "not run". The numbers
   in `olap/dbt/README.md` come from a seeded local run, not from `results/`.
 - **Never run against a real account:** the Snowflake and Databricks loaders and dbt targets, and

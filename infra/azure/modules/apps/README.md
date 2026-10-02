@@ -2,9 +2,11 @@
 
 ACR Basic, a Container Apps environment, and the `mcp-server` and `agent-api` container apps (0–1 replicas, scale to zero), each with Easy Auth.
 
-**Containers are gated off by count.** `enable_mcp_server` waits for M1 (streamable-HTTP transport; the MCP server is stdio-only today) and `enable_agent_api` waits for L4 (agent HTTP endpoint). With both `false`, only the registry and environment exist.
+**Containers are gated off by count.** `enable_mcp_server` is off by default (M1 shipped the streamable-HTTP transport) and `enable_agent_api` waits for L4 (agent HTTP endpoint). With both `false`, only the registry and environment exist.
 
 **Easy Auth** is an `azapi_resource` (`Microsoft.App/containerApps/authConfigs`, `Return401`, Entra v2 issuer), because azurerm 4.81 has no Container Apps auth-config resource. It validates bearer tokens only; there is no client secret.
+
+**mcp-server in HTTP mode.** The app runs `python -m ccai_mcp.server --http` (the image has no `CMD`, so the module sets `command`) with `MCP_TRANSPORT=http`, `MCP_SERVER_HOST=0.0.0.0`, `MCP_SERVER_PORT` and `MCP_AUTH_UPSTREAM=true`. The server refuses a non-loopback bind without `MCP_AUTH_TOKEN`, and Easy Auth owns the `Authorization` header here (an Entra token would never match a static token), so `MCP_AUTH_UPSTREAM=true` declares that Easy Auth is the only way in. Clients reach `https://<fqdn>/mcp` with an Entra bearer token; `ccai_mcp/README.md` has the client side. The metric tools also need `olap/dbt/target/semantic_manifest.json` in the image (`dbt parse` at build time); this module does not do that.
 
 **Secrets.** `DATABASE_URL` is a Container Apps secret (the Postgres password is in state anyway). API keys come from Key Vault: pass `key_vault_secrets = { OPENAI_API_KEY = "<vault_uri>secrets/openai-api-key" }` and the app identity resolves them at runtime, so the values never enter state.
 
