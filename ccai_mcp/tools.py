@@ -11,7 +11,8 @@ import psycopg2
 from psycopg2 import errors as pg_errors
 
 from rag.embeddings import CONNECTION_STRING
-from rag.pipeline import rag_query, get_llm, get_vector_store
+from rag.pipeline import rag_query, get_llm
+from retrieval import get_retriever
 
 
 def search_transcripts(query: str, k: int = 5) -> str:
@@ -38,15 +39,12 @@ def get_call_summary(call_id: str) -> str:
     Returns:
         Summary of the call transcript, or an error if not found
     """
-    doc = get_vector_store().similarity_search(
-        call_id, k=1, filter={"call_id": {"$eq": call_id}}
-    )
+    hit = get_retriever().get_by_id(call_id)
 
-    if not doc:
+    if hit is None:
         return f"No transcript found for call ID: {call_id}"
 
-    doc = doc[0]
-    meta = doc.metadata
+    meta = hit.metadata
     prompt = f"""Summarize this call concisely: what was the member's issue, how did the agent handle it, and what was the outcome?
 
 Call ID: {meta.get('call_id')}
@@ -55,7 +53,7 @@ Category: {meta.get('category')}
 Outcome: {meta.get('outcome')}
 
 TRANSCRIPT:
-{doc.page_content}"""
+{hit.text}"""
 
     response = get_llm().invoke(prompt)
     return response.content
