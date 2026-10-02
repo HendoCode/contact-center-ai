@@ -202,6 +202,17 @@ def _first_sentence(text: str) -> str:
     return text.split(". ")[0].rstrip(".") + "."
 
 
+def _ledger_sentence(member: dict, call) -> str:
+    amount = f"${_money(member['ledger'])}"
+    gap = _money(member["ledger"] - member["available"])
+    if amount in call.text:
+        return (f"The {amount} the call-center agent read out in {call.call_id} is the **ledger** "
+                f"balance, not the available one: two declared metrics, ${gap} apart on this "
+                "account.")
+    return (f"The call-center agent's figure in {call.call_id} does not match this account's "
+            f"ledger balance ({amount}).")
+
+
 def _illustrative(text: str, command: str) -> str:
     quoted = "\n".join(f"> {line}" if line else ">" for line in text.strip().splitlines())
     return (
@@ -224,7 +235,7 @@ def render(cap: dict) -> str:
     answer_body = clarify["result"]["answer"].split("\n\nSQL:\n")[0]
     assert LCV_EXPR in split_sql(cap["lcv"])[1], "member_lifetime_value SQL changed; update LCV_EXPR"
     low_note = ", so it is one of those low scores" if (member["csat_loan_call"] or 9) <= 2 else ""
-    ledger_in_call = f"${_money(member['ledger'])}" in balance_call.text
+    ledger_sentence = _ledger_sentence(member, balance_call)
     rate_in_call = f"{member['note_rate']}%" in rates_call.text
     principal_in_call = f"${_money(member['principal'])}" in rates_call.text
 
@@ -439,10 +450,7 @@ raw `SUM(balance)` would add a liability to assets.
 
 Cross-check, direct SQL on the marts (not a tool): {member['name']}'s banking account has
 `banking_ledger_balance` {_money(member['ledger'])} and `banking_available_balance`
-{_money(member['available'])}. The ${_money(member['ledger'])} the call-center agent read out in
-{CALL_BALANCE} {'is' if ledger_in_call else 'is NOT'} the **ledger** balance, not the
-available one: two declared metrics, ${_money(member['ledger'] - member['available'])} apart on
-this account.
+{_money(member['available'])}. {ledger_sentence}
 
 ## Turn 7: LCV or LTV?
 
