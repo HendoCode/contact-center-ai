@@ -23,7 +23,7 @@ dependencies = [
 ]
 
 [tool.setuptools.packages.find]
-include = ["rag*", "ccai_mcp*", "retrieval*"]
+include = ["rag*", "ccai_mcp*", "retrieval*", "agent*"]
 
 [project.optional-dependencies]
 dev = [
@@ -45,6 +45,15 @@ dbt = [
 lance = [
     "lancedb>=0.39.0",
     "pyarrow>=25.0.1",
+]
+# LangGraph agent (agent/). langchain-mcp-adapters is pinned at the version that
+# still works with the repo's mcp 1.x server; see docs/design/agent-graph.md.
+agent = [
+    "langgraph>=1.2.4",
+    "langgraph-checkpoint-postgres>=3.1.2",
+    "langgraph-cli[inmem]>=0.4.32",
+    "langchain-mcp-adapters==0.3.2",
+    "psycopg[binary]>=3.2",
 ]
 
 [tool.ruff]
@@ -72,6 +81,9 @@ ignore = [
 ]
 
 [tool.pytest.ini_options]
+# Repo root on sys.path so tests/agent and tests/retrieval (no __init__.py) cannot
+# shadow the real `agent` and `retrieval` packages as namespace packages.
+pythonpath = ["."]
 markers = [
     "integration: requires network, API keys, or a reachable database; skipped by default",
 ]

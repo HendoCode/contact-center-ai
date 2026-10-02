@@ -108,3 +108,6 @@ src/main/resources/dist/*
 /bin/
 .DS_Store
 /src/main/kotlin/com/sourcegraph/cody/agent/protocol_generated/*
+
+# LangGraph dev server state (langgraph dev)
+.langgraph_api/
