@@ -57,7 +57,7 @@ generate_data.py → transcripts.json + csat.json
                         ↓
 pipeline.py --ingest → embed (OpenAI default / Ollama local) → pgvector (PostgreSQL)
                         ↓
-ccai_mcp/server.py (stdio) → 5 tools exposed to MCP clients
+ccai_mcp/server.py (stdio; HTTP opt-in) → 5 tools exposed to MCP clients
 ```
 
 **Data flow across files:**
@@ -77,11 +77,18 @@ ccai_mcp/server.py (stdio) → 5 tools exposed to MCP clients
 - **CSAT is not semantically searchable.** `query_csat()` reads the Postgres `f_csat` fact (SQL-backed), but CSAT is not embedded in pgvector, so it cannot be combined with semantic transcript search.
 - **Chat provider swaps are controlled by `LLM_PROVIDER` env var** (`"openai"`, default, or `"ollama"`, `"anthropic"`, `"fireworks"`, `"vllm"`). `get_llm(provider: str | None = None)` in `rag/pipeline.py` takes an explicit provider override so evals can loop providers in one process. The `"openai"` branch is any OpenAI-compatible chat endpoint — its `LLM_BASE_URL` (default `https://openrouter.ai/api/v1`) and `LLM_MODEL` (default low-cost `z-ai/glm-5.3-flash`) are env-configurable; the key is read from `OPENAI_API_KEY`. Fireworks and vLLM go through the OpenAI-compatible client (`FIREWORKS_API_KEY`/`FIREWORKS_MODEL`, `VLLM_BASE_URL`/`VLLM_MODEL`); Anthropic uses `ANTHROPIC_API_KEY`/`ANTHROPIC_MODEL`.
 - **Embeddings are decoupled via `EMBEDDING_PROVIDER`** (falling back to `LLM_PROVIDER`, so an unset value keeps the old single-provider behavior). OpenRouter currently serves **no embedding models**, so an OpenRouter chat setup must pair with `EMBEDDING_PROVIDER=ollama` (local, free `nomic-embed-text`) or an OpenAI-compatible `EMBEDDING_BASE_URL`/`EMBEDDING_MODEL`. To add other providers (Anthropic, Vertex AI, etc.), only `rag/embeddings.py` and the LLM init in `rag/pipeline.py` need to change.
-- **MCP server is stdio-only** (not HTTP). Claude Desktop and other clients connect via process I/O. The production Azure deployment adds HTTP transport via App Service.
+- **MCP server is stdio by default**; streamable HTTP is opt-in (`MCP_TRANSPORT=http` or `--http`, `ccai_mcp/http_transport.py`) for clients on other machines, bound to loopback unless `MCP_AUTH_TOKEN` is set. Claude Desktop and other local clients can still connect via process I/O. Azure runs the HTTP mode behind Easy Auth (Entra).
 
 ## Environment variables
 
 ```
+MCP_TRANSPORT=stdio      # MCP server transport: "stdio" (default) | "http" (streamable HTTP, same as `--http`)
+MCP_SERVER_HOST=127.0.0.1  # HTTP bind address; a non-loopback host refuses to start without MCP_AUTH_TOKEN
+MCP_SERVER_PORT=8000     # HTTP port
+MCP_AUTH_TOKEN=          # static bearer token for the HTTP transport (demo-grade; `openssl rand -hex 32`)
+MCP_AUTH_UPSTREAM=false  # "true" lets a non-loopback bind skip the token when Azure Easy Auth fronts it
+MCP_PUBLISH_HOST=127.0.0.1  # Compose `mcp-server` only: host interface the port is published on
+MCP_SERVER_URL=http://127.0.0.1:8000/mcp   # client side: `python -m ccai_mcp.http_smoke` reads it
 RETRIEVER_BACKEND=pgvector  # retrieval backend behind get_retriever(): "pgvector" (default) | "lancedb" (needs `uv sync --group lance`)
 LANCE_URI=data/lance        # LanceDB location: local dir (gitignored) or az:// / s3:// URI; embedded, no server
 LLM_PROVIDER=openai      # chat provider: "openai" (OpenAI-compatible) | "ollama" | "anthropic" | "fireworks" | "vllm"

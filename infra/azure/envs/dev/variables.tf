@@ -82,7 +82,7 @@ variable "enable_databricks" {
 }
 
 variable "enable_mcp_server" {
-  description = "Create the mcp-server container app. Wait for M1 (streamable HTTP)."
+  description = "Create the mcp-server container app (streamable HTTP behind Easy Auth)."
   type        = bool
   default     = false
 }
