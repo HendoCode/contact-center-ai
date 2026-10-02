@@ -293,6 +293,9 @@ uv run python -m rag.pipeline --query "fraud disputes from last week"
 uv run --group agent python -m agent.demo           # the five questions, Postgres checkpointer
 ```
 
+A sample supervisor chat built from the real output of all five tools, SQL attached: `docs/demo-chat.md`
+(regenerate after B2 with `uv run --group agent --group dbt python -m tools.demo_chat`).
+
 ---
 
 ## C. Needs a credential (your run)
