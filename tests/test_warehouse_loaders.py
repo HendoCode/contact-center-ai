@@ -14,7 +14,6 @@ import sys
 import types
 from pathlib import Path
 
-import jinja2
 import pytest
 import yaml
 
@@ -393,11 +392,20 @@ def test_databricks_connect_allows_staging_from_the_temp_dir(monkeypatch, tmp_pa
 
 
 def _rendered_source_schema(target_type, **env):
+    """Evaluate the source schema's Jinja without jinja2 (not in the CI test env).
+
+    The expression is `{% if target.type == 'x' %}{{ env_var('V', 'default') }}{% elif ... %}
+    ...{% else %}literal{% endif %}`; real rendering is proven with `dbt parse` in the PR.
+    """
     raw = yaml.safe_load(SOURCES_YML.read_text())["sources"][0]["schema"]
-    return jinja2.Template(raw).render(
-        target=types.SimpleNamespace(type=target_type),
-        env_var=lambda name, default="": env.get(name, default),
+    branches = re.findall(
+        r"\{% (?:el)?if target\.type == '(\w+)' %\}\{\{ env_var\('(\w+)', '(\w+)'\) \}\}", raw
     )
+    assert len(branches) == 2, raw
+    for kind, var, default in branches:
+        if kind == target_type:
+            return env.get(var, default)
+    return re.search(r"\{% else %\}(\w+)\{% endif %\}", raw)[1]
 
 
 def test_dbt_source_schema_is_env_driven_per_target_and_dev_is_unchanged():
