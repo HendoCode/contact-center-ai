@@ -3,7 +3,7 @@
 import pytest
 
 pytest.importorskip(
-    "langchain_mcp_adapters", reason="install the agent group: uv sync --extra dev --group agent"
+    "fastmcp", reason="install the agent group: uv sync --extra dev --group agent"
 )
 
 from agent_support import FakeLLM, StubToolbox, call_exists  # noqa: E402

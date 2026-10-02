@@ -15,7 +15,8 @@ dependencies = [
     "langchain-postgres>=0.0.9",
     "pgvector>=0.3.0",
     "psycopg2-binary>=2.9.9",
-    "mcp>=1.0.0",
+    "mcp>=2.0.0,<3",
+    "jsonschema>=4.20.0",
     "boto3>=1.35.0",
     "python-dotenv>=1.0.0",
     "pydantic>=2.0.0",
@@ -46,13 +47,13 @@ lance = [
     "lancedb>=0.39.0",
     "pyarrow>=25.0.1",
 ]
-# LangGraph agent (agent/). langchain-mcp-adapters is pinned at the version that
-# still works with the repo's mcp 1.x server; see docs/design/agent-graph.md.
+# LangGraph agent (agent/). Tools bind through `langchain.mcp` (the `mcp` extra pulls
+# fastmcp 4, which needs mcp>=2); see docs/design/agent-graph.md.
 agent = [
     "langgraph>=1.2.4",
     "langgraph-checkpoint-postgres>=3.1.2",
     "langgraph-cli[inmem]>=0.4.32",
-    "langchain-mcp-adapters==0.3.2",
+    "langchain[mcp]>=1.4.3",
     "psycopg[binary]>=3.2",
 ]
 
