@@ -1,0 +1,1189 @@
+version: 0.2.0.dev0
+name: ccai_semantic
+datasets:
+- name: products
+  source: '"contactcenter"."marts"."d_product"'
+  primary_key:
+  - product_id
+  description: 'Product dimension carrying the LOB discriminator. The `lob` dimension
+    on this model is referenced as `Dimension(''product__lob'')` from every fact that
+    joins to it, and it is what turns "average interest rate" into four different
+    auditable metrics.
+
+    '
+  fields:
+  - name: product
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: product_id
+  - name: lob
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: lob
+    dimension:
+      is_time: false
+    description: Line of business — the discriminator for every colliding metric.
+  - name: product_code
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: product_code
+    dimension:
+      is_time: false
+  - name: product_name
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: product_name
+    dimension:
+      is_time: false
+  - name: is_active
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: is_active
+    dimension:
+      is_time: false
+- name: members
+  source: '"contactcenter"."marts"."d_member"'
+  primary_key:
+  - member_id
+  description: Member dimension (person or business entity).
+  fields:
+  - name: member
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: member_id
+  - name: household
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: household_id
+  - name: member_type
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: member_type
+    dimension:
+      is_time: false
+  - name: credit_score_band
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: credit_score_band
+    dimension:
+      is_time: false
+  - name: residence_state
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: residence_state
+    dimension:
+      is_time: false
+- name: households
+  source: '"contactcenter"."marts"."d_household"'
+  primary_key:
+  - household_id
+  description: Household dimension (relationship pricing / household LCV).
+  fields:
+  - name: household
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: household_id
+  - name: income_band
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: income_band
+    dimension:
+      is_time: false
+  - name: household_label
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: household_label
+    dimension:
+      is_time: false
+- name: staff
+  source: '"contactcenter"."marts"."d_staff"'
+  primary_key:
+  - staff_id
+  description: Staff (agent/specialist/supervisor) dimension.
+  fields:
+  - name: staff
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: staff_id
+  - name: team
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: team_id
+  - name: role
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: role
+    dimension:
+      is_time: false
+- name: teams
+  source: '"contactcenter"."marts"."d_team"'
+  primary_key:
+  - team_id
+  description: Team dimension (function area).
+  fields:
+  - name: team
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: team_id
+  - name: team_name
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: team_name
+    dimension:
+      is_time: false
+  - name: function_area
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: function_area
+    dimension:
+      is_time: false
+- name: account_snapshot
+  source: '"contactcenter"."marts"."f_account_snapshot"'
+  primary_key:
+  - account_id
+  description: 'Account balance/rate snapshot at account x snapshot_date (monthly)
+    grain. Every measure is lob-qualified and null-per-type; each is declared separately
+    so none can be summed across LOBs into a garbage blended number.
+
+    '
+  fields:
+  - name: account
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: account_id
+  - name: member
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: member_id
+  - name: product
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: product_id
+  - name: snapshot_date
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: snapshot_date
+    dimension:
+      is_time: true
+  - name: account_status
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: status
+    dimension:
+      is_time: false
+  - name: mortgage_note_rate
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: mortgage_note_rate
+    description: Average rate members PAY on first-lien mortgages (paid, fixed).
+  - name: note_rate_times_balance
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: mortgage_note_rate * mortgage_principal_balance
+    description: Numerator for the principal-weighted mortgage portfolio rate.
+  - name: mortgage_principal_balance
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: mortgage_principal_balance
+    description: Outstanding first-lien principal (denominator for weighting).
+  - name: purchase_apr
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: purchase_apr
+    description: Average PURCHASE APR on cards (deliberately not cash-advance).
+  - name: cash_advance_apr
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: cash_advance_apr
+    description: Average cash-advance APR on cards (a different rate, same card).
+  - name: deposit_apy
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: deposit_apy
+    description: Average rate members EARN on deposits (sign flipped vs loans).
+  - name: heloc_base_rate
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: heloc_base_rate
+  - name: heloc_margin
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: heloc_margin
+  - name: heloc_current_rate
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: heloc_current_rate
+    description: HELOC effective rate = base_rate + margin (two source columns).
+  - name: investment_return_pct
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: investment_return_pct
+    description: Investment return — explicitly NOT interest.
+  - name: ltv_at_origination
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: ltv_at_origination
+    description: Loan-to-value at origination (underwriting risk; the LTV half of
+      the homophone).
+  - name: banking_available_balance
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: banking_available_balance
+    description: Total available balance on banking accounts (asset).
+  - name: banking_ledger_balance
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: banking_ledger_balance
+  - name: checking_ledger_balance
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: checking_ledger_balance
+  - name: checking_available_balance
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: checking_available_balance
+  - name: savings_balance
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: savings_balance
+  - name: card_outstanding_balance
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: card_outstanding_balance
+    description: Total outstanding credit-card balance (LIABILITY sign).
+  - name: card_credit_limit
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: card_credit_limit
+    description: Card credit capacity ("limit" meaning 3).
+  - name: card_available_credit
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: card_available_credit
+  - name: heloc_drawn_balance
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: heloc_drawn_balance
+  - name: heloc_credit_limit
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: heloc_credit_limit
+    description: HELOC credit capacity ("limit" meaning 1).
+  - name: investment_market_value
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: investment_market_value
+  - name: investment_cash_value
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: investment_cash_value
+  - name: escrow_balance
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: escrow_balance
+  - name: insurance_annual_premium
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: insurance_annual_premium
+    description: Car-insurance premium (money moved, not a rate).
+  - name: insurance_monthly_premium
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: insurance_monthly_premium
+  - name: insurance_deductible
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: insurance_deductible
+    description: Insurance coverage "limit" (not credit capacity).
+- name: interactions
+  source: '"contactcenter"."marts"."f_interaction"'
+  primary_key:
+  - interaction_id
+  description: Contact fact at 1-interaction grain.
+  fields:
+  - name: interaction
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: interaction_id
+  - name: member
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: member_id
+  - name: staff
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: staff_id
+  - name: team
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: team_id
+  - name: started_at
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: started_at
+    dimension:
+      is_time: true
+  - name: channel
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: channel
+    dimension:
+      is_time: false
+  - name: direction
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: direction
+    dimension:
+      is_time: false
+  - name: outcome
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: outcome
+    dimension:
+      is_time: false
+  - name: caller_type
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: caller_type
+    dimension:
+      is_time: false
+  - name: category_code
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: category_code
+    dimension:
+      is_time: false
+  - name: hour_of_day
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: hour_of_day
+    dimension:
+      is_time: false
+  - name: interaction_count
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: '1'
+    description: Call volume ("volume" meaning 1 of 4).
+  - name: duration_seconds
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: duration_seconds
+    description: Total talk time in seconds (AHT is a derived ratio, not this).
+  - name: escalated_calls
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: case when outcome = 'escalated' then 1 else 0 end
+  - name: first_contact_resolved_calls
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: case when first_contact_resolved then 1 else 0 end
+- name: csat_surveys
+  source: '"contactcenter"."marts"."f_csat"'
+  primary_key:
+  - survey_id
+  description: CSAT survey fact at 1-survey grain (~75% of interactions).
+  fields:
+  - name: survey
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: survey_id
+  - name: interaction
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: interaction_id
+  - name: member
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: member_id
+  - name: staff
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: staff_id
+  - name: team
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: team_id
+  - name: surveyed_at
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: surveyed_at
+    dimension:
+      is_time: true
+  - name: question_code
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: question_code
+    dimension:
+      is_time: false
+  - name: survey_count
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: '1'
+  - name: score_sum
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: score
+  - name: score_avg
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: score
+  - name: promoters_count
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: is_promoter
+  - name: detractors_count
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: is_detractor
+- name: transactions
+  source: '"contactcenter"."marts"."f_transaction"'
+  primary_key:
+  - transaction_id
+  description: 'Ledger flow fact at 1-transaction grain. Amounts are signed — credits
+    are positive, debits are negative.
+
+    '
+  fields:
+  - name: transaction
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: transaction_id
+  - name: account
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: account_id
+  - name: member
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: member_id
+  - name: product
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: product_id
+  - name: posted_at
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: posted_at
+    dimension:
+      is_time: true
+  - name: txn_type
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: txn_type
+    dimension:
+      is_time: false
+  - name: status
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: status
+    dimension:
+      is_time: false
+  - name: amount
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: amount
+    description: 'Net signed amount (a flow). Never compare it to a snapshot balance
+      — that is the stock-vs-flow collision.
+
+      '
+  - name: txn_count
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: '1'
+  - name: fee_revenue
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: fee_revenue_amount
+    description: Fee revenue to the CU (stored debits, negated).
+  - name: interest_income
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: interest_earned_amount
+    description: Interest/dividends earned by members.
+  - name: interest_expense
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: interest_paid_amount
+    description: Interest charged to members (seed currently emits none).
+  - name: premium_paid
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: premium_paid_amount
+    description: Insurance premiums paid by members (a flow, not the rate premium).
+  - name: distinct_members
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: member_id
+- name: rate_locks
+  source: '"contactcenter"."marts"."f_rate_lock"'
+  primary_key:
+  - lock_id
+  description: Rate-lock pipeline fact at 1-lock grain.
+  fields:
+  - name: rate_lock
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: lock_id
+  - name: member
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: member_id
+  - name: product
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: product_id
+  - name: locked_at
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: locked_at
+    dimension:
+      is_time: true
+  - name: lock_status
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: status
+    dimension:
+      is_time: false
+  - name: lock_period_days
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: lock_period_days
+    dimension:
+      is_time: false
+  - name: locks_count
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: '1'
+  - name: lock_volume
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: loan_amount
+  - name: locks_exercised
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: is_exercised
+  - name: locks_expired
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: is_expired
+- name: posted_rates
+  source: '"contactcenter"."marts"."f_rate"'
+  primary_key:
+  - product_rate_id
+  description: Posted product-level rate fact — the THIRD meaning of "rate".
+  fields:
+  - name: product_rate
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: product_rate_id
+  - name: product
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: product_id
+  - name: effective_date
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: effective_date
+    dimension:
+      is_time: true
+  - name: rate_type
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: rate_type
+    dimension:
+      is_time: false
+  - name: is_teaser
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: is_teaser
+    dimension:
+      is_time: false
+  - name: posted_rate
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: rate_value
+  - name: posted_rate_count
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: '1'
+relationships:
+- name: account_snapshot__products__product
+  from: account_snapshot
+  to: products
+  from_columns:
+  - product_id
+  to_columns:
+  - product_id
+- name: transactions__products__product
+  from: transactions
+  to: products
+  from_columns:
+  - product_id
+  to_columns:
+  - product_id
+- name: rate_locks__products__product
+  from: rate_locks
+  to: products
+  from_columns:
+  - product_id
+  to_columns:
+  - product_id
+- name: posted_rates__products__product
+  from: posted_rates
+  to: products
+  from_columns:
+  - product_id
+  to_columns:
+  - product_id
+- name: account_snapshot__members__member
+  from: account_snapshot
+  to: members
+  from_columns:
+  - member_id
+  to_columns:
+  - member_id
+- name: interactions__members__member
+  from: interactions
+  to: members
+  from_columns:
+  - member_id
+  to_columns:
+  - member_id
+- name: csat_surveys__members__member
+  from: csat_surveys
+  to: members
+  from_columns:
+  - member_id
+  to_columns:
+  - member_id
+- name: transactions__members__member
+  from: transactions
+  to: members
+  from_columns:
+  - member_id
+  to_columns:
+  - member_id
+- name: rate_locks__members__member
+  from: rate_locks
+  to: members
+  from_columns:
+  - member_id
+  to_columns:
+  - member_id
+- name: members__households__household
+  from: members
+  to: households
+  from_columns:
+  - household_id
+  to_columns:
+  - household_id
+- name: interactions__staff__staff
+  from: interactions
+  to: staff
+  from_columns:
+  - staff_id
+  to_columns:
+  - staff_id
+- name: csat_surveys__staff__staff
+  from: csat_surveys
+  to: staff
+  from_columns:
+  - staff_id
+  to_columns:
+  - staff_id
+- name: staff__teams__team
+  from: staff
+  to: teams
+  from_columns:
+  - team_id
+  to_columns:
+  - team_id
+- name: interactions__teams__team
+  from: interactions
+  to: teams
+  from_columns:
+  - team_id
+  to_columns:
+  - team_id
+- name: csat_surveys__teams__team
+  from: csat_surveys
+  to: teams
+  from_columns:
+  - team_id
+  to_columns:
+  - team_id
+- name: transactions__account_snapshot__account
+  from: transactions
+  to: account_snapshot
+  from_columns:
+  - account_id
+  to_columns:
+  - account_id
+- name: csat_surveys__interactions__interaction
+  from: csat_surveys
+  to: interactions
+  from_columns:
+  - interaction_id
+  to_columns:
+  - interaction_id
+metrics:
+- name: average_mortgage_note_rate
+  expression:
+    dialects:
+    - dialect: ANSI_SQL
+      expression: AVG(CASE WHEN product__lob = 'mortgage' THEN account_snapshot.mortgage_note_rate
+        END)
+  description: 'Average interest rate members PAY on first-lien mortgages (paid, fixed).
+    "interest rate" meaning 1 of the collision.
+
+    '
+- name: note_rate_times_balance
+  expression:
+    dialects:
+    - dialect: ANSI_SQL
+      expression: SUM(CASE WHEN product__lob = 'mortgage' THEN mortgage_note_rate
+        * mortgage_principal_balance END)
+  description: 'Intermediate numerator for the principal-weighted mortgage portfolio
+    rate (note_rate multiplied by outstanding principal, summed). Not a headline metric
+    on its own.
+
+    '
+- name: weighted_mortgage_portfolio_rate
+  expression:
+    dialects:
+    - dialect: ANSI_SQL
+      expression: (SUM(CASE WHEN product__lob = 'mortgage' THEN mortgage_note_rate
+        * mortgage_principal_balance END)) / (SUM(CASE WHEN product__lob = 'mortgage'
+        THEN account_snapshot.mortgage_principal_balance END))
+  description: 'Mortgage note rate weighted by outstanding principal — the "what does
+    our book actually cost" number, a RATIO (note_rate x balance) / balance, not a
+    plain average. Numerator and denominator are declared metrics (note_rate_times_balance
+    / mortgage_principal_balance), each lob-filtered.
+
+    '
+- name: average_heloc_current_rate
+  expression:
+    dialects:
+    - dialect: ANSI_SQL
+      expression: AVG(CASE WHEN product__lob = 'home' THEN account_snapshot.heloc_current_rate
+        END)
+  description: 'Average HELOC effective rate = base_rate + margin (variable, two source
+    columns). "interest rate" meaning 2.
+
+    '
+- name: average_credit_card_purchase_apr
+  expression:
+    dialects:
+    - dialect: ANSI_SQL
+      expression: AVG(CASE WHEN product__lob = 'cards' THEN account_snapshot.purchase_apr
+        END)
+  description: 'Average PURCHASE APR on cards — deliberately NOT the cash-advance
+    APR on the same card. "interest rate" meaning 4a.
+
+    '
+- name: average_credit_card_cash_advance_apr
+  expression:
+    dialects:
+    - dialect: ANSI_SQL
+      expression: AVG(CASE WHEN product__lob = 'cards' THEN account_snapshot.cash_advance_apr
+        END)
+  description: 'Average cash-advance APR on cards. "interest rate" meaning 4b — a
+    different rate on the same piece of plastic.
+
+    '
+- name: average_deposit_apy
+  expression:
+    dialects:
+    - dialect: ANSI_SQL
+      expression: AVG(CASE WHEN product__lob = 'banking' THEN account_snapshot.deposit_apy
+        END)
+  description: 'Average rate members EARN on deposits (sign-flipped vs loans). "interest
+    rate" meaning 5.
+
+    '
+- name: average_investment_return_pct
+  expression:
+    dialects:
+    - dialect: ANSI_SQL
+      expression: AVG(CASE WHEN product__lob = 'investments' THEN account_snapshot.investment_return_pct
+        END)
+  description: 'Average investment return — explicitly NOT interest. "interest rate"
+    meaning 6, which is not interest at all.
+
+    '
+- name: banking_available_balance
+  expression:
+    dialects:
+    - dialect: ANSI_SQL
+      expression: SUM(CASE WHEN product__lob = 'banking' THEN account_snapshot.banking_available_balance
+        END)
+  description: 'Total AVAILABLE balance on banking accounts (asset; holds/pending
+    excluded). Additive across accounts. "balance" meaning 4b.
+
+    '
+- name: banking_ledger_balance
+  expression:
+    dialects:
+    - dialect: ANSI_SQL
+      expression: SUM(CASE WHEN product__lob = 'banking' THEN account_snapshot.banking_ledger_balance
+        END)
+  description: 'Total LEDGER balance on banking accounts (asset, gross of holds).
+    "balance" meaning 4a.
+
+    '
+- name: checking_available_balance
+  expression:
+    dialects:
+    - dialect: ANSI_SQL
+      expression: SUM(CASE WHEN product__lob = 'banking' THEN account_snapshot.checking_available_balance
+        END)
+  description: Available balance, checking accounts only.
+- name: savings_balance
+  expression:
+    dialects:
+    - dialect: ANSI_SQL
+      expression: SUM(CASE WHEN product__lob = 'banking' THEN account_snapshot.savings_balance
+        END)
+  description: Ledger balance on savings accounts only.
+- name: credit_card_outstanding
+  expression:
+    dialects:
+    - dialect: ANSI_SQL
+      expression: SUM(CASE WHEN product__lob = 'cards' THEN account_snapshot.card_outstanding_balance
+        END)
+  description: 'Total outstanding credit-card balance — the SAME word "balance", the
+    OPPOSITE sign (a liability, not an asset).
+
+    '
+- name: mortgage_principal_balance
+  expression:
+    dialects:
+    - dialect: ANSI_SQL
+      expression: SUM(CASE WHEN product__lob = 'mortgage' THEN account_snapshot.mortgage_principal_balance
+        END)
+  description: Outstanding first-lien principal. "balance" meaning 1.
+- name: heloc_drawn_balance
+  expression:
+    dialects:
+    - dialect: ANSI_SQL
+      expression: SUM(CASE WHEN product__lob = 'home' THEN account_snapshot.heloc_drawn_balance
+        END)
+  description: Drawn HELOC balance. "balance" meaning 3.
+- name: investment_market_value
+  expression:
+    dialects:
+    - dialect: ANSI_SQL
+      expression: SUM(CASE WHEN product__lob = 'investments' THEN account_snapshot.investment_market_value
+        END)
+  description: Total investment market value. "balance" meaning 6.
+- name: investment_cash_value
+  expression:
+    dialects:
+    - dialect: ANSI_SQL
+      expression: SUM(CASE WHEN product__lob = 'investments' THEN account_snapshot.investment_cash_value
+        END)
+  description: Settled cash in investment accounts. "balance" meaning 7.
+- name: escrow_balance
+  expression:
+    dialects:
+    - dialect: ANSI_SQL
+      expression: SUM(CASE WHEN product__lob = 'mortgage' THEN account_snapshot.escrow_balance
+        END)
+  description: Mortgage escrow balance. "balance" meaning 2.
+- name: net_member_liquidity
+  expression:
+    dialects:
+    - dialect: ANSI_SQL
+      expression: SUM(CASE WHEN product__lob = 'banking' THEN account_snapshot.banking_available_balance
+        END) - SUM(CASE WHEN product__lob = 'cards' THEN account_snapshot.card_outstanding_balance
+        END)
+  description: 'DERIVED: banking available balance (asset) MINUS card outstanding
+    (liability). Only the semantic layer knows the sign conventions — raw SQL SUM(balance)
+    would add assets to liabilities; this declared formula is the only place a blended
+    relationship number is allowed to exist.
+
+    '
+- name: loan_to_value
+  expression:
+    dialects:
+    - dialect: ANSI_SQL
+      expression: AVG(CASE WHEN product__lob = 'mortgage' THEN account_snapshot.ltv_at_origination
+        END)
+  description: 'Loan-to-value at origination (underwriting RISK) — a fact stored on
+    the mortgage account, averaged. The "LTV" half of the homophone collision.
+
+    '
+- name: member_lifetime_value
+  expression:
+    dialects:
+    - dialect: ANSI_SQL
+      expression: (SUM(transactions.fee_revenue_amount) + SUM(transactions.interest_earned_amount))
+        * 24 / COUNT(DISTINCT transactions.member_id)
+  description: 'Lifetime customer value (marketing) — a DERIVED, PARAMETERIZED CONVENTION,
+    not a fact. Declared formula (see olap/dbt/README.md): LCV = (relationship_revenue
+    / active_members) x 24, where relationship revenue is fee + interest income over
+    the trailing ~6-month window, x2 annualizes it, and x12 is the assumed relationship
+    tenure in years (24 = 2 x 12). Because the formula is a convention, it is declared
+    here once instead of being re-invented per dashboard.
+
+    '
+- name: total_fee_revenue
+  expression:
+    dialects:
+    - dialect: ANSI_SQL
+      expression: SUM(transactions.fee_revenue_amount)
+  description: Fee revenue to the CU over the transaction window.
+- name: total_interest_income
+  expression:
+    dialects:
+    - dialect: ANSI_SQL
+      expression: SUM(transactions.interest_earned_amount)
+  description: Interest/dividends earned by members over the transaction window.
+- name: relationship_revenue
+  expression:
+    dialects:
+    - dialect: ANSI_SQL
+      expression: SUM(transactions.fee_revenue_amount) + SUM(transactions.interest_earned_amount)
+  description: Fee revenue + interest income (the numerator of the LCV convention).
+- name: active_members
+  expression:
+    dialects:
+    - dialect: ANSI_SQL
+      expression: COUNT(DISTINCT transactions.member_id)
+  description: Distinct members with ledger activity in the window.
+- name: credit_card_credit_limit
+  expression:
+    dialects:
+    - dialect: ANSI_SQL
+      expression: SUM(CASE WHEN product__lob = 'cards' THEN account_snapshot.card_credit_limit
+        END)
+  description: Card credit capacity. "limit" meaning 3.
+- name: heloc_credit_limit
+  expression:
+    dialects:
+    - dialect: ANSI_SQL
+      expression: SUM(CASE WHEN product__lob = 'home' THEN account_snapshot.heloc_credit_limit
+        END)
+  description: HELOC credit capacity. "limit" meaning 1.
+- name: insurance_coverage_limit
+  expression:
+    dialects:
+    - dialect: ANSI_SQL
+      expression: AVG(CASE WHEN product__lob = 'car_insurance' THEN account_snapshot.insurance_deductible
+        END)
+  description: 'Car-insurance deductible (a coverage "limit" — NOT credit capacity).
+    "limit" meaning 2.
+
+    '
+- name: call_volume
+  expression:
+    dialects:
+    - dialect: ANSI_SQL
+      expression: SUM(1)
+  description: Number of interactions (call volume — "volume" meaning 1 of 4).
+- name: total_duration_seconds
+  expression:
+    dialects:
+    - dialect: ANSI_SQL
+      expression: SUM(interactions.duration_seconds)
+  description: Sum of talk time. AHT is the derived ratio, not this.
+- name: average_handle_time
+  expression:
+    dialects:
+    - dialect: ANSI_SQL
+      expression: (SUM(interactions.duration_seconds)) / (SUM(1))
+  description: 'AHT = total talk time / number of calls — a derived RATIO, never a
+    stored column.
+
+    '
+- name: first_contact_resolved_calls
+  expression:
+    dialects:
+    - dialect: ANSI_SQL
+      expression: SUM(case when first_contact_resolved then 1 else 0 end)
+  description: Count of interactions resolved on first contact.
+- name: first_contact_resolution_rate
+  expression:
+    dialects:
+    - dialect: ANSI_SQL
+      expression: (SUM(case when first_contact_resolved then 1 else 0 end)) / (SUM(1))
+  description: Share of interactions resolved on first contact.
+- name: csat_average_score
+  expression:
+    dialects:
+    - dialect: ANSI_SQL
+      expression: AVG(csat_surveys.score)
+  description: Average CSAT survey score (1-5).
+- name: nps
+  expression:
+    dialects:
+    - dialect: ANSI_SQL
+      expression: (SUM(csat_surveys.is_promoter) - SUM(csat_surveys.is_detractor))
+        / SUM(1) * 100
+  description: 'NPS = (promoters - detractors) / responses x 100, on the 1-5 mapping
+    (5=promoter, 4/3=passive, 2/1=detractor). A derived metric, never stored.
+
+    '
+- name: promoters
+  expression:
+    dialects:
+    - dialect: ANSI_SQL
+      expression: SUM(csat_surveys.is_promoter)
+  description: Count of CSAT responses scored 5.
+- name: detractors
+  expression:
+    dialects:
+    - dialect: ANSI_SQL
+      expression: SUM(csat_surveys.is_detractor)
+  description: Count of CSAT responses scored 1 or 2.
+- name: responses
+  expression:
+    dialects:
+    - dialect: ANSI_SQL
+      expression: SUM(1)
+  description: Count of completed CSAT surveys.
+- name: rate_locks_count
+  expression:
+    dialects:
+    - dialect: ANSI_SQL
+      expression: SUM(1)
+  description: 'Count of rate locks in the mortgage/home pipeline ("lock" as a financing
+    event — NOT a fraud account freeze).
+
+    '
+- name: rate_lock_volume
+  expression:
+    dialects:
+    - dialect: ANSI_SQL
+      expression: SUM(rate_locks.loan_amount)
+  description: Sum of loan_amount across rate locks.
+- name: rate_locks_exercised
+  expression:
+    dialects:
+    - dialect: ANSI_SQL
+      expression: SUM(rate_locks.is_exercised)
+  description: Count of rate locks whose status is 'exercised'.
+- name: rate_locks_expired
+  expression:
+    dialects:
+    - dialect: ANSI_SQL
+      expression: SUM(rate_locks.is_expired)
+  description: Count of rate locks whose status is 'expired'.
+- name: rate_lock_fallout_pct
+  expression:
+    dialects:
+    - dialect: ANSI_SQL
+      expression: (SUM(rate_locks.is_expired)) / (SUM(1))
+  description: 'Share of rate locks that expired without exercising (fall-out) — a
+    derived ratio.
+
+    '
