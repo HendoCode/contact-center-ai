@@ -49,8 +49,8 @@ from retrieval import get_retriever
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_OUT = REPO_ROOT / "docs" / "demo-chat.md"
 
-CALL_RATES = "CALL-00421"  # Allison Hill asks about loan rates
-CALL_BALANCE = "CALL-00260"  # the agent reads her a balance
+CALL_RATES = "CALL-00421"  # the member asks about loan rates
+CALL_BALANCE = "CALL-00260"  # the call-center agent reads out a balance
 RATE_QUESTION = "what is our average interest rate?"
 CLARIFY_QUESTION = "What is our average interest rate?"
 CLARIFY_CHOICES = ["average_mortgage_note_rate", "weighted_mortgage_portfolio_rate"]
@@ -409,7 +409,7 @@ declared metric and its SQL are both present.
 
 ## Turn 6: "balance", and net liquidity
 
-**User:** The agent read {member['name']} a balance of ${_money(member['ledger'])} on
+**User:** The call-center agent read {member['name']} a balance of ${_money(member['ledger'])} on
 {CALL_BALANCE}. Which balance is that, and what is our net member liquidity?
 
 The transcript, from the same metadata lookup as turn 2:
@@ -439,7 +439,7 @@ raw `SUM(balance)` would add a liability to assets.
 
 Cross-check, direct SQL on the marts (not a tool): {member['name']}'s banking account has
 `banking_ledger_balance` {_money(member['ledger'])} and `banking_available_balance`
-{_money(member['available'])}. The ${_money(member['ledger'])} the agent read out in
+{_money(member['available'])}. The ${_money(member['ledger'])} the call-center agent read out in
 {CALL_BALANCE} {'is' if ledger_in_call else 'is NOT'} the **ledger** balance, not the
 available one: two declared metrics, ${_money(member['ledger'] - member['available'])} apart on
 this account.
