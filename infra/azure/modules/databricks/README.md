@@ -25,13 +25,13 @@ Rerunning is safe: every step is find-or-create.
 
 **Free Edition limits that matter here**, from [Databricks' limitations page](https://docs.databricks.com/aws/en/getting-started/free-edition-limitations), checked 2026-10-03:
 
-- One SQL warehouse, 2X-Small only. If one already exists under another name, pass `--warehouse-name <it>`.
+- One SQL warehouse, 2X-Small only. When creating `ccai-sql` hits that limit (`RESOURCE_EXHAUSTED`) and exactly one warehouse exists (on Free Edition, `Serverless Starter Warehouse`), the script uses it and says so. Otherwise pass `--warehouse-name '<its name>'` (spaces are fine) or `--warehouse-id <id>`, which skips the name lookup.
 - Serverless compute only. This module's all-purpose cluster and its `http_path` output do not exist there; use the warehouse's HTTP path, which the script records.
 - A daily compute quota. Past it, compute is shut down for the rest of the day, so a large `make load-databricks` may have to resume the next day.
 - Outbound internet is limited to trusted domains. That does not matter here: the loaders upload from your machine.
 
 Not verified, because no Free Edition workspace was reachable:
-- whether `CREATE CATALOG` is allowed (if denied, the script lists your catalogs; Free Edition typically has one named `workspace`, so rerun with `--catalog workspace`);
+- whether `CREATE CATALOG` is allowed. If it is denied and exactly one usable catalog exists (not `system`, `samples` or `hive_metastore`; on Free Edition typically `workspace`), the script uses that one and says so. Otherwise it lists your catalogs and asks for `--catalog`. An explicit `--catalog` or `--warehouse-name` is never swapped;
 - whether personal access tokens and the SQL statements API are enabled by default.
 
 **Fallback: by hand.** Start the cluster from the workspace UI or CLI when needed, or create a SQL warehouse and copy its HTTP path. Create a personal access token under User settings > Developer, then in a SQL editor run:
