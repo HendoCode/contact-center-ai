@@ -13,6 +13,13 @@ volume, skipped once present. Every unique transcript (about 1,060) is embedded 
 with a progress line roughly every 10%. On a CPU-only Ollama that step is slow: about 6 minutes
 on an 8-core laptop, about 45 minutes on 2 cores.
 
+Reruns reuse the document embeddings cached under `.cache/bench-embeddings/` (gitignored, one file per
+embedding model, keyed by text hash), so only the first run pays for the embedding step; `--no-cache` skips the
+cache. Ingest goes in batches of `--ingest-batch` rows (default 12,500, the largest single insert proven at x10),
+so `--scale 80` never sends 100,000 rows in one call. A backend or mode that fails becomes a one-line
+`failed: <error>` row (at most 300 characters), the other backends still run, and the results file is
+written either way.
+
 ## LanceDB on az:// (ADLS Gen2)
 
 `make lance-azure-check` runs the bench's LanceDB half twice, on a local temp directory and on

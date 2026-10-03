@@ -38,6 +38,7 @@ import hashlib
 import json
 import os
 import platform
+import re
 import shutil
 import statistics
 import subprocess
@@ -55,6 +56,12 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 LABELS_PATH = REPO_ROOT / "retrieval" / "labels" / "queries.jsonl"
 RESULTS_ROOT = REPO_ROOT / "results"
 BACKENDS = ("pgvector", "lancedb")
+# Rows per Retriever.ingest() call. 12,500 is the largest single insert proven to work (x10);
+# pgvector's add_texts sends a whole batch as ONE multi-row INSERT, so x80's 100,000 rows in
+# one call is the prime suspect for the x80 failure.
+INGEST_BATCH = 12_500
+ERROR_CHARS = 300
+CACHE_DIR = REPO_ROOT / ".cache" / "bench-embeddings"
 MODES = ("vector", "fts", "hybrid")
 QUERY_TYPES = ("topical", "filter", "exact", "paraphrase")
 K = 10
@@ -199,24 +206,56 @@ def embed_progress() -> Callable[[int, int], None]:
     return report
 
 
-class CachedEmbeddings:
-    """Embed each unique text once; later calls (ingest, search) hit the cache."""
+def short_error(exc: BaseException, limit: int = ERROR_CHARS) -> str:
+    """`Class: message` on one line, at most `limit` characters: never a driver's payload dump."""
+    text = " ".join(f"{type(exc).__name__}: {exc}".split())
+    return text if len(text) <= limit else text[: limit - 15] + " ...[truncated]"
 
-    def __init__(self, inner):
+
+def _text_key(text: str) -> str:
+    return hashlib.sha256(text.encode()).hexdigest()
+
+
+class CachedEmbeddings:
+    """Embed each unique text once; later calls (ingest, search) hit the cache.
+
+    With `cache_file`, document vectors also persist on disk (JSONL keyed by text hash, one
+    file per embedding model), so a rerun skips the slow CPU embedding step.
+    """
+
+    def __init__(self, inner, cache_file: Path | None = None):
         self.inner = inner
         self._docs: dict[str, list[float]] = {}
         self._queries: dict[str, list[float]] = {}
+        self.cache_file = cache_file
+        self._disk: dict[str, list[float]] = {}
+        if cache_file and cache_file.exists():
+            for line in cache_file.read_text().splitlines():
+                row = json.loads(line)
+                self._disk[row["h"]] = row["v"]
 
     def warm_documents(self, texts: Iterable[str], batch: int = 64,
                        progress: Callable[[int, int], None] | None = None) -> tuple[int, float]:
         """Embed every uncached text; `progress(done, total)` runs at 0 and after each batch."""
         todo = [t for t in dict.fromkeys(texts) if t not in self._docs]
+        hits = [t for t in todo if _text_key(t) in self._disk]
+        for t in hits:
+            self._docs[t] = self._disk[_text_key(t)]
+        if hits:
+            print(f"bench: {len(hits)} document embeddings loaded from {self.cache_file}", flush=True)
+        todo = [t for t in todo if t not in self._docs]
         if progress and todo:
             progress(0, len(todo))
         t0 = time.perf_counter()
         for i in range(0, len(todo), batch):
             chunk = todo[i : i + batch]
-            self._docs.update(zip(chunk, self.inner.embed_documents(chunk)))
+            vectors = self.inner.embed_documents(chunk)
+            self._docs.update(zip(chunk, vectors))
+            if self.cache_file:
+                self.cache_file.parent.mkdir(parents=True, exist_ok=True)
+                with open(self.cache_file, "a") as fh:
+                    for t, v in zip(chunk, vectors):
+                        fh.write(json.dumps({"h": _text_key(t), "v": list(v)}) + "\n")
             if progress:
                 progress(i + len(chunk), len(todo))
         return len(todo), time.perf_counter() - t0
@@ -289,12 +328,21 @@ OPENERS: dict[str, Callable] = {"pgvector": open_pgvector, "lancedb": open_lance
 # ── run ───────────────────────────────────────────────────────────────────────
 
 def bench_backend(store: Store, docs: list[dict], queries: list[dict], modes: Iterable[str],
-                  repeats: int = 3) -> dict[str, dict]:
-    """Ingest into an empty store, then score and time every query in every mode."""
+                  repeats: int = 3, ingest_batch: int = INGEST_BATCH) -> dict[str, dict]:
+    """Ingest into an empty store in batches, then score and time every query in every mode.
+
+    A failing mode becomes a short `failed: ...` status row; the other modes still run.
+    """
     r = store.retriever
+    batches = [docs[i : i + ingest_batch] for i in range(0, len(docs), ingest_batch)]
     t0 = time.perf_counter()
-    written = r.ingest(docs)
+    written = 0
+    for n, batch in enumerate(batches, 1):
+        print(f"bench: ingest {r.name}: batch {n}/{len(batches)} ({len(batch)} rows)", flush=True)
+        written += r.ingest(batch)
     ingest_s = time.perf_counter() - t0
+    if store.index_build_s is not None:
+        print(f"bench: {r.name} index build {store.index_build_s:.2f}s (inside ingest)", flush=True)
     if written != len({d["call_id"] for d in docs}):
         raise RuntimeError(f"{r.name}: ingest wrote {written} rows for {len(docs)} docs")
 
@@ -306,49 +354,69 @@ def bench_backend(store: Store, docs: list[dict], queries: list[dict], modes: It
         except NotImplementedError as e:
             rows[name] = {"status": f"not supported: {e}"}
             continue
-
-        ranked, latencies = {}, []
-        for _ in range(repeats):
-            for q in queries:
-                t = time.perf_counter()
-                hits = r.search(q["query"], k=K, where=q["where"], mode=mode)
-                latencies.append((time.perf_counter() - t) * 1000)
-                ranked.setdefault(q["id"], [h.call_id for h in hits])
-
-        scores = {
-            q["id"]: (recall_at_k(ranked[q["id"]], q["relevant"], 5),
-                      recall_at_k(ranked[q["id"]], q["relevant"], 10),
-                      reciprocal_rank(ranked[q["id"]], q["relevant"]))
-            for q in queries
-        }
-
-        def mean(i: int, qs: list[dict], scores: dict = scores) -> float:
-            return statistics.fmean(scores[q["id"]][i] for q in qs)
-
-        by_type = {t: [q for q in queries if q["type"] == t] for t in QUERY_TYPES}
-        by_type = {t: qs for t, qs in by_type.items() if qs}
-        rows[name] = {
-            "status": "ok",
-            "recall@5": mean(0, queries),
-            "recall@10": mean(1, queries),
-            "mrr@10": mean(2, queries),
-            "p50_ms": percentile(latencies, 50),
-            "p95_ms": percentile(latencies, 95),
-            "ingest_s": ingest_s,
-            "index_build_s": store.index_build_s,
-            "recall@10_by_type": {t: mean(1, qs) for t, qs in by_type.items()},
-            "mrr@10_by_type": {t: mean(2, qs) for t, qs in by_type.items()},
-        }
+        except Exception as e:  # noqa: BLE001 - recorded, not raised: keep the other modes
+            rows[name] = {"status": f"failed: {short_error(e)}"}
+            print(f"bench: {name} FAILED: {short_error(e)}", flush=True)
+            continue
+        print(f"bench: queries {name} ({len(queries)} x {repeats})", flush=True)
+        try:
+            rows[name] = _score_mode(r, mode, queries, repeats, ingest_s, store.index_build_s)
+        except Exception as e:  # noqa: BLE001
+            rows[name] = {"status": f"failed: {short_error(e)}"}
+            print(f"bench: {name} FAILED: {short_error(e)}", flush=True)
     return rows
+
+
+def _score_mode(r, mode: str, queries: list[dict], repeats: int, ingest_s: float,
+                index_build_s: float | None) -> dict:
+    """recall@5/10, MRR@10 and p50/p95 latency for one mode."""
+    ranked, latencies = {}, []
+    for _ in range(repeats):
+        for q in queries:
+            t = time.perf_counter()
+            hits = r.search(q["query"], k=K, where=q["where"], mode=mode)
+            latencies.append((time.perf_counter() - t) * 1000)
+            ranked.setdefault(q["id"], [h.call_id for h in hits])
+
+    scores = {
+        q["id"]: (recall_at_k(ranked[q["id"]], q["relevant"], 5),
+                  recall_at_k(ranked[q["id"]], q["relevant"], 10),
+                  reciprocal_rank(ranked[q["id"]], q["relevant"]))
+        for q in queries
+    }
+
+    def mean(i: int, qs: list[dict], scores: dict = scores) -> float:
+        return statistics.fmean(scores[q["id"]][i] for q in qs)
+
+    by_type = {t: [q for q in queries if q["type"] == t] for t in QUERY_TYPES}
+    by_type = {t: qs for t, qs in by_type.items() if qs}
+    return {
+        "status": "ok",
+        "recall@5": mean(0, queries),
+        "recall@10": mean(1, queries),
+        "mrr@10": mean(2, queries),
+        "p50_ms": percentile(latencies, 50),
+        "p95_ms": percentile(latencies, 95),
+        "ingest_s": ingest_s,
+        "index_build_s": index_build_s,
+        "recall@10_by_type": {t: mean(1, qs) for t, qs in by_type.items()},
+        "mrr@10_by_type": {t: mean(2, qs) for t, qs in by_type.items()},
+    }
 
 
 def run_bench(docs: list[dict], queries: list[dict], embeddings, *,
               backends: Iterable[str] = BACKENDS, modes: Iterable[str] = MODES,
               repeats: int = 3, openers: dict[str, Callable] | None = None,
-              workdir: Path | None = None) -> dict:
-    """Run the benchmark; returns the `metrics` block of the results record."""
+              workdir: Path | None = None, ingest_batch: int = INGEST_BATCH,
+              cache_file: Path | None = None) -> dict:
+    """Run the benchmark; returns the `metrics` block of the results record.
+
+    A backend that fails (open, ingest or anything else) gets a short `failed: ...` row per
+    mode, and the other backends still run, so a partial run still yields a results file.
+    """
     openers = openers or OPENERS
-    cached = CachedEmbeddings(embeddings)
+    modes = list(modes)
+    cached = CachedEmbeddings(embeddings, cache_file=cache_file)
     n_unique, embed_s = cached.warm_documents((d["text"] for d in docs),
                                               progress=embed_progress())
     q_times = cached.warm_queries(q["query"] for q in queries)
@@ -360,11 +428,20 @@ def run_bench(docs: list[dict], queries: list[dict], embeddings, *,
     }
     with tempfile.TemporaryDirectory(prefix="ccai-bench-", dir=workdir) as tmp:
         for name in backends:
-            store = openers[name](cached, Path(tmp))
+            store = None
             try:
-                metrics.update(bench_backend(store, docs, queries, modes, repeats))
+                store = openers[name](cached, Path(tmp))
+                metrics.update(bench_backend(store, docs, queries, modes, repeats, ingest_batch))
+            except Exception as e:  # noqa: BLE001 - recorded, not raised: keep the other backends
+                print(f"bench: {name} FAILED: {short_error(e)}", flush=True)
+                for mode in modes:
+                    metrics.setdefault(f"{name}/{mode}", {"status": f"failed: {short_error(e)}"})
             finally:
-                store.cleanup()
+                if store is not None:
+                    try:
+                        store.cleanup()
+                    except Exception as e:  # noqa: BLE001
+                        print(f"bench: {name} cleanup failed: {short_error(e)}", flush=True)
     return metrics
 
 
@@ -463,8 +540,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--run", help="run name (default bench-<backends>-x<scale>)")
     parser.add_argument("--hardware", help="hardware description (default: auto-detected)")
     parser.add_argument("--labels", type=Path, help="labels file (default: committed queries.jsonl)")
+    parser.add_argument("--ingest-batch", type=int, default=INGEST_BATCH,
+                        help=f"rows per ingest call (default {INGEST_BATCH:,})")
+    parser.add_argument("--no-cache", action="store_true",
+                        help="do not read or write the embedding cache (.cache/bench-embeddings/)")
     args = parser.parse_args(argv)
-
+    if args.ingest_batch < 1:
+        parser.error("--ingest-batch must be at least 1")
     backends = [b.strip() for b in args.backends.split(",") if b.strip()]
     modes = [m.strip() for m in args.modes.split(",") if m.strip()]
     for b in backends:
@@ -473,6 +555,14 @@ def main(argv: list[str] | None = None) -> int:
     for m in modes:
         if m not in MODES:
             parser.error(f"unknown mode {m!r}")
+    try:
+        return _main(args, backends, modes)
+    except Exception as e:  # noqa: BLE001 - one short line, never a payload dump
+        print(f"bench: FAILED: {short_error(e)}", file=sys.stderr)
+        return 1
+
+
+def _main(args: argparse.Namespace, backends: list[str], modes: list[str]) -> int:
 
     from rag.embeddings import get_embeddings  # importing rag loads .env
     from tools.results import metrics_tables, render
@@ -485,17 +575,22 @@ def main(argv: list[str] | None = None) -> int:
     ensure_ollama_model(embeddings)
     print(f"bench: {len(docs)} docs, {len(queries)} queries, backends={backends}, modes={modes}")
 
+    model = embedding_model(embeddings)
+    cache_file = None if args.no_cache else CACHE_DIR / (re.sub(r"[^A-Za-z0-9_.-]+", "_", model) + ".jsonl")
     metrics = run_bench(docs, queries, embeddings, backends=backends, modes=modes,
-                        repeats=args.repeats)
+                        repeats=args.repeats, ingest_batch=args.ingest_batch, cache_file=cache_file)
 
     versions = {"python": platform.python_version(), "model": embedding_model(embeddings)}
     for pkg in ("lancedb", "pyarrow", "pylance", "langchain-postgres", "psycopg2-binary"):
         versions[pkg] = _version(pkg)
     if "pgvector" in backends:
-        versions.update(postgres_versions())
+        try:
+            versions.update(postgres_versions())
+        except Exception as e:  # noqa: BLE001 - never lose a finished run to a version lookup
+            versions["postgres"] = f"unknown ({short_error(e, 120)})"
     params = {
         "backends": backends, "modes": modes, "k": K, "repeats": args.repeats,
-        "scale": args.scale, "rows": len(docs), "queries": len(queries),
+        "scale": args.scale, "rows": len(docs), "queries": len(queries), "ingest_batch": args.ingest_batch,
         "labels_sha256": hashlib.sha256(labels_text.encode()).hexdigest()[:16],
     }
     notes = ("recall@k is capped recall, |rel ∩ top-k| / min(k, |rel|). Embeddings are "
