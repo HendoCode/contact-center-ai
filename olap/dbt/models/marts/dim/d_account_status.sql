@@ -5,4 +5,4 @@ select distinct
     status as account_status_code,
     status as account_status_name
 from {{ source('oltp', 'account') }}
-order by status
+order by account_status_code
