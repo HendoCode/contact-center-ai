@@ -48,6 +48,33 @@ Every row records its `index` and `search` settings in the results JSON and tabl
   left on device`). With a small `/dev/shm`, `--pgvector-parallel-workers 0` builds serially; the failure
   row names both fixes.
 
+**What scale runs measure.** Scale runs measure ingest, index build, latency and **`ann_recall@10`**.
+Label recall is only meaningful at x1. `ann_recall@10` is the overlap of a vector row's top 10 with a
+brute-force exact top 10 that the bench computes itself: the same jittered vectors, the same `where` filter,
+and ties at the 10th score counted as hits. On replicated data, label recall mixes replica identity (which of
+80 copies came back) with index quality. `ann_recall@10` measures only the index, and an exact scan scores
+1.0 by construction.
+
+**More knobs.**
+- `--lance-index ivf_pq|ivf_flat|ivf_sq|ivf_hnsw_sq|ivf_hnsw_pq` picks the index type; those are the five
+  types the pinned lancedb 0.39 ships.
+- `--lance-num-sub-vectors` and `--lance-num-bits` set PQ. They apply to the `*_pq` types only.
+- `--sweep ef_search=40,100,200` sweeps pgvector's HNSW on the same index. LanceDB's
+  `nprobes`/`refine_factor` grid is swept separately.
+- Each row also reports `p50_ms_by_type` and `p95_ms_by_type`.
+- Timing starts after one untimed pass over every query.
+
+**Why nprobes did not move recall.** It is applied: the plan shows `ANNIvfPartition ... minimum_nprobes=N,
+maximum_nprobes=Some(N)`, and a test asserts it. With 80 near-identical replicas per document, a query's
+neighbours sit in one partition, so extra probes find nothing new. On synthetic replicated data, overlap with
+the exact top 10 stayed at 2/10 from 1 to all 316 probes. The loss is PQ quantization, which cannot rank
+near-identical vectors. `refine_factor`, which re-ranks `k x refine_factor` candidates with exact
+distances, or a non-PQ index (`ivf_flat`, `ivf_hnsw_sq`) addresses it.
+
+**Why HNSW p95 >> p50.** The filter queries cause it. With `iterative_scan = relaxed_order`, a selective
+`where` keeps walking the graph until k matches pass. In a local x80 run the HNSW p95 was 37.8 ms for filter
+queries vs 1.1 ms for every other type. A cold cache is not the cause: timing follows a full warm-up pass.
+
 **Replica jitter.** `--scale N` repeats the same texts with new ids. Identical vectors made k-means
 degenerate (empty clusters, "many duplicate vectors"), so for `--scale > 1` each repeat now gets a seeded
 jitter of norm `--jitter-eps` (default 0.05, cosine to the original about 0.999), renormalised. The first

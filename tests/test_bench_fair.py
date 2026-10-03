@@ -125,10 +125,10 @@ def test_sweep_table_is_compact():
                                "lancedb/fts": ok, "pgvector-hnsw/vector": {"status": "failed: DiskFull: x"},
                                "embed_docs_s": 1.0})
     assert table.splitlines() == [
-        "| config | recall@10 | mrr@10 | p50 ms | p95 ms |", "|---|---|---|---|---|",
-        "| lancedb/vector | 0.500 | 0.600 | 12.3 | 20.0 |",
-        "| lancedb[nprobes=20,refine_factor=5]/vector | 0.500 | 0.600 | 12.3 | 20.0 |",
-        "| pgvector-hnsw/vector | failed | | | |"]
+        "| config | recall@10 | ann_recall@10 | mrr@10 | p50 ms | p95 ms |", "|---|---|---|---|---|---|",
+        "| lancedb/vector | 0.500 | n/a | 0.600 | 12.3 | 20.0 |",
+        "| lancedb[nprobes=20,refine_factor=5]/vector | 0.500 | n/a | 0.600 | 12.3 | 20.0 |",
+        "| pgvector-hnsw/vector | failed | | | | |"]
 
 
 def test_shared_memory_exhaustion_gets_the_one_line_fix():

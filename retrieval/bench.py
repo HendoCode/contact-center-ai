@@ -255,7 +255,7 @@ class JitteredEmbeddings:
         return self.inner.embed_query(text)
 
 
-SWEEP_KEYS = ("nprobes", "refine_factor")
+SWEEP_KEYS = ("nprobes", "refine_factor", "ef_search")  # the first two: LanceDB; ef_search: pgvector HNSW
 
 
 def parse_sweep(specs: list[str]) -> tuple[dict[str, int], ...]:
@@ -278,17 +278,26 @@ def parse_sweep(specs: list[str]) -> tuple[dict[str, int], ...]:
     return tuple(c for c in combos if c)
 
 
+def split_sweep(grid: tuple[dict[str, int], ...]) -> tuple[tuple[dict[str, int], ...], tuple[int, ...]]:
+    """The --sweep grid -> (LanceDB nprobes/refine_factor combinations, pgvector ef_search values).
+    The two stores are swept independently, so ef_search never multiplies the LanceDB grid."""
+    lance = {tuple((k, v) for k, v in c.items() if k != "ef_search"): None for c in grid}
+    efs = {c["ef_search"]: None for c in grid if "ef_search" in c}
+    return tuple(dict(c) for c in lance if c), tuple(efs)
+
+
 def sweep_table(metrics: dict) -> str:
     """One compact table: the LanceDB baseline, every sweep row, and the pgvector rows for reference."""
     keep = [k for k, v in metrics.items() if isinstance(v, dict) and k.endswith("/vector")
             and (k.startswith("lancedb") or k.startswith("pgvector"))]
-    lines = ["| config | recall@10 | mrr@10 | p50 ms | p95 ms |", "|---|---|---|---|---|"]
+    lines = ["| config | recall@10 | ann_recall@10 | mrr@10 | p50 ms | p95 ms |", "|---|---|---|---|---|---|"]
     for k in keep:
         r = metrics[k]
         if r.get("status") != "ok":
-            lines.append(f"| {k} | {str(r.get('status', '')).split(':')[0]} | | | |")
+            lines.append(f"| {k} | {str(r.get('status', '')).split(':')[0]} | | | | |")
             continue
-        lines.append(f"| {k} | {r['recall@10']:.3f} | {r['mrr@10']:.3f} | {r['p50_ms']:.1f} | {r['p95_ms']:.1f} |")
+        ann = "n/a" if r.get("ann_recall@10") is None else f"{r['ann_recall@10']:.3f}"
+        lines.append(f"| {k} | {r['recall@10']:.3f} | {ann} | {r['mrr@10']:.3f} | {r['p50_ms']:.1f} | {r['p95_ms']:.1f} |")
     return "\n".join(lines)
 
 
@@ -405,12 +414,14 @@ class IndexConfig:
                  hnsw_ef_search: int = 40, nprobes: int | None = None, refine_factor: int | None = None,
                  num_partitions: int | None = None, num_sub_vectors: int | None = None,
                  pgvector_parallel_workers: int | None = None,
-                 sweep: tuple[dict[str, int], ...] = ()):
+                 sweep: tuple[dict[str, int], ...] = (), lance_index: str = "ivf_pq",
+                 num_bits: int | None = None, sweep_ef_search: tuple[int, ...] = ()):
         self.pgvector_index, self.hnsw_m = pgvector_index, hnsw_m
         self.hnsw_ef_construction, self.hnsw_ef_search = hnsw_ef_construction, hnsw_ef_search
         self.nprobes, self.refine_factor, self.num_partitions = nprobes, refine_factor, num_partitions
         self.num_sub_vectors, self.pgvector_parallel_workers = num_sub_vectors, pgvector_parallel_workers
         self.sweep = sweep  # LanceDB search-knob combinations, e.g. ({"nprobes": 20, "refine_factor": 5}, ...)
+        self.lance_index, self.num_bits, self.sweep_ef_search = lance_index, num_bits, sweep_ef_search
 
     def as_params(self) -> dict:
         return {k: v for k, v in vars(self).items() if v not in (None, ())}
@@ -429,7 +440,8 @@ def open_lancedb(embeddings, workdir: Path, cfg: IndexConfig | None = None) -> S
     def retriever(name="lancedb", nprobes=cfg.nprobes, refine=cfg.refine_factor):
         r = LanceDBRetriever(uri=str(path), embeddings=embeddings, table_name="bench", nprobes=nprobes,
                              refine_factor=refine, num_partitions=cfg.num_partitions,
-                             num_sub_vectors=cfg.num_sub_vectors)
+                             num_sub_vectors=cfg.num_sub_vectors, index_type=cfg.lance_index,
+                             num_bits=cfg.num_bits)
         r.name = name
         return r
 
@@ -441,8 +453,10 @@ def open_lancedb(embeddings, workdir: Path, cfg: IndexConfig | None = None) -> S
         if not has_ivf:
             return "flat (exact)"
         parts = cfg.num_partitions or int(math.sqrt(table.count_rows()))
-        subs = f", {cfg.num_sub_vectors} sub-vectors" if cfg.num_sub_vectors else ""
-        return f"ivf_pq (cosine, {parts} partitions{subs})"
+        pq = cfg.lance_index.endswith("_pq")
+        subs = f", {cfg.num_sub_vectors} sub-vectors" if pq and cfg.num_sub_vectors else ""
+        bits = f", {cfg.num_bits}-bit codes" if pq and cfg.num_bits else ""
+        return f"{cfg.lance_index} (cosine, {parts} partitions{subs}{bits})"
 
     def variants() -> list[Variant]:  # the --sweep grid, scored on the same table
         out = []
@@ -580,9 +594,18 @@ def open_pgvector(embeddings, workdir: Path, cfg: IndexConfig | None = None) -> 
                     cur.execute("SET hnsw.iterative_scan = relaxed_order")
                 cur.execute("ANALYZE langchain_pg_embedding")
 
-        search = (f"ef_search={cfg.hnsw_ef_search}, iterative_scan=relaxed_order")
         index = f"hnsw (cosine, m={cfg.hnsw_m}, ef_construction={cfg.hnsw_ef_construction})"
-        return [Variant(PgHnswRetriever(conn, embeddings, uuid, dim), ["vector"], index, search, build)]
+        out = [Variant(PgHnswRetriever(conn, embeddings, uuid, dim), ["vector"], index,
+                       f"ef_search={cfg.hnsw_ef_search}, iterative_scan=relaxed_order", build)]
+        for ef in cfg.sweep_ef_search:  # same index, only the session's ef_search changes
+            r = PgHnswRetriever(conn, embeddings, uuid, dim)
+            r.name = f"pgvector-hnsw[ef_search={ef}]"
+
+            def set_ef(ef=ef):
+                with conn.cursor() as cur:
+                    cur.execute(f"SET hnsw.ef_search = {int(ef)}")
+            out.append(Variant(r, ["vector"], index, f"ef_search={ef}, iterative_scan=relaxed_order", set_ef))
+        return out
 
     def cleanup():
         try:
@@ -604,7 +627,8 @@ OPENERS: dict[str, Callable] = {"pgvector": open_pgvector, "lancedb": open_lance
 # ── run ───────────────────────────────────────────────────────────────────────
 
 def bench_backend(store: Store, docs: list[dict], queries: list[dict], modes: Iterable[str],
-                  repeats: int = 3, ingest_batch: int = INGEST_BATCH) -> dict[str, dict]:
+                  repeats: int = 3, ingest_batch: int = INGEST_BATCH,
+                  reference: "ExactReference | None" = None) -> dict[str, dict]:
     """Ingest into an empty store in batches, then score and time every query in every mode.
 
     A failing mode becomes a short `failed: ...` status row; the other modes still run.
@@ -623,7 +647,8 @@ def bench_backend(store: Store, docs: list[dict], queries: list[dict], modes: It
         raise RuntimeError(f"{r.name}: ingest wrote {written} rows for {len(docs)} docs")
 
     index = store.index() if callable(store.index) else store.index
-    rows = score_modes(r, queries, modes, repeats, ingest_s, store.index_build_s, index, store.search)
+    rows = score_modes(r, queries, modes, repeats, ingest_s, store.index_build_s, index, store.search,
+                       reference)
     for v in (store.variants() if store.variants else []):
         build_s = None
         try:
@@ -636,12 +661,14 @@ def bench_backend(store: Store, docs: list[dict], queries: list[dict], modes: It
             print(f"bench: {v.retriever.name} FAILED: {short_error(e)}", flush=True)
             rows.update({f"{v.retriever.name}/{m}": {"status": f"failed: {short_error(e)}"} for m in v.modes})
             continue
-        rows.update(score_modes(v.retriever, queries, v.modes, repeats, ingest_s, build_s, v.index, v.search))
+        rows.update(score_modes(v.retriever, queries, v.modes, repeats, ingest_s, build_s, v.index, v.search,
+                                reference))
     return rows
 
 
 def score_modes(r, queries: list[dict], modes: Iterable[str], repeats: int, ingest_s: float,
-                index_build_s: float | None, index: str = "", search: str = "") -> dict[str, dict]:
+                index_build_s: float | None, index: str = "", search: str = "",
+                reference: "ExactReference | None" = None) -> dict[str, dict]:
     """Score every mode for one retriever; a failing mode becomes a short `failed: ...` row."""
     rows: dict[str, dict] = {}
     for mode in modes:
@@ -657,7 +684,8 @@ def score_modes(r, queries: list[dict], modes: Iterable[str], repeats: int, inge
             continue
         print(f"bench: queries {name} ({len(queries)} x {repeats})", flush=True)
         try:
-            row = _score_mode(r, mode, queries, repeats, ingest_s, index_build_s)
+            row = _score_mode(r, mode, queries, repeats, ingest_s, index_build_s,
+                              reference if mode == "vector" else None)
             if index or search:
                 row = {"status": row.pop("status"), "index": index if mode != "fts" else "fts (BM25)",
                        "search": search if mode != "fts" else "", **row}
@@ -669,14 +697,21 @@ def score_modes(r, queries: list[dict], modes: Iterable[str], repeats: int, inge
 
 
 def _score_mode(r, mode: str, queries: list[dict], repeats: int, ingest_s: float,
-                index_build_s: float | None) -> dict:
-    """recall@5/10, MRR@10 and p50/p95 latency for one mode."""
-    ranked, latencies = {}, []
+                index_build_s: float | None, reference: "ExactReference | None" = None) -> dict:
+    """recall@5/10, MRR@10, ann_recall@10 (vector mode) and p50/p95 latency for one mode.
+
+    One untimed pass over every query runs first, so caches and buffers are warm before timing.
+    """
+    for q in queries:
+        r.search(q["query"], k=K, where=q["where"], mode=mode)
+    ranked, latencies, lat_by_type = {}, [], {}
     for _ in range(repeats):
         for q in queries:
             t = time.perf_counter()
             hits = r.search(q["query"], k=K, where=q["where"], mode=mode)
-            latencies.append((time.perf_counter() - t) * 1000)
+            ms = (time.perf_counter() - t) * 1000
+            latencies.append(ms)
+            lat_by_type.setdefault(q["type"], []).append(ms)
             ranked.setdefault(q["id"], [h.call_id for h in hits])
 
     scores = {
@@ -691,18 +726,71 @@ def _score_mode(r, mode: str, queries: list[dict], repeats: int, ingest_s: float
 
     by_type = {t: [q for q in queries if q["type"] == t] for t in QUERY_TYPES}
     by_type = {t: qs for t, qs in by_type.items() if qs}
+    ann = None
+    if reference is not None:
+        vals = [v for q in queries if (v := reference.recall(q["id"], ranked[q["id"]])) is not None]
+        ann = statistics.fmean(vals) if vals else None
     return {
         "status": "ok",
         "recall@5": mean(0, queries),
         "recall@10": mean(1, queries),
         "mrr@10": mean(2, queries),
+        "ann_recall@10": ann,
         "p50_ms": percentile(latencies, 50),
         "p95_ms": percentile(latencies, 95),
         "ingest_s": ingest_s,
         "index_build_s": index_build_s,
         "recall@10_by_type": {t: mean(1, qs) for t, qs in by_type.items()},
         "mrr@10_by_type": {t: mean(2, qs) for t, qs in by_type.items()},
+        "p50_ms_by_type": {t: percentile(v, 50) for t, v in lat_by_type.items()},
+        "p95_ms_by_type": {t: percentile(v, 95) for t, v in lat_by_type.items()},
     }
+
+
+class ExactReference:
+    """Brute-force cosine top-k over exactly the vectors the backends ingested (same order, same
+    jitter) with each query's `where` applied: the yardstick for ann_recall@10.
+
+    ann_recall@10 = hits whose true cosine reaches the reference's k-th best (ties count) /
+    min(k, rows passing the filter). Unlike label recall it does not depend on which replica
+    of a document comes back, so it measures the index, not replica identity.
+    """
+
+    def __init__(self, docs: list[dict], embeddings, queries: list[dict], k: int = K):
+        import numpy as np
+
+        from retrieval.base import validate_where
+
+        by_id = {d["call_id"]: d for d in docs}  # last occurrence wins, as in both backends
+        self.ids = list(by_id)
+        self.pos = {cid: i for i, cid in enumerate(self.ids)}
+        x = np.asarray(embeddings.embed_documents([by_id[c]["text"] for c in self.ids]), dtype=np.float32)
+        self.x = x / np.maximum(np.linalg.norm(x, axis=1, keepdims=True), 1e-12)
+        meta = [by_id[c].get("metadata", {}) for c in self.ids]
+        ops = {"eq": lambda a, b: a == b, "in": lambda a, b: a in b, "gte": lambda a, b: a is not None and a >= b,
+               "lte": lambda a, b: a is not None and a <= b, "lt": lambda a, b: a is not None and a < b}
+        self.k, self.ref = k, {}
+        for q in queries:
+            clauses = [(f, ops[op], [str(v) for v in val] if op == "in" else (None if val is None else str(val)))
+                       for f, op, val in validate_where(q["where"])]
+            mask = np.fromiter((all(fn(None if m.get(f) is None else str(m.get(f)), v) for f, fn, v in clauses)
+                                for m in meta), dtype=bool, count=len(meta))
+            n = int(mask.sum())
+            if n == 0:
+                continue
+            v = np.asarray(embeddings.embed_query(q["query"]), dtype=np.float32)
+            v /= max(float(np.linalg.norm(v)), 1e-12)
+            sims = self.x @ v
+            kth = float(np.sort(sims[mask])[-min(k, n)])
+            self.ref[q["id"]] = (v, kth, n)
+
+    def recall(self, qid: str, hit_ids: list[str]) -> float | None:
+        if qid not in self.ref:
+            return None
+        v, kth, n = self.ref[qid]
+        rows = [self.pos[c] for c in hit_ids[: self.k] if c in self.pos]
+        good = int(((self.x[rows] @ v) >= kth - 1e-5).sum()) if rows else 0
+        return min(good, self.k) / min(self.k, n)
 
 
 def run_bench(docs: list[dict], queries: list[dict], embeddings, *,
@@ -721,6 +809,8 @@ def run_bench(docs: list[dict], queries: list[dict], embeddings, *,
     n_unique, embed_s = cached.warm_documents((d["text"] for d in docs),
                                               progress=embed_progress())
     q_times = cached.warm_queries(q["query"] for q in queries)
+    print("bench: exact reference top-10 for ann_recall@10", flush=True)
+    reference = ExactReference(docs, JitteredEmbeddings(cached, jitter_eps) if jitter_eps else cached, queries)
 
     metrics: dict = {
         "embed_unique_docs": n_unique,
@@ -733,7 +823,7 @@ def run_bench(docs: list[dict], queries: list[dict], embeddings, *,
             try:
                 emb = JitteredEmbeddings(cached, jitter_eps) if jitter_eps else cached
                 store = openers[name](emb, Path(tmp))
-                metrics.update(bench_backend(store, docs, queries, modes, repeats, ingest_batch))
+                metrics.update(bench_backend(store, docs, queries, modes, repeats, ingest_batch, reference))
             except Exception as e:  # noqa: BLE001 - recorded, not raised: keep the other backends
                 print(f"bench: {name} FAILED: {short_error(e)}", flush=True)
                 for mode in modes:
@@ -856,7 +946,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--nprobes", type=int, help="LanceDB IVF nprobes (default: LanceDB's)")
     parser.add_argument("--refine-factor", type=int, help="LanceDB refine_factor (default: none)")
     parser.add_argument("--num-partitions", type=int, help="LanceDB IVF partitions (default sqrt(rows))")
-    parser.add_argument("--num-sub-vectors", type=int, help="LanceDB PQ sub-vectors (default: LanceDB's)")
+    parser.add_argument("--lance-index", default="ivf_pq",
+                        choices=["ivf_pq", "ivf_flat", "ivf_sq", "ivf_hnsw_sq", "ivf_hnsw_pq"],
+                        help="LanceDB vector index at >= 100,000 rows (default ivf_pq)")
+    parser.add_argument("--num-sub-vectors", "--lance-num-sub-vectors", dest="num_sub_vectors", type=int,
+                        help="LanceDB PQ sub-vectors (default: LanceDB's)")
+    parser.add_argument("--lance-num-bits", type=int, help="LanceDB PQ bits per code (default 8)")
     parser.add_argument("--pgvector-parallel-workers", type=int,
                         help="max_parallel_maintenance_workers for the HNSW build (0 = serial; for a small /dev/shm)")
     parser.add_argument("--sweep", action="append", default=[],
@@ -876,7 +971,8 @@ def main(argv: list[str] | None = None) -> int:
         hnsw_ef_construction=args.hnsw_ef_construction, hnsw_ef_search=args.hnsw_ef_search,
         nprobes=args.nprobes, refine_factor=args.refine_factor, num_partitions=args.num_partitions,
         num_sub_vectors=args.num_sub_vectors, pgvector_parallel_workers=args.pgvector_parallel_workers,
-        sweep=sweep)
+        lance_index=args.lance_index, num_bits=args.lance_num_bits,
+        sweep=split_sweep(sweep)[0], sweep_ef_search=split_sweep(sweep)[1])
     backends = [b.strip() for b in args.backends.split(",") if b.strip()]
     modes = [m.strip() for m in args.modes.split(",") if m.strip()]
     for b in backends:
