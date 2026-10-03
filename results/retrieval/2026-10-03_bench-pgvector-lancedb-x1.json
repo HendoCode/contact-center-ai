@@ -1,0 +1,135 @@
+{
+  "date": "2026-10-03",
+  "git_sha": "9c244e1fa2f8637c8ec9c216c6869331cfd5c7a2",
+  "area": "retrieval",
+  "run": "bench-pgvector-lancedb-x1",
+  "hardware": "Intel(R) Core(TM) i5-1038NG7 CPU @ 2.00GHz, 8 cores, 15 GB RAM, Linux",
+  "versions": {
+    "python": "3.14.7",
+    "model": "ollama:nomic-embed-text",
+    "lancedb": "0.39.0",
+    "pyarrow": "25.0.1",
+    "pylance": "not installed",
+    "langchain-postgres": "0.0.17",
+    "psycopg2-binary": "2.9.12",
+    "postgres": "16.15 (Debian 16.15-1.pgdg12+2)",
+    "pgvector_ext": "0.8.7"
+  },
+  "params": {
+    "backends": [
+      "pgvector",
+      "lancedb"
+    ],
+    "modes": [
+      "vector",
+      "fts",
+      "hybrid"
+    ],
+    "k": 10,
+    "repeats": 3,
+    "scale": 1,
+    "rows": 1250,
+    "queries": 40,
+    "labels_sha256": "14fc5f3c345dd138"
+  },
+  "metrics": {
+    "embed_unique_docs": 1063,
+    "embed_docs_s": 350.90982966599995,
+    "embed_query_p50_ms": 42.90424800001347,
+    "pgvector/vector": {
+      "status": "ok",
+      "recall@5": 0.845,
+      "recall@10": 0.8631249999999999,
+      "mrr@10": 0.8333333333333334,
+      "p50_ms": 17.777623999791103,
+      "p95_ms": 20.084439450283753,
+      "ingest_s": 2.394303580000269,
+      "index_build_s": null,
+      "recall@10_by_type": {
+        "topical": 1.0,
+        "filter": 0.9525,
+        "exact": 0.6,
+        "paraphrase": 0.8888888888888888
+      },
+      "mrr@10_by_type": {
+        "topical": 1.0,
+        "filter": 0.8333333333333334,
+        "exact": 0.6,
+        "paraphrase": 0.8888888888888888
+      }
+    },
+    "pgvector/fts": {
+      "status": "not supported: pgvector backend supports mode='vector' only, not 'fts'"
+    },
+    "pgvector/hybrid": {
+      "status": "not supported: pgvector backend supports mode='vector' only, not 'hybrid'"
+    },
+    "lancedb/vector": {
+      "status": "ok",
+      "recall@5": 0.845,
+      "recall@10": 0.8631249999999999,
+      "mrr@10": 0.8333333333333334,
+      "p50_ms": 13.434138500088011,
+      "p95_ms": 16.840415950036913,
+      "ingest_s": 3.54147465799997,
+      "index_build_s": 0.0950293870000678,
+      "recall@10_by_type": {
+        "topical": 1.0,
+        "filter": 0.9525,
+        "exact": 0.6,
+        "paraphrase": 0.8888888888888888
+      },
+      "mrr@10_by_type": {
+        "topical": 1.0,
+        "filter": 0.8333333333333334,
+        "exact": 0.6,
+        "paraphrase": 0.8888888888888888
+      }
+    },
+    "lancedb/fts": {
+      "status": "ok",
+      "recall@5": 0.7,
+      "recall@10": 0.71,
+      "mrr@10": 0.69375,
+      "p50_ms": 9.426509999912014,
+      "p95_ms": 11.220466500162729,
+      "ingest_s": 3.54147465799997,
+      "index_build_s": 0.0950293870000678,
+      "recall@10_by_type": {
+        "topical": 0.8636363636363636,
+        "filter": 0.89,
+        "exact": 1.0,
+        "paraphrase": 0.0
+      },
+      "mrr@10_by_type": {
+        "topical": 0.8409090909090909,
+        "filter": 0.85,
+        "exact": 1.0,
+        "paraphrase": 0.0
+      }
+    },
+    "lancedb/hybrid": {
+      "status": "ok",
+      "recall@5": 0.8574999999999999,
+      "recall@10": 0.9004166666666666,
+      "mrr@10": 0.8895833333333334,
+      "p50_ms": 15.306258999999045,
+      "p95_ms": 19.561210100073367,
+      "ingest_s": 3.54147465799997,
+      "index_build_s": 0.0950293870000678,
+      "recall@10_by_type": {
+        "topical": 0.9454545454545454,
+        "filter": 0.9650000000000001,
+        "exact": 0.9466666666666667,
+        "paraphrase": 0.7222222222222222
+      },
+      "mrr@10_by_type": {
+        "topical": 0.9318181818181818,
+        "filter": 0.95,
+        "exact": 0.7833333333333333,
+        "paraphrase": 0.8888888888888888
+      }
+    }
+  },
+  "notes": "recall@k is capped recall, |rel \u2229 top-k| / min(k, |rel|). Embeddings are precomputed and cached, so ingest_s and latency exclude the embedding model. pgvector builds no vector index (exact scan), so index_build_s is n/a."
+}
