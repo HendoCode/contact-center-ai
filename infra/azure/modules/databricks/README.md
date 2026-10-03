@@ -25,7 +25,7 @@ Rerunning is safe: every step is find-or-create.
 
 **Free Edition limits that matter here**, from [Databricks' limitations page](https://docs.databricks.com/aws/en/getting-started/free-edition-limitations), checked 2026-10-03:
 
-- One SQL warehouse, 2X-Small only. When creating `ccai-sql` hits that limit (`RESOURCE_EXHAUSTED`) and exactly one warehouse exists (on Free Edition, `Serverless Starter Warehouse`), the script uses it and says so. Otherwise pass `--warehouse-name <it>`.
+- One SQL warehouse, 2X-Small only. When creating `ccai-sql` hits that limit (`RESOURCE_EXHAUSTED`) and exactly one warehouse exists (on Free Edition, `Serverless Starter Warehouse`), the script uses it and says so. Otherwise pass `--warehouse-name '<its name>'` (spaces are fine) or `--warehouse-id <id>`, which skips the name lookup.
 - Serverless compute only. This module's all-purpose cluster and its `http_path` output do not exist there; use the warehouse's HTTP path, which the script records.
 - A daily compute quota. Past it, compute is shut down for the rest of the day, so a large `make load-databricks` may have to resume the next day.
 - Outbound internet is limited to trusted domains. That does not matter here: the loaders upload from your machine.

@@ -38,7 +38,8 @@ Options:
   --catalog NAME         catalog to use or create (default ccai; Free Edition: see README)
   --raw-schema NAME      loaders' schema (default raw; DATABRICKS_RAW_SCHEMA)
   --marts-schema NAME    dbt's schema (default marts; DATABRICKS_SCHEMA)
-  --warehouse-name NAME  SQL warehouse to find or create (default ccai-sql)
+  --warehouse-name NAME  SQL warehouse to find or create (default ccai-sql; spaces are fine)
+  --warehouse-id ID      use this warehouse id, skipping the name lookup
   --skip-1password       do not write the 1Password item
   --dry-run              print each step and change nothing
   -h, --help             this help
@@ -57,6 +58,7 @@ parse_args() {
       --raw-schema) RAW_SCHEMA="${2:?--raw-schema needs a value}"; shift 2 ;;
       --marts-schema) MARTS_SCHEMA="${2:?--marts-schema needs a value}"; shift 2 ;;
       --warehouse-name) WAREHOUSE_NAME="${2:?--warehouse-name needs a value}"; WAREHOUSE_GIVEN=1; shift 2 ;;
+      --warehouse-id) WAREHOUSE_ID="${2:?--warehouse-id needs a value}"; WAREHOUSE_GIVEN=1; shift 2 ;;
       --skip-1password) SKIP_OP=1; shift ;;
       --dry-run) DRY_RUN=1; shift ;;
       -h | --help) usage; exit 0 ;;
@@ -66,7 +68,9 @@ parse_args() {
   for n in "$CATALOG" "$RAW_SCHEMA" "$MARTS_SCHEMA"; do
     valid_ident "$n" || die "not a plain identifier: '$n' (letters, digits, underscore)"
   done
-  [[ "$WAREHOUSE_NAME" =~ ^[A-Za-z0-9_-]+$ ]] || die "warehouse name: letters, digits, '-' and '_' only"
+  # The name is only looked up and JSON-encoded, so any printable name (spaces included) is fine.
+  [[ -n "$WAREHOUSE_NAME" && "$WAREHOUSE_NAME" != *[[:cntrl:]]* ]] || die "warehouse name must be printable text"
+  [[ -z "$WAREHOUSE_ID" || "$WAREHOUSE_ID" =~ ^[A-Za-z0-9]+$ ]] || die "warehouse id: letters and digits only"
 }
 
 # Same rule as the loaders' check_ident: unquoted-safe Unity Catalog names.
@@ -108,13 +112,14 @@ grant_hint() {
   esac
 }
 
-# json_get <python-expr on d>: read JSON from stdin, print the expression ('' when absent).
+# json_get <python-expr on d> [arg...]: read JSON from stdin, print the expression ('' when
+# absent). Extra args are the list `a`, so values are passed as data, never spliced into code.
 json_get() {
   python3 -c 'import json,sys
-d = json.load(sys.stdin)
+d, a = json.load(sys.stdin), sys.argv[2:]
 try: v = eval(sys.argv[1])
 except Exception: v = None
-print("" if v is None else v)' "$1"
+print("" if v is None else v)' "$@"
 }
 
 # api <METHOD> <path> [json-body]: the token goes through a mode-600 header file, not argv.
@@ -151,13 +156,18 @@ verify_token() {
 
 find_or_create_warehouse() {
   local list body
+  if [[ -n "$WAREHOUSE_ID" ]]; then
+    say "Using SQL warehouse id $WAREHOUSE_ID (--warehouse-id; no name lookup)"
+    HTTP_PATH="/sql/1.0/warehouses/$WAREHOUSE_ID"
+    return
+  fi
   list="$(api_ok GET /api/2.0/sql/warehouses)"
-  WAREHOUSE_ID="$(json_get "next(w['id'] for w in d.get('warehouses', []) if w['name'] == '$WAREHOUSE_NAME')" <<<"$list")"
+  WAREHOUSE_ID="$(json_get "next(w['id'] for w in d.get('warehouses', []) if w['name'] == a[0])" "$WAREHOUSE_NAME" <<<"$list")"
   if [[ -n "$WAREHOUSE_ID" ]]; then
     say "Using SQL warehouse $WAREHOUSE_NAME ($WAREHOUSE_ID)"
   else
     say "Creating SQL warehouse $WAREHOUSE_NAME (serverless, 2X-Small, stops after 10 idle minutes)"
-    body="{\"name\":\"$WAREHOUSE_NAME\",\"cluster_size\":\"2X-Small\",\"min_num_clusters\":1,\"max_num_clusters\":1,\"auto_stop_mins\":10,\"enable_serverless_compute\":true,\"warehouse_type\":\"PRO\"}"
+    body="{\"name\":$(json_str "$WAREHOUSE_NAME"),\"cluster_size\":\"2X-Small\",\"min_num_clusters\":1,\"max_num_clusters\":1,\"auto_stop_mins\":10,\"enable_serverless_compute\":true,\"warehouse_type\":\"PRO\"}"
     local out
     if ! out="$(api_ok POST /api/2.0/sql/warehouses "$body" 2>&1)"; then
       # Free Edition allows one warehouse: when that limit is hit and exactly one exists, use it.
@@ -262,7 +272,9 @@ dry_run() {
   say "Host: ${HOST:-<from --host, --from-terraform, or a prompt>}"
   say "Read the personal access token without echo (prompt, or stdin when piped)"
   say "GET https://${HOST:-<host>}/api/2.0/preview/scim/v2/Me   (token check)"
-  say "Find SQL warehouse '$WAREHOUSE_NAME' (GET /api/2.0/sql/warehouses), else create it serverless 2X-Small"
+  if [[ -n "$WAREHOUSE_ID" ]]; then say "Use SQL warehouse id $WAREHOUSE_ID (no lookup)"
+  else say "Find SQL warehouse '$WAREHOUSE_NAME' (GET /api/2.0/sql/warehouses), else create it serverless 2X-Small"
+  fi
   say "Run through POST /api/2.0/sql/statements:"
   bootstrap_sql | sed 's/^/    /'
   if ((SKIP_OP)); then say "Skip 1Password"

@@ -90,7 +90,8 @@ def test_sql_statements_and_identifier_checks():
         "CREATE VOLUME IF NOT EXISTS `my_cat`.`raw2`.`ccai_loader_stage`",
     ]
     assert sh("parse_args --catalog 'bad-cat'").returncode != 0
-    assert sh("parse_args --warehouse-name \"x'y\"").returncode != 0
+    assert sh("parse_args --warehouse-name 'Serverless Starter Warehouse'").returncode == 0
+    assert sh("parse_args --warehouse-id 'abc; rm'").returncode != 0
     assert sh("parse_args --nope").returncode != 0
 
 
@@ -119,6 +120,30 @@ def test_bad_token_fails_at_the_check(tmp_path):
     res, calls = run(["--host", "adb-1.2.azuredatabricks.net", "--skip-1password"], "wrong", tmp_path)
     assert res.returncode != 0 and "token check failed" in res.stderr
     assert len(calls) == 1
+
+
+def test_warehouse_name_with_spaces_and_quotes_is_looked_up_as_data(tmp_path):
+    res, _ = run(["--host", "adb-1.2.azuredatabricks.net", "--skip-1password",
+                  "--warehouse-name", "Bob's Serverless Starter Warehouse"], "good-token", tmp_path,
+                 WAREHOUSES="other,Bob's Serverless Starter Warehouse")
+    assert res.returncode == 0, res.stderr
+    assert "Using SQL warehouse Bob's Serverless Starter Warehouse (wh1)" in res.stdout
+
+
+def test_new_warehouse_name_is_json_encoded(tmp_path):
+    res, calls = run(["--host", "adb-1.2.azuredatabricks.net", "--skip-1password",
+                      "--warehouse-name", 'My "team" WH'], "good-token", tmp_path, WAREHOUSES="")
+    assert res.returncode == 0, res.stderr
+    create = next(c for c in calls if c["method"] == "POST" and c["url"].endswith("/sql/warehouses"))
+    assert json.loads(create["data"])["name"] == 'My "team" WH'
+
+
+def test_warehouse_id_skips_the_lookup(tmp_path):
+    res, calls = run(["--host", "adb-1.2.azuredatabricks.net", "--skip-1password",
+                      "--warehouse-id", "f00d42"], "good-token", tmp_path)
+    assert res.returncode == 0, res.stderr
+    assert not any("/sql/warehouses" in c["url"] for c in calls)
+    assert "DATABRICKS_HTTP_PATH=/sql/1.0/warehouses/f00d42" in res.stdout
 
 
 def test_warehouse_limit_with_one_existing_warehouse_uses_it(tmp_path):
