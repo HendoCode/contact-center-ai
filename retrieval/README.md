@@ -20,6 +20,39 @@ so `--scale 80` never sends 100,000 rows in one call. A backend or mode that fai
 `failed: <error>` row (at most 300 characters), the other backends still run, and the results file is
 written either way.
 
+### Fair comparison at scale (`--scale 80`)
+
+A plain `make bench ARGS="--scale 80"` now gives an approximate-vs-approximate comparison, plus the exact
+reference:
+
+| row | index | search |
+|---|---|---|
+| `pgvector/vector` | none (exact scan), the reference | exact |
+| `pgvector-hnsw/vector` | HNSW, cosine, `m=16`, `ef_construction=64`, built after ingest (its own `index_build_s`) | `ef_search=40`, `iterative_scan=relaxed_order` |
+| `lancedb/vector`, `/hybrid` | IVF-PQ, cosine, sqrt(rows) partitions at >= 100,000 rows, else flat | LanceDB defaults |
+
+Every row records its `index` and `search` settings in the results JSON and table. The settings:
+
+- **pgvector:** `--pgvector-index none` skips the HNSW variant. `--hnsw-m`, `--hnsw-ef-construction` and
+  `--hnsw-ef-search` tune it. The HNSW index is a partial index over the bench collection on
+  `embedding::vector(<dim>)`, because LangChain's column has no fixed dimension. It is queried with
+  bench-only SQL through that expression and dropped afterwards.
+- **LanceDB:** `--nprobes`, `--refine-factor` and `--num-partitions` set the IVF-PQ knobs.
+- **Sweep:** `--sweep nprobes=10,20,50,100` or `--sweep refine_factor=1,5,10,20` adds one row per value,
+  scored on the same table, as a compact recall-vs-latency table.
+
+**Replica jitter.** `--scale N` repeats the same texts with new ids. Identical vectors made k-means
+degenerate (empty clusters, "many duplicate vectors"), so for `--scale > 1` each repeat now gets a seeded
+jitter of norm `--jitter-eps` (default 0.05, cosine to the original about 0.999), renormalised. The first
+copy and every query vector are unchanged, and `--scale 1` is unchanged. `--no-jitter` turns it off.
+All replicas still count as relevant, so recall at scale measures ranking among near-duplicates: compare
+ingest and latency across scales, not recall.
+
+**What a local run showed.** These are offline hashed embeddings at x80, so the absolute scores mean nothing.
+The `nprobes` sweep did not move LanceDB's recall (0.225 at 5, 20 and 50 probes), while `refine_factor=20`
+lifted it to the exact-scan level (about 0.30–0.33 vs 0.300). That points at PQ compression rather than
+probing as the x80 recall gap. Check it on real embeddings with `--sweep refine_factor=1,5,10,20`.
+
 ## LanceDB on az:// (ADLS Gen2)
 
 `make lance-azure-check` runs the bench's LanceDB half twice, on a local temp directory and on

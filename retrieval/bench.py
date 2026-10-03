@@ -34,8 +34,11 @@ Method
 """
 
 import argparse
+import contextlib
+import functools
 import hashlib
 import json
+import math
 import os
 import platform
 import re
@@ -212,6 +215,46 @@ def short_error(exc: BaseException, limit: int = ERROR_CHARS) -> str:
     return text if len(text) <= limit else text[: limit - 15] + " ...[truncated]"
 
 
+JITTER_EPS = 0.05
+
+
+def jitter(vec: list[float], text: str, n: int, eps: float = JITTER_EPS) -> list[float]:
+    """`vec` (normalised) plus seeded Gaussian noise of norm ~eps, renormalised.
+
+    The seed is sha256(n, text), so a replica's vector is the same on every run and backend.
+    At eps=0.05 the cosine to the original is ~0.999: replicas stay near-duplicates (the
+    ground truth is still all of them) but are no longer identical points for k-means/PQ.
+    """
+    import numpy as np
+
+    seed = int.from_bytes(hashlib.sha256(f"{n}\0{text}".encode()).digest()[:8], "big")
+    v = np.asarray(vec, dtype=np.float64)
+    v = v / (np.linalg.norm(v) or 1.0)
+    v = v + eps * np.random.default_rng(seed).standard_normal(v.shape[0]) / math.sqrt(v.shape[0])
+    return (v / np.linalg.norm(v)).tolist()
+
+
+class JitteredEmbeddings:
+    """Scale-up replicas repeat the same text; the n-th repeat of a text (n >= 1) gets
+    `jitter(vec, text, n)` so --scale does not feed the vector index identical points.
+    The first occurrence and every query embedding are unchanged. One instance per backend,
+    so both backends see the same vectors."""
+
+    def __init__(self, inner, eps: float = JITTER_EPS):
+        self.inner, self.eps, self._seen = inner, eps, {}
+
+    def embed_documents(self, texts: list[str]) -> list[list[float]]:
+        out = []
+        for t, v in zip(texts, self.inner.embed_documents(texts)):
+            n = self._seen.get(t, 0)
+            self._seen[t] = n + 1
+            out.append(v if n == 0 else jitter(v, t, n, self.eps))
+        return out
+
+    def embed_query(self, text: str) -> list[float]:
+        return self.inner.embed_query(text)
+
+
 def cache_file_for(embeddings) -> Path:
     """The on-disk embedding cache for this model; every bench caller shares it."""
     return CACHE_DIR / (re.sub(r"[^A-Za-z0-9_.-]+", "_", embedding_model(embeddings)) + ".jsonl")
@@ -288,43 +331,214 @@ class CachedEmbeddings:
 
 # ── backends ──────────────────────────────────────────────────────────────────
 
-class Store:
-    """A fresh bench-only backend: the retriever, its index-build timer, cleanup."""
+class Variant:
+    """A second configuration scored on the same ingested data (an extra index, a knob value).
 
-    def __init__(self, retriever: Retriever, cleanup: Callable[[], None] = lambda: None):
+    `setup()` runs once after the base rows are scored (e.g. builds an HNSW index) and its
+    wall time is reported as that variant's index_build_s.
+    """
+
+    def __init__(self, retriever, modes: Iterable[str], index: str, search: str,
+                 setup: Callable[[], None] | None = None):
+        self.retriever, self.modes, self.index, self.search = retriever, list(modes), index, search
+        self.setup = setup
+
+
+class Store:
+    """A fresh bench-only backend: the retriever, its index-build timer, cleanup.
+
+    `index` / `search` describe the vector index and search parameters for the result rows;
+    a callable is evaluated after ingest (LanceDB only builds IVF-PQ at >= 100,000 rows).
+    """
+
+    def __init__(self, retriever: Retriever, cleanup: Callable[[], None] = lambda: None,
+                 index: str | Callable[[], str] = "", search: str = "",
+                 variants: Callable[[], list[Variant]] | None = None):
         self.retriever = retriever
         self.cleanup = cleanup
         self.index_build_s: float | None = None
+        self.index, self.search, self.variants = index, search, variants
 
 
-def open_lancedb(embeddings, workdir: Path) -> Store:
+class IndexConfig:
+    """Vector-index and search knobs for both stores (CLI flags; defaults = previous behaviour
+    for LanceDB, plus an HNSW variant for pgvector)."""
+
+    def __init__(self, pgvector_index: str = "hnsw", hnsw_m: int = 16, hnsw_ef_construction: int = 64,
+                 hnsw_ef_search: int = 40, nprobes: int | None = None, refine_factor: int | None = None,
+                 num_partitions: int | None = None, sweep_nprobes: tuple[int, ...] = (),
+                 sweep_refine: tuple[int, ...] = ()):
+        self.pgvector_index, self.hnsw_m = pgvector_index, hnsw_m
+        self.hnsw_ef_construction, self.hnsw_ef_search = hnsw_ef_construction, hnsw_ef_search
+        self.nprobes, self.refine_factor, self.num_partitions = nprobes, refine_factor, num_partitions
+        self.sweep_nprobes, self.sweep_refine = sweep_nprobes, sweep_refine
+
+    def as_params(self) -> dict:
+        return {k: v for k, v in vars(self).items() if v not in (None, ())}
+
+
+def _lance_search(nprobes: int | None, refine_factor: int | None) -> str:
+    return (f"nprobes={nprobes or 'default'}, refine_factor={refine_factor or 'none'}")
+
+
+def open_lancedb(embeddings, workdir: Path, cfg: IndexConfig | None = None) -> Store:
     from retrieval.lancedb_backend import LanceDBRetriever
 
+    cfg = cfg or IndexConfig()
     path = Path(tempfile.mkdtemp(prefix="lance-", dir=workdir))
-    retriever = LanceDBRetriever(uri=str(path), embeddings=embeddings, table_name="bench")
-    store = Store(retriever, cleanup=lambda: shutil.rmtree(path, ignore_errors=True))
+
+    def retriever(name="lancedb", nprobes=cfg.nprobes, refine=cfg.refine_factor):
+        r = LanceDBRetriever(uri=str(path), embeddings=embeddings, table_name="bench", nprobes=nprobes,
+                             refine_factor=refine, num_partitions=cfg.num_partitions)
+        r.name = name
+        return r
+
+    base = retriever()
+
+    def index() -> str:
+        table = base._table()
+        has_ivf = table is not None and "vector" in {i.columns[0] for i in table.list_indices()}
+        if not has_ivf:
+            return "flat (exact)"
+        parts = cfg.num_partitions or int(math.sqrt(table.count_rows()))
+        return f"ivf_pq (cosine, {parts} partitions)"
+
+    def variants() -> list[Variant]:  # the --sweep values, scored on the same table
+        return ([Variant(retriever(f"lancedb[nprobes={n}]", n), ["vector"], index(),
+                         _lance_search(n, cfg.refine_factor)) for n in cfg.sweep_nprobes]
+                + [Variant(retriever(f"lancedb[refine_factor={f}]", cfg.nprobes, f), ["vector"], index(),
+                           _lance_search(cfg.nprobes, f)) for f in cfg.sweep_refine])
+
+    store = Store(base, cleanup=lambda: shutil.rmtree(path, ignore_errors=True), index=index,
+                  search=_lance_search(cfg.nprobes, cfg.refine_factor), variants=variants)
 
     # Time the index build inside ingest() without changing the backend.
-    build = retriever._ensure_indexes
+    build = base._ensure_indexes
 
     def timed_build(table):
         t0 = time.perf_counter()
         build(table)
         store.index_build_s = (store.index_build_s or 0.0) + time.perf_counter() - t0
 
-    retriever._ensure_indexes = timed_build
+    base._ensure_indexes = timed_build
     return store
 
 
-def open_pgvector(embeddings, workdir: Path) -> Store:
+HNSW_INDEX = "ccai_bench_hnsw"
+
+
+def hnsw_sql(dim: int, where: dict | None) -> tuple[str, list]:
+    """The bench's HNSW query: same table and metric as PGVector, written so the planner can use
+    the partial expression index (`embedding::vector(dim)`). Returns SQL and its leading params
+    (vector, collection uuid, filter values); the caller appends the order vector and k."""
+    from retrieval.base import validate_where
+
+    ops = {"gte": ">=", "lte": "<=", "lt": "<"}
+    clauses, params = [], []
+    for fld, op, value in validate_where(where):
+        col = "(cmetadata->>%s)"
+        if op == "eq" and value is None:
+            clauses.append(f"{col} IS NULL")
+            params.append(fld)
+        elif op == "eq":
+            clauses.append(f"{col} = %s")
+            params += [fld, str(value)]
+        elif op == "in":
+            clauses.append(f"{col} = ANY(%s)")
+            params += [fld, [str(v) for v in value]]
+        else:
+            clauses.append(f"{col} {ops[op]} %s")
+            params += [fld, str(value)]
+    d = int(dim)
+    sql = (f"SELECT cmetadata->>'call_id', document, cmetadata, "
+           f"1 - ((embedding::vector({d})) <=> %s::vector({d})) "
+           f"FROM langchain_pg_embedding WHERE collection_id = %s::uuid"
+           + "".join(f" AND {c}" for c in clauses)
+           + f" ORDER BY (embedding::vector({d})) <=> %s::vector({d}) LIMIT %s")
+    return sql, params
+
+
+class PgHnswRetriever:
+    """Vector search over the bench collection through the HNSW index (bench-only)."""
+
+    name = "pgvector-hnsw"
+
+    def __init__(self, conn, embeddings, collection_uuid: str, dim: int):
+        self.conn, self.embeddings, self.uuid, self.dim = conn, embeddings, collection_uuid, dim
+
+    def search(self, query, k=5, where=None, mode="vector"):
+        from retrieval.base import Hit
+
+        if mode != "vector":
+            raise NotImplementedError(f"pgvector-hnsw supports mode='vector' only, not {mode!r}")
+        vec = "[" + ",".join(f"{x:.7g}" for x in self.embeddings.embed_query(query)) + "]"
+        sql, filt = hnsw_sql(self.dim, where)
+        with self.conn.cursor() as cur:
+            cur.execute(sql, [vec, self.uuid, *filt, vec, k])
+            return [Hit(call_id=cid, text=doc, score=float(score), metadata=meta)
+                    for cid, doc, meta, score in cur.fetchall()]
+
+
+def open_pgvector(embeddings, workdir: Path, cfg: IndexConfig | None = None) -> Store:
+    import psycopg2
     from langchain_postgres import PGVector
 
     from rag.embeddings import CONNECTION_STRING
     from retrieval.pgvector_backend import PgVectorRetriever
 
+    cfg = cfg or IndexConfig()
     pg = PGVector(embeddings=embeddings, collection_name=BENCH_COLLECTION,
                   connection=CONNECTION_STRING, use_jsonb=True, pre_delete_collection=True)
-    return Store(PgVectorRetriever(store=pg), cleanup=pg.delete_collection)
+    conns = []
+
+    def connect():
+        conn = psycopg2.connect(CONNECTION_STRING)
+        conn.autocommit = True
+        conns.append(conn)
+        return conn
+
+    def variants() -> list[Variant]:
+        if cfg.pgvector_index != "hnsw":
+            return []
+        conn = connect()
+        with conn.cursor() as cur:
+            cur.execute("SELECT uuid::text FROM langchain_pg_collection WHERE name = %s", (BENCH_COLLECTION,))
+            uuid = cur.fetchone()[0]
+            cur.execute("SELECT vector_dims(embedding) FROM langchain_pg_embedding "
+                        "WHERE collection_id = %s::uuid LIMIT 1", (uuid,))
+            dim = int(cur.fetchone()[0])
+
+        def build():
+            with conn.cursor() as cur:
+                cur.execute(f"DROP INDEX IF EXISTS {HNSW_INDEX}")
+                cur.execute("SET maintenance_work_mem = '512MB'")
+                cur.execute(
+                    f"CREATE INDEX {HNSW_INDEX} ON langchain_pg_embedding USING hnsw "
+                    f"((embedding::vector({dim})) vector_cosine_ops) "
+                    f"WITH (m = {int(cfg.hnsw_m)}, ef_construction = {int(cfg.hnsw_ef_construction)}) "
+                    "WHERE collection_id = %s::uuid", (uuid,))
+                cur.execute(f"SET hnsw.ef_search = {int(cfg.hnsw_ef_search)}")
+                # pgvector >= 0.8: keep scanning past filtered-out rows so k hits come back.
+                with contextlib.suppress(psycopg2.Error):
+                    cur.execute("SET hnsw.iterative_scan = relaxed_order")
+                cur.execute("ANALYZE langchain_pg_embedding")
+
+        search = (f"ef_search={cfg.hnsw_ef_search}, iterative_scan=relaxed_order")
+        index = f"hnsw (cosine, m={cfg.hnsw_m}, ef_construction={cfg.hnsw_ef_construction})"
+        return [Variant(PgHnswRetriever(conn, embeddings, uuid, dim), ["vector"], index, search, build)]
+
+    def cleanup():
+        try:
+            if conns:
+                with conns[0].cursor() as cur:
+                    cur.execute(f"DROP INDEX IF EXISTS {HNSW_INDEX}")
+        finally:
+            for c in conns:
+                c.close()
+            pg.delete_collection()
+
+    return Store(PgVectorRetriever(store=pg), cleanup=cleanup, index="none (exact scan)",
+                 search="exact", variants=variants)
 
 
 OPENERS: dict[str, Callable] = {"pgvector": open_pgvector, "lancedb": open_lancedb}
@@ -351,6 +565,27 @@ def bench_backend(store: Store, docs: list[dict], queries: list[dict], modes: It
     if written != len({d["call_id"] for d in docs}):
         raise RuntimeError(f"{r.name}: ingest wrote {written} rows for {len(docs)} docs")
 
+    index = store.index() if callable(store.index) else store.index
+    rows = score_modes(r, queries, modes, repeats, ingest_s, store.index_build_s, index, store.search)
+    for v in (store.variants() if store.variants else []):
+        build_s = None
+        try:
+            if v.setup:
+                t0 = time.perf_counter()
+                v.setup()
+                build_s = time.perf_counter() - t0
+                print(f"bench: {v.retriever.name} index build {build_s:.2f}s", flush=True)
+        except Exception as e:  # noqa: BLE001 - the base rows stand; this variant is marked failed
+            print(f"bench: {v.retriever.name} FAILED: {short_error(e)}", flush=True)
+            rows.update({f"{v.retriever.name}/{m}": {"status": f"failed: {short_error(e)}"} for m in v.modes})
+            continue
+        rows.update(score_modes(v.retriever, queries, v.modes, repeats, ingest_s, build_s, v.index, v.search))
+    return rows
+
+
+def score_modes(r, queries: list[dict], modes: Iterable[str], repeats: int, ingest_s: float,
+                index_build_s: float | None, index: str = "", search: str = "") -> dict[str, dict]:
+    """Score every mode for one retriever; a failing mode becomes a short `failed: ...` row."""
     rows: dict[str, dict] = {}
     for mode in modes:
         name = f"{r.name}/{mode}"
@@ -365,7 +600,11 @@ def bench_backend(store: Store, docs: list[dict], queries: list[dict], modes: It
             continue
         print(f"bench: queries {name} ({len(queries)} x {repeats})", flush=True)
         try:
-            rows[name] = _score_mode(r, mode, queries, repeats, ingest_s, store.index_build_s)
+            row = _score_mode(r, mode, queries, repeats, ingest_s, index_build_s)
+            if index or search:
+                row = {"status": row.pop("status"), "index": index if mode != "fts" else "fts (BM25)",
+                       "search": search if mode != "fts" else "", **row}
+            rows[name] = row
         except Exception as e:  # noqa: BLE001
             rows[name] = {"status": f"failed: {short_error(e)}"}
             print(f"bench: {name} FAILED: {short_error(e)}", flush=True)
@@ -413,7 +652,7 @@ def run_bench(docs: list[dict], queries: list[dict], embeddings, *,
               backends: Iterable[str] = BACKENDS, modes: Iterable[str] = MODES,
               repeats: int = 3, openers: dict[str, Callable] | None = None,
               workdir: Path | None = None, ingest_batch: int = INGEST_BATCH,
-              cache_file: Path | None = None) -> dict:
+              cache_file: Path | None = None, jitter_eps: float = 0.0) -> dict:
     """Run the benchmark; returns the `metrics` block of the results record.
 
     A backend that fails (open, ingest or anything else) gets a short `failed: ...` row per
@@ -435,7 +674,8 @@ def run_bench(docs: list[dict], queries: list[dict], embeddings, *,
         for name in backends:
             store = None
             try:
-                store = openers[name](cached, Path(tmp))
+                emb = JitteredEmbeddings(cached, jitter_eps) if jitter_eps else cached
+                store = openers[name](emb, Path(tmp))
                 metrics.update(bench_backend(store, docs, queries, modes, repeats, ingest_batch))
             except Exception as e:  # noqa: BLE001 - recorded, not raised: keep the other backends
                 print(f"bench: {name} FAILED: {short_error(e)}", flush=True)
@@ -547,11 +787,40 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--labels", type=Path, help="labels file (default: committed queries.jsonl)")
     parser.add_argument("--ingest-batch", type=int, default=INGEST_BATCH,
                         help=f"rows per ingest call (default {INGEST_BATCH:,})")
+    parser.add_argument("--jitter", action=argparse.BooleanOptionalAction, default=None,
+                        help="jitter replica vectors (default: on when --scale > 1)")
+    parser.add_argument("--jitter-eps", type=float, default=JITTER_EPS,
+                        help=f"jitter noise norm on unit vectors (default {JITTER_EPS})")
+    parser.add_argument("--pgvector-index", choices=["hnsw", "none"], default="hnsw",
+                        help="also score pgvector through an HNSW index (default hnsw); the exact row stays")
+    parser.add_argument("--hnsw-m", type=int, default=16, help="HNSW m (default 16)")
+    parser.add_argument("--hnsw-ef-construction", type=int, default=64, help="HNSW ef_construction (default 64)")
+    parser.add_argument("--hnsw-ef-search", type=int, default=40, help="HNSW ef_search (default 40)")
+    parser.add_argument("--nprobes", type=int, help="LanceDB IVF nprobes (default: LanceDB's)")
+    parser.add_argument("--refine-factor", type=int, help="LanceDB refine_factor (default: none)")
+    parser.add_argument("--num-partitions", type=int, help="LanceDB IVF partitions (default sqrt(rows))")
+    parser.add_argument("--sweep", help="LanceDB recall-vs-latency sweep, e.g. nprobes=10,20,50,100 "
+                                         "or refine_factor=1,5,10")
     parser.add_argument("--no-cache", action="store_true",
                         help="do not read or write the embedding cache (.cache/bench-embeddings/)")
     args = parser.parse_args(argv)
     if args.ingest_batch < 1:
         parser.error("--ingest-batch must be at least 1")
+    sweep: tuple[int, ...] = ()
+    if args.sweep:
+        key, _, values = args.sweep.partition("=")
+        try:
+            sweep = tuple(int(v) for v in values.split(",") if v.strip())
+        except ValueError:
+            sweep = ()
+        if key.strip() not in ("nprobes", "refine_factor") or not sweep or min(sweep) < 1:
+            parser.error("--sweep takes nprobes=<n>,... or refine_factor=<n>,... (positive integers)")
+    args.index_config = IndexConfig(
+        pgvector_index=args.pgvector_index, hnsw_m=args.hnsw_m,
+        hnsw_ef_construction=args.hnsw_ef_construction, hnsw_ef_search=args.hnsw_ef_search,
+        nprobes=args.nprobes, refine_factor=args.refine_factor, num_partitions=args.num_partitions,
+        sweep_nprobes=sweep if args.sweep and args.sweep.startswith("nprobes") else (),
+        sweep_refine=sweep if args.sweep and args.sweep.startswith("refine_factor") else ())
     backends = [b.strip() for b in args.backends.split(",") if b.strip()]
     modes = [m.strip() for m in args.modes.split(",") if m.strip()]
     for b in backends:
@@ -581,8 +850,14 @@ def _main(args: argparse.Namespace, backends: list[str], modes: list[str]) -> in
     print(f"bench: {len(docs)} docs, {len(queries)} queries, backends={backends}, modes={modes}")
 
     cache_file = None if args.no_cache else cache_file_for(embeddings)
+    jitter_on = args.jitter if args.jitter is not None else args.scale > 1
+    jitter_eps = args.jitter_eps if jitter_on else 0.0
+    cfg = args.index_config
+    openers = {k: (functools.partial(v, cfg=cfg) if v in (open_pgvector, open_lancedb) else v)
+               for k, v in OPENERS.items()}
     metrics = run_bench(docs, queries, embeddings, backends=backends, modes=modes,
-                        repeats=args.repeats, ingest_batch=args.ingest_batch, cache_file=cache_file)
+                        repeats=args.repeats, ingest_batch=args.ingest_batch, cache_file=cache_file,
+                        openers=openers, jitter_eps=jitter_eps)
 
     versions = {"python": platform.python_version(), "model": embedding_model(embeddings)}
     for pkg in ("lancedb", "pyarrow", "pylance", "langchain-postgres", "psycopg2-binary"):
@@ -595,6 +870,7 @@ def _main(args: argparse.Namespace, backends: list[str], modes: list[str]) -> in
     params = {
         "backends": backends, "modes": modes, "k": K, "repeats": args.repeats,
         "scale": args.scale, "rows": len(docs), "queries": len(queries), "ingest_batch": args.ingest_batch,
+        "jitter_eps": jitter_eps, "index": cfg.as_params(),
         "labels_sha256": hashlib.sha256(labels_text.encode()).hexdigest()[:16],
     }
     notes = ("recall@k is capped recall, |rel ∩ top-k| / min(k, |rel|). Embeddings are "
@@ -602,7 +878,11 @@ def _main(args: argparse.Namespace, backends: list[str], modes: list[str]) -> in
              "pgvector builds no vector index (exact scan), so index_build_s is n/a.")
     if args.scale > 1:
         notes += (f" SYNTHETIC SCALE-UP: the {len(docs) // args.scale}-call corpus replicated "
-                  f"{args.scale}x with new call_ids; replicas share text and vectors.")
+                  f"{args.scale}x with new call_ids; replicas share text"
+                  + (f" and get seeded vector jitter (eps={jitter_eps}), so they are near-duplicates, "
+                     "not identical points." if jitter_eps else " and vectors.")
+                  + " All replicas count as relevant, so recall at scale>1 measures retrieval among "
+                    "near-duplicates; compare ingest and latency across scales, not recall.")
     run = args.run or f"bench-{'-'.join(backends)}-x{args.scale}"
     record = build_record(metrics, run=run, hardware=args.hardware or detect_hardware(),
                           versions=versions, params=params, notes=notes)
