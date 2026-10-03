@@ -54,6 +54,8 @@ from retrieval.base import Hit, validate_where
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_LANCE_URI = str(REPO_ROOT / "data" / "lance")
 VECTOR_INDEX_MIN_ROWS = 100_000
+# Vector index types in the pinned lancedb (0.39: IvfPq, IvfFlat, IvfSq, IvfHnswSq, IvfHnswPq).
+INDEX_TYPES = ("ivf_pq", "ivf_flat", "ivf_sq", "ivf_hnsw_sq", "ivf_hnsw_pq")
 RRF_K = 60
 EMBED_BATCH = 64
 
@@ -94,6 +96,8 @@ class LanceDBRetriever:
         refine_factor: int | None = None,
         num_partitions: int | None = None,
         num_sub_vectors: int | None = None,
+        index_type: str = "ivf_pq",
+        num_bits: int | None = None,
     ):
         self.uri = uri or os.getenv("LANCE_URI") or DEFAULT_LANCE_URI
         # Object-store settings for az:// / s3:// (e.g. azure_storage_account_name,
@@ -102,6 +106,9 @@ class LanceDBRetriever:
         # IVF-PQ knobs; None keeps LanceDB's defaults (num_partitions: sqrt(rows)).
         self.nprobes, self.refine_factor, self.num_partitions = nprobes, refine_factor, num_partitions
         self.num_sub_vectors = num_sub_vectors  # PQ sub-vectors; None = LanceDB's default
+        if index_type not in INDEX_TYPES:
+            raise ValueError(f"index_type {index_type!r}; use one of {', '.join(INDEX_TYPES)}")
+        self.index_type, self.num_bits = index_type, num_bits
         self.table_name = table_name or os.getenv("COLLECTION_NAME", "call_transcripts")
         self.vector_index_min_rows = vector_index_min_rows
         self._embeddings = embeddings
@@ -198,7 +205,7 @@ class LanceDBRetriever:
         return len(rows)
 
     def _ensure_indexes(self, table) -> None:
-        from lancedb.index import FTS, BTree, IvfPq
+        from lancedb.index import FTS, BTree
 
         existing = {idx.columns[0] for idx in table.list_indices()}
         if "call_id" not in existing:
@@ -207,14 +214,21 @@ class LanceDBRetriever:
             table.create_index("text", config=FTS())
         n = table.count_rows()
         if "vector" not in existing and n >= self.vector_index_min_rows:
-            table.create_index(
-                "vector",
-                config=IvfPq(distance_type="cosine",
-                             num_partitions=self.num_partitions or max(1, int(math.sqrt(n))),
-                             num_sub_vectors=self.num_sub_vectors),
-            )
+            table.create_index("vector", config=self._vector_index_config(n))
         # Fold rows written since the last run into the existing indexes.
         table.optimize()
+
+    def _vector_index_config(self, n: int):
+        """The vector index for `index_type` (all cosine); PQ knobs apply only to the *_pq types."""
+        import lancedb.index as li
+
+        kw = {"distance_type": "cosine",
+              "num_partitions": self.num_partitions or max(1, int(math.sqrt(n)))}
+        pq = {k: v for k, v in (("num_sub_vectors", self.num_sub_vectors), ("num_bits", self.num_bits))
+              if v is not None}
+        cls = {"ivf_pq": li.IvfPq, "ivf_flat": li.IvfFlat, "ivf_sq": li.IvfSq,
+               "ivf_hnsw_sq": li.IvfHnswSq, "ivf_hnsw_pq": li.IvfHnswPq}[self.index_type]
+        return cls(**kw, **(pq if self.index_type.endswith("_pq") else {}))
 
     # ── search ────────────────────────────────────────────────────────────────
 
@@ -231,7 +245,11 @@ class LanceDBRetriever:
         table = self._table()
         if table is None:
             return []
+        rows = self._query(table, query, k, flt, mode).to_list()
+        return self._to_hits(rows, mode)
 
+    def _query(self, table, query: str, k: int, flt: str | None, mode: str):
+        """The LanceDB query builder for one search (`explain_plan()` shows nprobes etc.)."""
         if mode == "fts":
             q = table.search(query, query_type="fts")
         elif mode == "vector":
@@ -254,8 +272,7 @@ class LanceDBRetriever:
                 q = q.refine_factor(self.refine_factor)
         if flt:
             q = q.where(flt, prefilter=True)
-        rows = q.limit(k).to_list()
-        return self._to_hits(rows, mode)
+        return q.limit(k)
 
     @staticmethod
     def _to_hits(rows: list[dict], mode: str) -> list[Hit]:
