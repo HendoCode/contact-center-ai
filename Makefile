@@ -6,7 +6,7 @@
 # `evals` is the L2 agent golden set offline (a CI gate); `evals-live` is the same set
 # against real models, uploaded to LangSmith.
 
-.PHONY: up down seed ingest test lint check-public demo bench evals evals-live finetune-data finetune-label load-snowflake load-databricks load-dry-run
+.PHONY: up down seed ingest test lint check-public demo bench evals evals-live finetune-data finetune-label load-snowflake load-databricks load-dry-run dbt-build
 
 PYTHON := uv run python
 
@@ -82,14 +82,23 @@ finetune-label:
 # ── Warehouse loaders (S2) ────────────────────────────────────────────────────
 
 # Load the OLTP JSON into raw tables on Snowflake or Databricks. Each warehouse's adapter
-# group lives in its own uv env (the two groups conflict), hence one target each. They connect
-# to a real warehouse, so they read the SNOWFLAKE_* / DATABRICKS_* variables from the shell.
+# group lives in its own uv env (the two groups conflict), hence one target each.
+# The SNOWFLAKE_* / DATABRICKS_* settings come from 1Password through tools/warehouse-run.sh
+# (templates in tools/op/). DRY=1 prints what would run and the variable names it resolved;
+# DIRECT=1 skips 1Password and reads the variables from the shell, as before.
 # `make load-dry-run` prints every statement for both and connects to nothing.
+WAREHOUSE_RUN = $(if $(DIRECT),,tools/warehouse-run.sh $(if $(DRY),--dry-run) $(1) --)
+
 load-snowflake:
-	uv run --group dbt --group snowflake python -m olap.dbt.loaders snowflake
+	$(call WAREHOUSE_RUN,snowflake) uv run --group dbt --group snowflake python -m olap.dbt.loaders snowflake
 
 load-databricks:
-	uv run --group dbt --group databricks python -m olap.dbt.loaders databricks
+	$(call WAREHOUSE_RUN,databricks) uv run --group dbt --group databricks python -m olap.dbt.loaders databricks
+
+# dbt build on a warehouse target, settings from 1Password: make dbt-build WAREHOUSE=snowflake
+dbt-build:
+	@case "$(WAREHOUSE)" in snowflake|databricks) ;; *) echo "usage: make dbt-build WAREHOUSE=snowflake|databricks" >&2; exit 2 ;; esac
+	$(call WAREHOUSE_RUN,$(WAREHOUSE)) uv run --group dbt --group $(WAREHOUSE) dbt build --project-dir olap/dbt --profiles-dir olap/dbt --target $(WAREHOUSE)
 
 load-dry-run:
 	$(PYTHON) -m olap.dbt.loaders snowflake --dry-run
