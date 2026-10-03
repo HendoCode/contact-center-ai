@@ -6,7 +6,7 @@
 # `evals` is the L2 agent golden set offline (a CI gate); `evals-live` is the same set
 # against real models, uploaded to LangSmith.
 
-.PHONY: up down seed ingest test lint check-public demo bench evals evals-live finetune-data finetune-label load-snowflake load-databricks load-dry-run dbt-build
+.PHONY: up down seed ingest test lint check-public demo bench evals evals-live finetune-data finetune-label load-snowflake load-databricks load-dry-run dbt-build lance-azure-check
 
 PYTHON := uv run python
 
@@ -67,6 +67,11 @@ check-public:
 # flags with ARGS, e.g. `make bench ARGS="--backends lancedb"` or `ARGS="--scale 80"`.
 bench:
 	uv run --group lance python -m retrieval.bench $(ARGS)
+
+# LanceDB's half of the bench on local disk and on az:// (the envs/dev ADLS account), side by
+# side. Needs `az login` (Entra; no account keys). ARGS="--dry-run" prints the plan only.
+lance-azure-check:
+	uv run --group lance python -m retrieval.lance_azure_check $(ARGS)
 
 # ── Fine-tune dataset (F1) ────────────────────────────────────────────────────
 

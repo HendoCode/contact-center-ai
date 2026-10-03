@@ -13,6 +13,50 @@ volume, skipped once present. Every unique transcript (about 1,060) is embedded 
 with a progress line roughly every 10%. On a CPU-only Ollama that step is slow: about 6 minutes
 on an 8-core laptop, about 45 minutes on 2 cores.
 
+## LanceDB on az:// (ADLS Gen2)
+
+`make lance-azure-check` runs the bench's LanceDB half twice, on a local temp directory and on
+`az://lance/<prefix>` in the envs/dev ADLS account, then prints recall@10 and p50 side by side.
+Both stores share the same corpus, labels and embeddings (each unique document is embedded once), so the only
+difference is the storage. The filter queries exercise the metadata prefilter. The Azure table is
+dropped afterwards (`--keep` leaves it), and nothing is written to `results/`.
+
+```bash
+az login                                                   # the account must hold Storage Blob Data Contributor
+make lance-azure-check ARGS="--dry-run"                    # the plan; touches nothing
+make lance-azure-check                                     # account from AZURE_STORAGE_ACCOUNT_NAME or terraform output
+```
+
+**Auth.** Entra only; the account has shared keys off, and no account key is ever used.
+`retrieval/lance_azure_check.py` passes `azure_storage_account_name` plus
+`azure_use_azure_cli=true` as `storage_options`, so Lance's object store (the Rust `object_store`
+crate) gets a storage token from `az` for the signed-in user. If that is refused, set
+`AZURE_STORAGE_SAS_KEY` to a container-scoped SAS (keep it in 1Password, for example
+`op://CMW/azure-ccai`) and rerun; the SAS is used instead.
+
+**What the results mean.** Recall should match the local numbers exactly, because the data,
+vectors and queries are the same. A difference would point at the storage path, not the
+retrieval. Latency is higher on `az://` because every read is a network round trip; that gap is
+the cost of object storage over local disk, not a recall tradeoff.
+
+**Verified (2026-10-03):**
+
+- The pinned `lancedb` 0.39.0 native library contains the Azure object-store options
+  `azure_use_azure_cli`, `azure_storage_token`, `azure_storage_sas_key` and
+  `azure_storage_use_emulator` (string check of `_lancedb.abi3.so`). The `object_store` Azure
+  options, `AZURE_USE_AZURE_CLI` among them, are documented in
+  [obstore's Azure store reference](https://developmentseed.org/obstore/v0.4.0/api/store/azure/),
+  which wraps the same crate.
+- A full run on `az://` against the Azurite emulator: ingest, vector, fts and hybrid,
+  prefiltered queries and the table drop. The test suite's offline embeddings stood in for
+  Ollama, so the absolute scores mean nothing, but recall@10 was identical on disk and on `az://`
+  in every mode (`tests/retrieval/test_lance_azure_check.py`, `-m integration` with `AZURITE=1`).
+
+**Not run, so not claimed:**
+
+- **A real ADLS account:** Entra via `az` against a hierarchical-namespace (ADLS Gen2) account, the RBAC role in practice, real `az://` latency.
+- **`DefaultAzureCredential`:** `object_store` has its own credential chain (CLI, managed identity, workload identity, client secret), not the Azure SDK's.
+
 ## DuckDB over the Lance dataset (R3 stretch)
 
 `duckdb_lance.py` opens the dataset `LanceDBRetriever` writes (`<LANCE_URI>/<table>.lance`)
@@ -43,7 +87,7 @@ against the 50-document test fixture. No timing comparison was run, so there are
 - Hybrid fuses with an `alpha` blend, not RRF, so hybrid rankings and scores differ from the
   LanceDB backend's. It is not wired into `make bench` for that reason: a third column would
   compare different fusion methods.
-- Only a local `LANCE_URI` was tried; `az://` / `s3://` are untested.
+- Only a local `LANCE_URI` was tried here; for `az://` see the section above, and `s3://` is untested.
 - `INSTALL` downloads the extension, so the tests that use it are `integration`-marked:
 
 ```bash

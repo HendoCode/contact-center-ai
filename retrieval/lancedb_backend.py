@@ -89,8 +89,12 @@ class LanceDBRetriever:
         embeddings=None,
         table_name: str | None = None,
         vector_index_min_rows: int = VECTOR_INDEX_MIN_ROWS,
+        storage_options: dict[str, str] | None = None,
     ):
         self.uri = uri or os.getenv("LANCE_URI") or DEFAULT_LANCE_URI
+        # Object-store settings for az:// / s3:// (e.g. azure_storage_account_name,
+        # azure_use_azure_cli); None leaves Lance to read them from the environment.
+        self.storage_options = storage_options
         self.table_name = table_name or os.getenv("COLLECTION_NAME", "call_transcripts")
         self.vector_index_min_rows = vector_index_min_rows
         self._embeddings = embeddings
@@ -109,7 +113,7 @@ class LanceDBRetriever:
     def db(self):
         if self._db is None:
             import lancedb
-            self._db = lancedb.connect(self.uri)
+            self._db = lancedb.connect(self.uri, storage_options=self.storage_options)
         return self._db
 
     def _table(self):
