@@ -24,6 +24,7 @@ import argparse
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 from datetime import datetime, UTC
 from pathlib import Path
@@ -32,11 +33,13 @@ from retrieval.bench import (
     REPO_ROOT,
     MODES,
     Store,
+    cache_file_for,
     ensure_ollama_model,
     load_corpus,
     load_queries,
     open_lancedb,
     run_bench,
+    short_error,
 )
 
 DEV_ENV = REPO_ROOT / "infra" / "azure" / "envs" / "dev"
@@ -54,6 +57,28 @@ def azure_storage_options(account: str, *, sas: str | None = None, emulator: boo
     else:
         opts["azure_use_azure_cli"] = "true"
     return opts
+
+
+# Service-principal settings the Lance object store reads from the environment. Set (even to an
+# empty string, which is what a copied .env.example gives) they switch it from az CLI auth to a
+# client-credentials flow, which then fails against login.microsoftonline.com//oauth2/...
+SP_VARS = ("AZURE_CLIENT_ID", "AZURE_CLIENT_SECRET", "AZURE_TENANT_ID")
+AUTH_HINT = ("Azure sign-in failed: run `az login` (and `az account set -s <subscription>`), check "
+             "you hold Storage Blob Data Contributor on the account, or set AZURE_STORAGE_SAS_KEY")
+
+
+def scrub_azure_env(deliberate: set[str], using_cli: bool, environ=os.environ) -> list[str]:
+    """Drop AZURE_* variables that would misdirect the object store; returns the names dropped.
+
+    Empty AZURE_* values always go. With az CLI auth the service-principal variables go too,
+    unless they were already set when this process started (`deliberate`), i.e. not from .env.
+    """
+    dropped = [k for k, v in environ.items() if k.startswith("AZURE_") and not v.strip()]
+    if using_cli:
+        dropped += [k for k in SP_VARS if k in environ and k not in dropped and k not in deliberate]
+    for k in dropped:
+        del environ[k]
+    return sorted(dropped)
 
 
 def account_name(given: str | None) -> str | None:
@@ -84,7 +109,9 @@ def comparison(metrics: dict, modes=MODES) -> str:
     for m in modes:
         loc, az = metrics.get(f"lancedb/{m}", {}), metrics.get(f"lancedb-az/{m}", {})
         def f(row, key, fmt):
-            return format(row[key], fmt) if row.get("status") == "ok" else row.get("status", "n/a")
+            if row.get("status") == "ok":
+                return format(row[key], fmt)
+            return str(row.get("status", "n/a")).split(":")[0]  # details are printed above the table
         lines.append(f"| {m} | {f(loc, 'recall@10', '.3f')} | {f(az, 'recall@10', '.3f')} | "
                      f"{f(loc, 'p50_ms', '.1f')} | {f(az, 'p50_ms', '.1f')} |")
     return "\n".join(lines)
@@ -98,8 +125,20 @@ def main(argv: list[str] | None = None, embeddings=None) -> int:
     p.add_argument("--repeats", type=int, default=3, help="latency passes per query")
     p.add_argument("--keep", action="store_true", help="leave the Azure table in place")
     p.add_argument("--emulator", action="store_true", help="Azurite on 127.0.0.1:10000 (local test)")
+    p.add_argument("--no-cache", action="store_true",
+                   help="do not read or write the embedding cache (.cache/bench-embeddings/)")
     p.add_argument("--dry-run", action="store_true", help="print the plan and touch nothing")
     args = p.parse_args(argv)
+    # AZURE_* the caller set on purpose, before .env is loaded by importing rag below.
+    deliberate = {k for k, v in os.environ.items() if k.startswith("AZURE_") and v.strip()}
+    try:
+        return _run(args, embeddings, deliberate)
+    except Exception as e:  # noqa: BLE001 - one short line, never a Rust error dump or traceback
+        print(f"lance-azure-check: FAILED: {short_error(e)}", file=sys.stderr)
+        return 1
+
+
+def _run(args: argparse.Namespace, embeddings, deliberate: set[str]) -> int:
 
     account = "devstoreaccount1" if args.emulator else account_name(args.account)
     prefix = args.prefix or f"ccai-check-{datetime.now(UTC):%Y%m%dT%H%M%S}"
@@ -127,6 +166,11 @@ def main(argv: list[str] | None = None, embeddings=None) -> int:
 
         embeddings = get_embeddings()
         ensure_ollama_model(embeddings)
+    sas = sas or os.getenv("AZURE_STORAGE_SAS_KEY") or None  # .env is loaded now
+    dropped = scrub_azure_env(deliberate, using_cli=not (sas or args.emulator))
+    if dropped:
+        print(f"lance-azure-check: ignoring {', '.join(dropped)} (blank, or service-principal settings "
+              "from .env that would override az login)")
     options = azure_storage_options(account, sas=sas, emulator=args.emulator)
     docs, queries = load_corpus(), load_queries()
     print(f"lance-azure-check: {len(docs)} docs, {len(queries)} queries -> {uri} ({auth})")
@@ -135,16 +179,25 @@ def main(argv: list[str] | None = None, embeddings=None) -> int:
     with tempfile.TemporaryDirectory(prefix="ccai-lance-az-") as tmp:
         metrics = run_bench(docs, queries, embeddings, backends=["lancedb", "lancedb-az"],
                             openers={"lancedb": open_lancedb, "lancedb-az": opener},
-                            repeats=args.repeats, workdir=Path(tmp))
-    if not args.keep:
-        import lancedb
+                            repeats=args.repeats, workdir=Path(tmp),
+                            cache_file=None if args.no_cache else cache_file_for(embeddings))
+    az_failed = any(str(v.get("status", "")).startswith("failed")
+                    for k, v in metrics.items() if k.startswith("lancedb-az/") and isinstance(v, dict))
+    if not args.keep and not az_failed:
+        try:
+            import lancedb
 
-        lancedb.connect(uri, storage_options=options).drop_table(TABLE)
+            lancedb.connect(uri, storage_options=options).drop_table(TABLE)
+        except Exception as e:  # noqa: BLE001
+            print(f"lance-azure-check: could not drop {uri} table {TABLE}: {short_error(e, 160)}")
     print()
     print(comparison(metrics))
     az = metrics.get("lancedb-az/vector", {})
     print(f"\naz ingest_s={az.get('ingest_s', float('nan')):.2f}  "
           f"local ingest_s={metrics.get('lancedb/vector', {}).get('ingest_s', float('nan')):.2f}")
+    if az_failed:
+        print(f"lance-azure-check: the az:// run failed (rows above). {AUTH_HINT}", file=sys.stderr)
+        return 1
     return 0
 
 
