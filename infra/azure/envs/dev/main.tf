@@ -22,7 +22,7 @@ module "data" {
   source = "../../modules/data"
 
   resource_group_name       = module.core.resource_group_name
-  location                  = module.core.location
+  location                  = coalesce(var.data_location, module.core.location)
   operator_ip               = var.operator_ip
   operator_object_id        = var.operator_object_id
   app_identity_principal_id = module.core.app_identity_principal_id
@@ -33,7 +33,7 @@ module "apps" {
   source = "../../modules/apps"
 
   resource_group_name        = module.core.resource_group_name
-  location                   = module.core.location
+  location                   = coalesce(var.apps_location, module.core.location)
   log_analytics_workspace_id = module.core.log_analytics_workspace_id
   app_identity_id            = module.core.app_identity_id
   app_identity_principal_id  = module.core.app_identity_principal_id
@@ -64,6 +64,6 @@ module "databricks" {
   count  = var.enable_databricks ? 1 : 0
 
   resource_group_name = module.core.resource_group_name
-  location            = module.core.location
+  location            = coalesce(var.databricks_location, module.core.location)
   tags                = local.tags
 }

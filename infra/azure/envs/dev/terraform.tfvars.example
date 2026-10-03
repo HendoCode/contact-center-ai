@@ -18,7 +18,13 @@ enable_databricks = false
 enable_mcp_server = false # M1 shipped; enabling it bills (see modules/apps/README.md)
 enable_agent_api  = false # wait for L4
 
-# gpu_location         = "centralus" # Spot-quota fallback
+# Per-module regions when location hits a capacity or quota error; each defaults to location.
+# See infra/azure/README.md "Regions" for the cross-region effects.
+# apps_location       = "eastus2"   # Container Apps environment, ACR, container apps
+# data_location       = "centralus" # Postgres Flexible + ADLS; this subscription allows Postgres only in centralus
+# databricks_location = "eastus2"   # workspace, managed resource group, cluster VMs
+# gpu_location        = "centralus" # Spot-quota fallback
+
 # admin_ssh_public_key = "ssh-ed25519 AAAA... you@example.com"
 # key_vault_secrets = {
 #   OPENAI_API_KEY = "https://kv-ccai-xxxxxx.vault.azure.net/secrets/openai-api-key"

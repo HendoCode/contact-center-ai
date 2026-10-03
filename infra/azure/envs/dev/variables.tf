@@ -34,13 +34,34 @@ variable "session_expires" {
 }
 
 variable "location" {
-  description = "Azure region (docs/design/infra.md: East US 2)."
+  description = "Azure region (docs/design/infra.md: East US 2). The resource group, Log Analytics and the app identity stay here; each *_location below defaults to it."
   type        = string
   default     = "eastus2"
 }
 
+# Per-module region overrides for regional capacity or quota errors. Null uses location,
+# so leaving them unset changes nothing. Cross-region notes: infra/azure/README.md.
+
+variable "apps_location" {
+  description = "Region for ACR, the Container Apps environment and its apps. Container Apps environments can fail with ManagedEnvironmentCapacityHeavyUsageError in a busy region. Null uses location."
+  type        = string
+  default     = null
+}
+
+variable "data_location" {
+  description = "Region for Postgres Flexible and the ADLS account. Postgres Flexible is offered per region and some subscriptions are restricted to one (this one: centralus), so this usually stays there. Null uses location."
+  type        = string
+  default     = null
+}
+
+variable "databricks_location" {
+  description = "Region for the Databricks workspace, its managed resource group and cluster VMs. Cluster VM vCPU quota is per region and VM family. Null uses location."
+  type        = string
+  default     = null
+}
+
 variable "gpu_location" {
-  description = "Region for the GPU VM when it differs from location (Central US is the Spot-quota fallback). Null uses location."
+  description = "Region for the GPU VM. GPU Spot vCPU quota is per region (Central US is the Spot-quota fallback). Null uses location."
   type        = string
   default     = null
 }
