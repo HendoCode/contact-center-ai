@@ -255,6 +255,43 @@ class JitteredEmbeddings:
         return self.inner.embed_query(text)
 
 
+SWEEP_KEYS = ("nprobes", "refine_factor")
+
+
+def parse_sweep(specs: list[str]) -> tuple[dict[str, int], ...]:
+    """`["nprobes=20,50", "refine_factor=1,20"]` -> the grid of combinations, in order."""
+    axes: dict[str, list[int]] = {}
+    for spec in specs:
+        key, _, values = spec.partition("=")
+        key = key.strip()
+        try:
+            vals = [int(v) for v in values.split(",") if v.strip()]
+        except ValueError:
+            vals = []
+        if key not in SWEEP_KEYS or not vals or min(vals) < 1 or key in axes:
+            raise ValueError(f"--sweep {spec!r}: use {' or '.join(k + '=<n>,...' for k in SWEEP_KEYS)} "
+                             "(positive integers, each key once)")
+        axes[key] = vals
+    combos: list[dict[str, int]] = [{}]
+    for key, vals in axes.items():
+        combos = [{**c, key: v} for c in combos for v in vals]
+    return tuple(c for c in combos if c)
+
+
+def sweep_table(metrics: dict) -> str:
+    """One compact table: the LanceDB baseline, every sweep row, and the pgvector rows for reference."""
+    keep = [k for k, v in metrics.items() if isinstance(v, dict) and k.endswith("/vector")
+            and (k.startswith("lancedb") or k.startswith("pgvector"))]
+    lines = ["| config | recall@10 | mrr@10 | p50 ms | p95 ms |", "|---|---|---|---|---|"]
+    for k in keep:
+        r = metrics[k]
+        if r.get("status") != "ok":
+            lines.append(f"| {k} | {str(r.get('status', '')).split(':')[0]} | | | |")
+            continue
+        lines.append(f"| {k} | {r['recall@10']:.3f} | {r['mrr@10']:.3f} | {r['p50_ms']:.1f} | {r['p95_ms']:.1f} |")
+    return "\n".join(lines)
+
+
 def cache_file_for(embeddings) -> Path:
     """The on-disk embedding cache for this model; every bench caller shares it."""
     return CACHE_DIR / (re.sub(r"[^A-Za-z0-9_.-]+", "_", embedding_model(embeddings)) + ".jsonl")
@@ -366,12 +403,14 @@ class IndexConfig:
 
     def __init__(self, pgvector_index: str = "hnsw", hnsw_m: int = 16, hnsw_ef_construction: int = 64,
                  hnsw_ef_search: int = 40, nprobes: int | None = None, refine_factor: int | None = None,
-                 num_partitions: int | None = None, sweep_nprobes: tuple[int, ...] = (),
-                 sweep_refine: tuple[int, ...] = ()):
+                 num_partitions: int | None = None, num_sub_vectors: int | None = None,
+                 pgvector_parallel_workers: int | None = None,
+                 sweep: tuple[dict[str, int], ...] = ()):
         self.pgvector_index, self.hnsw_m = pgvector_index, hnsw_m
         self.hnsw_ef_construction, self.hnsw_ef_search = hnsw_ef_construction, hnsw_ef_search
         self.nprobes, self.refine_factor, self.num_partitions = nprobes, refine_factor, num_partitions
-        self.sweep_nprobes, self.sweep_refine = sweep_nprobes, sweep_refine
+        self.num_sub_vectors, self.pgvector_parallel_workers = num_sub_vectors, pgvector_parallel_workers
+        self.sweep = sweep  # LanceDB search-knob combinations, e.g. ({"nprobes": 20, "refine_factor": 5}, ...)
 
     def as_params(self) -> dict:
         return {k: v for k, v in vars(self).items() if v not in (None, ())}
@@ -389,7 +428,8 @@ def open_lancedb(embeddings, workdir: Path, cfg: IndexConfig | None = None) -> S
 
     def retriever(name="lancedb", nprobes=cfg.nprobes, refine=cfg.refine_factor):
         r = LanceDBRetriever(uri=str(path), embeddings=embeddings, table_name="bench", nprobes=nprobes,
-                             refine_factor=refine, num_partitions=cfg.num_partitions)
+                             refine_factor=refine, num_partitions=cfg.num_partitions,
+                             num_sub_vectors=cfg.num_sub_vectors)
         r.name = name
         return r
 
@@ -401,13 +441,16 @@ def open_lancedb(embeddings, workdir: Path, cfg: IndexConfig | None = None) -> S
         if not has_ivf:
             return "flat (exact)"
         parts = cfg.num_partitions or int(math.sqrt(table.count_rows()))
-        return f"ivf_pq (cosine, {parts} partitions)"
+        subs = f", {cfg.num_sub_vectors} sub-vectors" if cfg.num_sub_vectors else ""
+        return f"ivf_pq (cosine, {parts} partitions{subs})"
 
-    def variants() -> list[Variant]:  # the --sweep values, scored on the same table
-        return ([Variant(retriever(f"lancedb[nprobes={n}]", n), ["vector"], index(),
-                         _lance_search(n, cfg.refine_factor)) for n in cfg.sweep_nprobes]
-                + [Variant(retriever(f"lancedb[refine_factor={f}]", cfg.nprobes, f), ["vector"], index(),
-                           _lance_search(cfg.nprobes, f)) for f in cfg.sweep_refine])
+    def variants() -> list[Variant]:  # the --sweep grid, scored on the same table
+        out = []
+        for combo in cfg.sweep:
+            n, f = combo.get("nprobes", cfg.nprobes), combo.get("refine_factor", cfg.refine_factor)
+            label = ",".join(f"{k}={v}" for k, v in combo.items())
+            out.append(Variant(retriever(f"lancedb[{label}]", n, f), ["vector"], index(), _lance_search(n, f)))
+        return out
 
     store = Store(base, cleanup=lambda: shutil.rmtree(path, ignore_errors=True), index=index,
                   search=_lance_search(cfg.nprobes, cfg.refine_factor), variants=variants)
@@ -425,6 +468,15 @@ def open_lancedb(embeddings, workdir: Path, cfg: IndexConfig | None = None) -> S
 
 
 HNSW_INDEX = "ccai_bench_hnsw"
+def explain_build_error(e: Exception) -> Exception:
+    """A /dev/shm exhaustion during the HNSW build becomes a one-line fix; anything else is unchanged."""
+    if "shared memory" in str(e) and "No space left" in str(e):
+        return RuntimeError(SHM_HINT + " | " + short_error(e, 150))
+    return e
+
+
+SHM_HINT = ("HNSW build ran out of /dev/shm: raise the db container's shm_size (docker-compose.yml) "
+            "or rerun with --pgvector-parallel-workers 0")
 
 
 def hnsw_sql(dim: int, where: dict | None) -> tuple[str, list]:
@@ -512,11 +564,16 @@ def open_pgvector(embeddings, workdir: Path, cfg: IndexConfig | None = None) -> 
             with conn.cursor() as cur:
                 cur.execute(f"DROP INDEX IF EXISTS {HNSW_INDEX}")
                 cur.execute("SET maintenance_work_mem = '512MB'")
-                cur.execute(
-                    f"CREATE INDEX {HNSW_INDEX} ON langchain_pg_embedding USING hnsw "
-                    f"((embedding::vector({dim})) vector_cosine_ops) "
-                    f"WITH (m = {int(cfg.hnsw_m)}, ef_construction = {int(cfg.hnsw_ef_construction)}) "
-                    "WHERE collection_id = %s::uuid", (uuid,))
+                if cfg.pgvector_parallel_workers is not None:
+                    cur.execute(f"SET max_parallel_maintenance_workers = {int(cfg.pgvector_parallel_workers)}")
+                try:
+                    cur.execute(
+                        f"CREATE INDEX {HNSW_INDEX} ON langchain_pg_embedding USING hnsw "
+                        f"((embedding::vector({dim})) vector_cosine_ops) "
+                        f"WITH (m = {int(cfg.hnsw_m)}, ef_construction = {int(cfg.hnsw_ef_construction)}) "
+                        "WHERE collection_id = %s::uuid", (uuid,))
+                except psycopg2.Error as e:
+                    raise explain_build_error(e) from None
                 cur.execute(f"SET hnsw.ef_search = {int(cfg.hnsw_ef_search)}")
                 # pgvector >= 0.8: keep scanning past filtered-out rows so k hits come back.
                 with contextlib.suppress(psycopg2.Error):
@@ -799,28 +856,27 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--nprobes", type=int, help="LanceDB IVF nprobes (default: LanceDB's)")
     parser.add_argument("--refine-factor", type=int, help="LanceDB refine_factor (default: none)")
     parser.add_argument("--num-partitions", type=int, help="LanceDB IVF partitions (default sqrt(rows))")
-    parser.add_argument("--sweep", help="LanceDB recall-vs-latency sweep, e.g. nprobes=10,20,50,100 "
-                                         "or refine_factor=1,5,10")
+    parser.add_argument("--num-sub-vectors", type=int, help="LanceDB PQ sub-vectors (default: LanceDB's)")
+    parser.add_argument("--pgvector-parallel-workers", type=int,
+                        help="max_parallel_maintenance_workers for the HNSW build (0 = serial; for a small /dev/shm)")
+    parser.add_argument("--sweep", action="append", default=[],
+                        help="LanceDB recall-vs-latency sweep; repeat to combine into a grid, e.g. "
+                             "--sweep nprobes=20,50,100 --sweep refine_factor=1,20")
     parser.add_argument("--no-cache", action="store_true",
                         help="do not read or write the embedding cache (.cache/bench-embeddings/)")
     args = parser.parse_args(argv)
     if args.ingest_batch < 1:
         parser.error("--ingest-batch must be at least 1")
-    sweep: tuple[int, ...] = ()
-    if args.sweep:
-        key, _, values = args.sweep.partition("=")
-        try:
-            sweep = tuple(int(v) for v in values.split(",") if v.strip())
-        except ValueError:
-            sweep = ()
-        if key.strip() not in ("nprobes", "refine_factor") or not sweep or min(sweep) < 1:
-            parser.error("--sweep takes nprobes=<n>,... or refine_factor=<n>,... (positive integers)")
+    try:
+        sweep = parse_sweep(args.sweep)
+    except ValueError as e:
+        parser.error(str(e))
     args.index_config = IndexConfig(
         pgvector_index=args.pgvector_index, hnsw_m=args.hnsw_m,
         hnsw_ef_construction=args.hnsw_ef_construction, hnsw_ef_search=args.hnsw_ef_search,
         nprobes=args.nprobes, refine_factor=args.refine_factor, num_partitions=args.num_partitions,
-        sweep_nprobes=sweep if args.sweep and args.sweep.startswith("nprobes") else (),
-        sweep_refine=sweep if args.sweep and args.sweep.startswith("refine_factor") else ())
+        num_sub_vectors=args.num_sub_vectors, pgvector_parallel_workers=args.pgvector_parallel_workers,
+        sweep=sweep)
     backends = [b.strip() for b in args.backends.split(",") if b.strip()]
     modes = [m.strip() for m in args.modes.split(",") if m.strip()]
     for b in backends:
@@ -890,6 +946,8 @@ def _main(args: argparse.Namespace, backends: list[str], modes: list[str]) -> in
     readme = render("retrieval", out.parent.parent)
     print(f"\nwrote {out} and {readme}\n")
     print(metrics_tables(record))
+    if any("[" in k for k in metrics):
+        print("\n" + sweep_table(metrics))
     return 0
 
 

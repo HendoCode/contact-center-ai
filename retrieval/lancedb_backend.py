@@ -93,6 +93,7 @@ class LanceDBRetriever:
         nprobes: int | None = None,
         refine_factor: int | None = None,
         num_partitions: int | None = None,
+        num_sub_vectors: int | None = None,
     ):
         self.uri = uri or os.getenv("LANCE_URI") or DEFAULT_LANCE_URI
         # Object-store settings for az:// / s3:// (e.g. azure_storage_account_name,
@@ -100,6 +101,7 @@ class LanceDBRetriever:
         self.storage_options = storage_options
         # IVF-PQ knobs; None keeps LanceDB's defaults (num_partitions: sqrt(rows)).
         self.nprobes, self.refine_factor, self.num_partitions = nprobes, refine_factor, num_partitions
+        self.num_sub_vectors = num_sub_vectors  # PQ sub-vectors; None = LanceDB's default
         self.table_name = table_name or os.getenv("COLLECTION_NAME", "call_transcripts")
         self.vector_index_min_rows = vector_index_min_rows
         self._embeddings = embeddings
@@ -208,7 +210,8 @@ class LanceDBRetriever:
             table.create_index(
                 "vector",
                 config=IvfPq(distance_type="cosine",
-                             num_partitions=self.num_partitions or max(1, int(math.sqrt(n)))),
+                             num_partitions=self.num_partitions or max(1, int(math.sqrt(n))),
+                             num_sub_vectors=self.num_sub_vectors),
             )
         # Fold rows written since the last run into the existing indexes.
         table.optimize()
