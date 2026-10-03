@@ -90,11 +90,16 @@ class LanceDBRetriever:
         table_name: str | None = None,
         vector_index_min_rows: int = VECTOR_INDEX_MIN_ROWS,
         storage_options: dict[str, str] | None = None,
+        nprobes: int | None = None,
+        refine_factor: int | None = None,
+        num_partitions: int | None = None,
     ):
         self.uri = uri or os.getenv("LANCE_URI") or DEFAULT_LANCE_URI
         # Object-store settings for az:// / s3:// (e.g. azure_storage_account_name,
         # azure_use_azure_cli); None leaves Lance to read them from the environment.
         self.storage_options = storage_options
+        # IVF-PQ knobs; None keeps LanceDB's defaults (num_partitions: sqrt(rows)).
+        self.nprobes, self.refine_factor, self.num_partitions = nprobes, refine_factor, num_partitions
         self.table_name = table_name or os.getenv("COLLECTION_NAME", "call_transcripts")
         self.vector_index_min_rows = vector_index_min_rows
         self._embeddings = embeddings
@@ -202,7 +207,8 @@ class LanceDBRetriever:
         if "vector" not in existing and n >= self.vector_index_min_rows:
             table.create_index(
                 "vector",
-                config=IvfPq(distance_type="cosine", num_partitions=max(1, int(math.sqrt(n)))),
+                config=IvfPq(distance_type="cosine",
+                             num_partitions=self.num_partitions or max(1, int(math.sqrt(n)))),
             )
         # Fold rows written since the last run into the existing indexes.
         table.optimize()
@@ -238,6 +244,11 @@ class LanceDBRetriever:
                 .distance_type("cosine")
                 .rerank(RRFReranker(K=RRF_K))
             )
+        if mode != "fts":
+            if self.nprobes:
+                q = q.nprobes(self.nprobes)
+            if self.refine_factor:
+                q = q.refine_factor(self.refine_factor)
         if flt:
             q = q.where(flt, prefilter=True)
         rows = q.limit(k).to_list()
