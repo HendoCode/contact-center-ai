@@ -50,6 +50,17 @@ else:
 """
 
 
+FAKE_OP = r"""#!/usr/bin/env bash
+# 1Password CLI stand-in: signed in, item absent, create succeeds; logs the template path.
+case "$1 $2" in
+  "whoami "*) exit 0 ;;
+  "item get") exit 1 ;;
+  "item create"|"item edit")
+    while (($#)); do [[ "$1" == --template ]] && { echo "$2" >> "$OP_LOG"; test -s "$2"; }; shift; done ;;
+esac
+"""
+
+
 def sh(body: str, **env) -> subprocess.CompletedProcess:
     return subprocess.run(["bash", "-c", f'source "{SCRIPT}"; {body}'], capture_output=True,
                           text=True, env={**os.environ, **env})
@@ -60,10 +71,12 @@ def run(args, token, tmp_path, **env):
     bindir.mkdir(exist_ok=True)
     (bindir / "curl").write_text(FAKE_CURL)
     (bindir / "curl").chmod(0o755)
+    (bindir / "op").write_text(FAKE_OP)
+    (bindir / "op").chmod(0o755)
     log = tmp_path / "curl.log"
     res = subprocess.run([str(SCRIPT), *args], input=token + "\n", capture_output=True, text=True,
                          env={**os.environ, "PATH": f"{bindir}:{os.environ['PATH']}",
-                              "CURL_LOG": str(log), **env})
+                              "CURL_LOG": str(log), "OP_LOG": str(tmp_path / "op.log"), **env})
     calls = [json.loads(line) for line in log.read_text().splitlines()] if log.exists() else []
     return res, calls
 
@@ -201,3 +214,17 @@ def test_op_template_conceals_the_token():
     assert item["title"] == "databricks-ccai"
     types = {f["label"]: (f["type"], f["value"]) for f in item["fields"]}
     assert types == {"DATABRICKS_HOST": ("STRING", "h"), "DATABRICKS_TOKEN": ("CONCEALED", 't"x')}
+
+
+def test_successful_run_with_the_store_step_exits_cleanly(tmp_path):
+    """Regression: an EXIT trap naming a function-local var printed 'tpl: unbound variable'."""
+    res, _ = run(["--host", "adb-1.2.azuredatabricks.net"], "good-token", tmp_path)
+    assert (res.returncode, res.stderr) == (0, "")
+    assert "1Password item databricks-ccai updated" in res.stdout
+    template = Path((tmp_path / "op.log").read_text().strip())
+    assert not template.exists()  # removed on exit
+
+
+def test_dry_run_exits_cleanly(tmp_path):
+    res, _ = run(["--dry-run", "--host", "adb-1.2.azuredatabricks.net"], "", tmp_path)
+    assert (res.returncode, res.stderr) == (0, "")

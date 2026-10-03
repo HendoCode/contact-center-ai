@@ -24,6 +24,12 @@ OP_VAULT="${OP_VAULT:-CMW}"
 OP_ITEM="${OP_ITEM:-databricks-ccai}"
 VOLUME="ccai_loader_stage" # olap/dbt/loaders/databricks_loader.py
 
+# Temp files to remove on exit. One global list and one EXIT trap: a trap that names a
+# function-local variable fails under set -u once that function has returned.
+CLEANUP=()
+cleanup() { if ((${#CLEANUP[@]})); then rm -f -- "${CLEANUP[@]}"; fi; }
+trap cleanup EXIT
+
 DRY_RUN=0 SKIP_OP=0 FROM_TF=0 CATALOG_GIVEN=0 WAREHOUSE_GIVEN=0
 HOST="" CATALOG="ccai" RAW_SCHEMA="raw" MARTS_SCHEMA="marts" WAREHOUSE_NAME="ccai-sql"
 TOKEN="" AUTH_FILE="" WAREHOUSE_ID="" HTTP_PATH="" ME=""
@@ -143,7 +149,7 @@ read_token() {
   fi
   [[ -n "$TOKEN" ]] || die "no token given"
   AUTH_FILE="$(umask 077 && mktemp)"
-  trap 'rm -f "$AUTH_FILE"' EXIT
+  CLEANUP+=("$AUTH_FILE")
   printf 'Authorization: Bearer %s\n' "$TOKEN" > "$AUTH_FILE"
 }
 
@@ -256,7 +262,7 @@ store_in_1password() {
   command -v op >/dev/null || die "op (1Password CLI) not found; rerun with --skip-1password or install it"
   op whoami >/dev/null 2>&1 || die "op is not signed in: run 'eval \$(op signin)' and rerun (everything above is reused)"
   local tpl; tpl="$(umask 077 && mktemp)"
-  trap 'rm -f "$tpl" "$AUTH_FILE"' EXIT
+  CLEANUP+=("$tpl")
   op_template "DATABRICKS_HOST=$HOST" "DATABRICKS_HTTP_PATH=$HTTP_PATH" \
     "DATABRICKS_TOKEN=$TOKEN" "DATABRICKS_CATALOG=$CATALOG" > "$tpl"
   if op item get "$OP_ITEM" --vault "$OP_VAULT" >/dev/null 2>&1; then
