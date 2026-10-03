@@ -40,6 +40,10 @@ make lance-azure-check                                     # account from AZURE_
 crate) gets a storage token from `az` for the signed-in user. If that is refused, set
 `AZURE_STORAGE_SAS_KEY` to a container-scoped SAS (keep it in 1Password, for example
 `op://CMW/azure-ccai`) and rerun; the SAS is used instead.
+Blank `AZURE_*` values (a `.env` copied from `.env.example` has empty `AZURE_TENANT_ID`,
+`AZURE_CLIENT_ID` and `AZURE_CLIENT_SECRET`) are dropped before connecting, and with `az login` auth so are
+those three when they come from `.env`, so they cannot switch the store to a client-secret flow.
+Embeddings come from the same `.cache/bench-embeddings/` cache as `make bench` (`--no-cache` skips it).
 
 **What the results mean.** Recall should match the local numbers exactly, because the data,
 vectors and queries are the same. A difference would point at the storage path, not the
