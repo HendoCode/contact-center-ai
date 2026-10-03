@@ -28,7 +28,14 @@ if "Bearer good-token" not in auth:
 elif url.endswith("/scim/v2/Me"):
     reply({"userName": "someone@example.com"})
 elif url.endswith("/sql/warehouses") and method == "GET":
-    reply({"warehouses": [{"id": "abc123", "name": "ccai-sql"}]})
+    names = os.environ.get("WAREHOUSES", "ccai-sql").split(",")
+    reply({"warehouses": [{"id": f"wh{i}", "name": n} for i, n in enumerate(names) if n]})
+elif url.endswith("/sql/warehouses") and method == "POST":
+    if os.environ.get("WAREHOUSE_LIMIT"):
+        reply({"error_code": "RESOURCE_EXHAUSTED",
+               "message": "COMMUNITY_EDITION limit: 1 of 1 warehouses"}, 429)
+    else:
+        reply({"id": "new1"})
 elif url.endswith("/sql/statements"):
     stmt = json.loads(data)["statement"]
     if os.environ.get("DENY") and stmt.startswith(os.environ["DENY"]):
@@ -36,7 +43,8 @@ elif url.endswith("/sql/statements"):
     else:
         reply({"statement_id": "s1", "status": {"state": "SUCCEEDED"}})
 elif "/unity-catalog/catalogs" in url:
-    reply({"catalogs": [{"name": "workspace"}, {"name": "system"}]})
+    names = os.environ.get("CATALOGS", "workspace,system").split(",")
+    reply({"catalogs": [{"name": n} for n in names]})
 else:
     reply({"message": "unexpected " + url}, 404)
 """
@@ -98,7 +106,7 @@ def test_dry_run_reads_and_sends_nothing(tmp_path):
 def test_full_run_keeps_the_token_out_of_argv_and_output(tmp_path):
     res, calls = run(["--host", "adb-1.2.azuredatabricks.net", "--skip-1password"], "good-token", tmp_path)
     assert res.returncode == 0, res.stderr
-    assert "DATABRICKS_HTTP_PATH=/sql/1.0/warehouses/abc123" in res.stdout
+    assert "DATABRICKS_HTTP_PATH=/sql/1.0/warehouses/wh0" in res.stdout
     assert [json.loads(c["data"])["statement"] for c in calls if c["url"].endswith("/statements")] == [
         "CREATE CATALOG IF NOT EXISTS `ccai`", "CREATE SCHEMA IF NOT EXISTS `ccai`.`raw`",
         "CREATE SCHEMA IF NOT EXISTS `ccai`.`marts`",
@@ -113,13 +121,46 @@ def test_bad_token_fails_at_the_check(tmp_path):
     assert len(calls) == 1
 
 
+def test_warehouse_limit_with_one_existing_warehouse_uses_it(tmp_path):
+    res, _ = run(["--host", "adb-1.2.azuredatabricks.net", "--skip-1password"], "good-token", tmp_path,
+                 WAREHOUSES="Serverless Starter Warehouse", WAREHOUSE_LIMIT="1")
+    assert res.returncode == 0, res.stderr
+    assert "exactly one exists: using 'Serverless Starter Warehouse' (wh0)" in res.stdout
+    assert "DATABRICKS_HTTP_PATH=/sql/1.0/warehouses/wh0" in res.stdout
+
+
+def test_warehouse_limit_without_a_single_candidate_keeps_the_guidance(tmp_path):
+    res, _ = run(["--host", "adb-1.2.azuredatabricks.net", "--skip-1password"], "good-token", tmp_path,
+                 WAREHOUSES="a,b", WAREHOUSE_LIMIT="1")
+    assert res.returncode != 0
+    assert "Existing warehouses: a, b" in res.stderr and "--warehouse-name" in res.stderr
+    res, _ = run(["--host", "adb-1.2.azuredatabricks.net", "--skip-1password", "--warehouse-name", "mine"],
+                 "good-token", tmp_path, WAREHOUSES="other", WAREHOUSE_LIMIT="1")
+    assert res.returncode != 0  # an explicitly named warehouse is never swapped silently
+
+
+def test_denied_catalog_with_one_usable_catalog_uses_it(tmp_path):
+    res, calls = run(["--host", "adb-1.2.azuredatabricks.net", "--skip-1password"], "good-token", tmp_path,
+                     DENY="CREATE CATALOG", CATALOGS="workspace,system,samples")
+    assert res.returncode == 0, res.stderr
+    assert "exactly one usable catalog exists: using 'workspace'" in res.stdout
+    stmts = [json.loads(c["data"])["statement"] for c in calls if c["url"].endswith("/statements")]
+    assert stmts[1:] == ["CREATE SCHEMA IF NOT EXISTS `workspace`.`raw`",
+                         "CREATE SCHEMA IF NOT EXISTS `workspace`.`marts`",
+                         "CREATE VOLUME IF NOT EXISTS `workspace`.`raw`.`ccai_loader_stage`"]
+    assert "DATABRICKS_CATALOG=workspace" in res.stdout
+
+
 def test_denied_catalog_prints_the_grant_and_visible_catalogs(tmp_path):
     res, _ = run(["--host", "adb-1.2.azuredatabricks.net", "--skip-1password"], "good-token", tmp_path,
-                 DENY="CREATE CATALOG")
+                 DENY="CREATE CATALOG", CATALOGS="workspace,team,system")
     assert res.returncode != 0
     assert "PERMISSION_DENIED" in res.stderr
     assert "GRANT CREATE CATALOG ON METASTORE TO `someone@example.com`;" in res.stderr
-    assert "Catalogs you can see: workspace, system" in res.stderr
+    assert "Catalogs you can see: workspace, team, system" in res.stderr
+    res, _ = run(["--host", "adb-1.2.azuredatabricks.net", "--skip-1password", "--catalog", "mine"],
+                 "good-token", tmp_path, DENY="CREATE CATALOG", CATALOGS="workspace,system")
+    assert res.returncode != 0  # an explicit --catalog is never swapped silently
 
 
 def test_denied_volume_names_schema_grants(tmp_path):

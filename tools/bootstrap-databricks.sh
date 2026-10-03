@@ -24,7 +24,7 @@ OP_VAULT="${OP_VAULT:-CMW}"
 OP_ITEM="${OP_ITEM:-databricks-ccai}"
 VOLUME="ccai_loader_stage" # olap/dbt/loaders/databricks_loader.py
 
-DRY_RUN=0 SKIP_OP=0 FROM_TF=0
+DRY_RUN=0 SKIP_OP=0 FROM_TF=0 CATALOG_GIVEN=0 WAREHOUSE_GIVEN=0
 HOST="" CATALOG="ccai" RAW_SCHEMA="raw" MARTS_SCHEMA="marts" WAREHOUSE_NAME="ccai-sql"
 TOKEN="" AUTH_FILE="" WAREHOUSE_ID="" HTTP_PATH="" ME=""
 
@@ -53,10 +53,10 @@ parse_args() {
     case "$1" in
       --host) HOST="${2:?--host needs a value}"; shift 2 ;;
       --from-terraform) FROM_TF=1; shift ;;
-      --catalog) CATALOG="${2:?--catalog needs a value}"; shift 2 ;;
+      --catalog) CATALOG="${2:?--catalog needs a value}"; CATALOG_GIVEN=1; shift 2 ;;
       --raw-schema) RAW_SCHEMA="${2:?--raw-schema needs a value}"; shift 2 ;;
       --marts-schema) MARTS_SCHEMA="${2:?--marts-schema needs a value}"; shift 2 ;;
-      --warehouse-name) WAREHOUSE_NAME="${2:?--warehouse-name needs a value}"; shift 2 ;;
+      --warehouse-name) WAREHOUSE_NAME="${2:?--warehouse-name needs a value}"; WAREHOUSE_GIVEN=1; shift 2 ;;
       --skip-1password) SKIP_OP=1; shift ;;
       --dry-run) DRY_RUN=1; shift ;;
       -h | --help) usage; exit 0 ;;
@@ -160,6 +160,14 @@ find_or_create_warehouse() {
     body="{\"name\":\"$WAREHOUSE_NAME\",\"cluster_size\":\"2X-Small\",\"min_num_clusters\":1,\"max_num_clusters\":1,\"auto_stop_mins\":10,\"enable_serverless_compute\":true,\"warehouse_type\":\"PRO\"}"
     local out
     if ! out="$(api_ok POST /api/2.0/sql/warehouses "$body" 2>&1)"; then
+      # Free Edition allows one warehouse: when that limit is hit and exactly one exists, use it.
+      local only; only="$(json_get "(lambda w: w[0]['id'] + ' ' + w[0]['name'] if len(w) == 1 else None)(d.get('warehouses', []))" <<<"$list")"
+      if ((!WAREHOUSE_GIVEN)) && [[ "$out" == *RESOURCE_EXHAUSTED* && -n "$only" ]]; then
+        WAREHOUSE_ID="${only%% *}" WAREHOUSE_NAME="${only#* }"
+        say "Warehouse limit reached (RESOURCE_EXHAUSTED) and exactly one exists: using '$WAREHOUSE_NAME' ($WAREHOUSE_ID)"
+        HTTP_PATH="/sql/1.0/warehouses/$WAREHOUSE_ID"
+        return
+      fi
       printf '%s\n' "$out" >&2; grant_hint warehouse "$ME" >&2
       local names; names="$(json_get "', '.join(w['name'] for w in d.get('warehouses', []))" <<<"$list")"
       [[ -n "$names" ]] && say "Existing warehouses: $names (Free Edition allows one)" >&2
@@ -187,19 +195,29 @@ run_sql() {
   return 1
 }
 
+# Catalogs a user can put tables in: not the built-in system, samples or legacy ones.
+USABLE_CATALOGS="[c['name'] for c in d.get('catalogs', []) if c['name'] not in ('system', 'samples', 'hive_metastore') and not c['name'].startswith('__')]"
+
 create_objects() {
-  local stmt
-  while IFS= read -r stmt; do
-    say "$stmt"
-    if ! run_sql "$stmt"; then
-      if [[ "$stmt" == "CREATE CATALOG"* ]]; then
-        local cats; cats="$(api_ok GET /api/2.1/unity-catalog/catalogs | json_get "', '.join(c['name'] for c in d.get('catalogs', []))")" || true
-        say "Catalogs you can see: ${cats:-none}" >&2
-      fi
-      grant_hint "$stmt" "$ME" >&2
+  local stmt first
+  first="$(bootstrap_sql | head -n 1)"
+  say "$first"
+  if ! run_sql "$first"; then
+    local cats; cats="$(api_ok GET /api/2.1/unity-catalog/catalogs)" || cats='{}'
+    local usable; usable="$(json_get "' '.join($USABLE_CATALOGS)" <<<"$cats")"
+    if ((!CATALOG_GIVEN)) && [[ -n "$usable" && "$usable" != *" "* ]]; then
+      say "Cannot create catalog '$CATALOG' and exactly one usable catalog exists: using '$usable'"
+      CATALOG="$usable"
+    else
+      say "Catalogs you can see: $(json_get "', '.join(c['name'] for c in d.get('catalogs', []))" <<<"$cats")" >&2
+      grant_hint "$first" "$ME" >&2
       exit 1
     fi
-  done < <(bootstrap_sql)
+  fi
+  while IFS= read -r stmt; do
+    say "$stmt"
+    if ! run_sql "$stmt"; then grant_hint "$stmt" "$ME" >&2; exit 1; fi
+  done < <(bootstrap_sql | tail -n +2)
 }
 
 # json_str / op_template: the same 1Password template shape as tools/bootstrap-snowflake.sh.
