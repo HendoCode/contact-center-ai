@@ -20,6 +20,12 @@ KEY_DIR="${SNOWFLAKE_KEY_DIR:-$HOME/.snowflake}"
 OP_VAULT="${OP_VAULT:-CMW}"
 OP_ITEM="${OP_ITEM:-snowflake-ccai}"
 
+# Temp files to remove on exit. One global list and one EXIT trap: a trap that names a
+# function-local variable fails under set -u once that function has returned.
+CLEANUP=()
+cleanup() { if ((${#CLEANUP[@]})); then rm -f -- "${CLEANUP[@]}"; fi; }
+trap cleanup EXIT
+
 DRY_RUN=0 YES=0 FORCE_KEYS=0 USE_PASSPHRASE=0 SKIP_OP=0
 ORG="" ACCOUNT="" ADMIN_USER=""
 
@@ -97,6 +103,7 @@ gen_key() {
   ((DRY_RUN)) && { printf '    [dry-run] openssl genrsa 2048 | openssl pkcs8 -topk8 ... > %s; chmod 600\n' "$p8"; return; }
   mkdir -p "$KEY_DIR" && chmod 700 "$KEY_DIR"
   local tmp; tmp="$(mktemp "$KEY_DIR/.$1.XXXXXX")"
+  CLEANUP+=("$tmp") # gone after the mv below; removed here only if keygen fails midway
   if ((USE_PASSPHRASE)); then
     openssl genrsa 2048 2>/dev/null | openssl pkcs8 -topk8 -v2 aes-256-cbc -passout env:CCAI_KEY_PASSPHRASE -out "$tmp"
     openssl rsa -in "$tmp" -passin env:CCAI_KEY_PASSPHRASE -pubout -out "$pub" 2>/dev/null
@@ -186,7 +193,7 @@ store_in_1password() {
   )
   ((USE_PASSPHRASE)) && fields+=("SNOWFLAKE_PRIVATE_KEY_PASSPHRASE=$CCAI_KEY_PASSPHRASE")
   local tpl; tpl="$(umask 077 && mktemp)"
-  trap 'rm -f "$tpl"' RETURN
+  CLEANUP+=("$tpl")
   op_template "${fields[@]}" > "$tpl"
   if op item get "$OP_ITEM" --vault "$OP_VAULT" >/dev/null 2>&1; then
     op item edit "$OP_ITEM" --vault "$OP_VAULT" --template "$tpl" >/dev/null
@@ -209,7 +216,7 @@ terraform_steps() {
   TF_VAR_dbt_rsa_public_key="$(public_key_line "$KEY_DIR/ccai_dbt_key.pub")"
   SNOWFLAKE_PRIVATE_KEY="$(cat "$KEY_DIR/ccai_tf_admin_key.p8")"
   ((USE_PASSPHRASE)) && export SNOWFLAKE_PRIVATE_KEY_PASSPHRASE="$CCAI_KEY_PASSPHRASE"
-  trap 'rm -f "$ENV_DIR/tfplan"' EXIT
+  CLEANUP+=("$ENV_DIR/tfplan")
   terraform -chdir="$ENV_DIR" init -input=false -backend-config=backend.hcl >/dev/null
   terraform -chdir="$ENV_DIR" plan -input=false -out=tfplan >/dev/null
   terraform -chdir="$ENV_DIR" show -no-color tfplan | grep -E '^(Plan:|No changes)|^  # ' || true

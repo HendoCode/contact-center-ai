@@ -26,6 +26,22 @@ END_PKCS8 = _PEM.format("END", "PRIVATE ")
 pytestmark = pytest.mark.skipif(not shutil.which("openssl"), reason="needs openssl")
 
 
+FAKE_OP = r"""#!/usr/bin/env bash
+# 1Password CLI stand-in: signed in, item absent, create succeeds; logs the template path.
+case "$1 $2" in
+  "whoami "*) exit 0 ;;
+  "item get") exit 1 ;;
+  "item create"|"item edit")
+    while (($#)); do [[ "$1" == --template ]] && { echo "$2" >> "$OP_LOG"; test -s "$2"; }; shift; done ;;
+esac
+"""
+
+FAKE_TERRAFORM = """#!/usr/bin/env bash
+echo '{"SNOWFLAKE_ACCOUNT": "ORG-ACCT", "SNOWFLAKE_USER": "CCAI_DBT", "SNOWFLAKE_ROLE": "R",
+       "SNOWFLAKE_WAREHOUSE": "W", "SNOWFLAKE_DATABASE": "D"}'
+"""
+
+
 def sh(body: str, tmp_path: Path, **env) -> subprocess.CompletedProcess:
     """Run `body` in bash after sourcing the script, with keys under tmp_path."""
     full_env = {**os.environ, "SNOWFLAKE_KEY_DIR": str(tmp_path / "keys"), **env}
@@ -104,3 +120,26 @@ def test_op_template_is_valid_json_and_conceals_secrets(tmp_path):
                                         "type": "STRING", "value": "CCAI_DBT"}
     assert fields["SNOWFLAKE_PRIVATE_KEY_PEM"]["type"] == "CONCEALED"
     assert fields["SNOWFLAKE_PRIVATE_KEY_PEM"]["value"] == pem
+
+
+def test_store_step_then_exit_is_clean(tmp_path):
+    """Regression: a RETURN/EXIT trap naming a function-local var fails under set -u later."""
+    bindir = tmp_path / "bin"
+    bindir.mkdir()
+    for name, body in (("op", FAKE_OP), ("terraform", FAKE_TERRAFORM)):
+        (bindir / name).write_text(body)
+        (bindir / name).chmod(0o755)
+    oplog = tmp_path / "op.log"
+    res = sh("set -euo pipefail; gen_key ccai_dbt_key >/dev/null; store_in_1password; say done", tmp_path,
+             PATH=f"{bindir}:{os.environ['PATH']}", OP_LOG=str(oplog))
+    assert (res.returncode, res.stderr) == (0, "")
+    assert "1Password item snowflake-ccai updated" in res.stdout
+    assert not Path(oplog.read_text().strip()).exists()
+
+
+def test_dry_run_exits_cleanly(tmp_path):
+    out = subprocess.run([str(SCRIPT), "--dry-run"], capture_output=True, text=True,
+                         env={**os.environ, "SNOWFLAKE_KEY_DIR": str(tmp_path / "keys")})
+    assert out.returncode == 0
+    # Only the script's own notices (the missing envs/dev/backend.hcl one, in a fresh clone).
+    assert all(line.startswith("==> ") for line in out.stderr.splitlines()), out.stderr
