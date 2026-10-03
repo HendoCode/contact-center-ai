@@ -32,6 +32,7 @@ Cross-region effects, from the current config and Microsoft's docs:
 - Container Apps and Log Analytics: the environment ships logs to the workspace by ID and key, and Microsoft documents no same-region rule for Container Apps, so a workspace in another region is expected to work, but that is not verified here. Cross-region log traffic may add bandwidth charges.
 - Container Apps and Postgres: the `allow-azure-services` firewall rule (0.0.0.0) admits Azure IPs from any region, so apps in another region still connect. Every query pays the inter-region round trip, and the traffic is billed as inter-region egress. The `operator_ip` rule is unaffected.
 - ACR stays beside the Container Apps environment (both follow `apps_location`), so image pulls stay in-region.
+  Observed once (2026-10-03, not a rule): after a centralus capacity error, only the ACR had to move to eastus2 for the apply to go through, and the environment then showed Succeeded. Whether the environment stayed in centralus or capacity had simply cleared is unknown. If an apply fails, try moving only the ACR first, then the environment.
 - Databricks: Azure creates the managed resource group's resources (cluster VMs, storage, network) in the workspace's region, so `databricks_location` decides where the cluster's vCPU quota is drawn.
 - GPU: the VM, VNet, NIC and public IP all follow `gpu_location`. Its Spot quota is separate from regular vCPU quota.
 

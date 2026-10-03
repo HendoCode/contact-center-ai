@@ -5,4 +5,4 @@
 
 The generated admin password is in the env's remote state. `database_url` is a sensitive output.
 
-After apply, enable the extension once: `psql "$DATABASE_URL" -c 'CREATE EXTENSION IF NOT EXISTS vector'`, then `make seed && make ingest` against it.
+After apply, run `make seed && make ingest` against it. The first ingest creates the `vector` extension itself (`rag/embeddings.py` builds a `PGVector` store, which runs `CREATE EXTENSION IF NOT EXISTS vector` by default), so no manual step is expected. This has not been verified against Azure Postgres. Only if that first ingest reports the extension missing, run `psql "$DATABASE_URL" -c 'CREATE EXTENSION IF NOT EXISTS vector'` once and ingest again.
