@@ -16,6 +16,25 @@ modules/snowflake   XS warehouse (60 s auto-suspend), database, dbt role + key-p
 
 Each root commits its `.terraform.lock.hcl` (the `uv.lock` counterpart). `backend.hcl` and `*.tfvars` are gitignored; copy the `.example` files. Everything that costs money is off by default (`enable_gpu`, `enable_databricks`, `enable_mcp_server`, `enable_agent_api`).
 
+## Regions
+
+`location` places the resource group, Log Analytics and the app identity (`modules/core`; none of them is capacity-sensitive). When a region runs out of capacity or quota for one module, move just that module with its override in `terraform.tfvars`. Each one is null by default and falls back to `location`, so leaving them unset changes nothing.
+
+| Variable | Moves | Why it might need to |
+|---|---|---|
+| `apps_location` | ACR, Container Apps environment, container apps | `ManagedEnvironmentCapacityHeavyUsageError` when a region is busy |
+| `data_location` | Postgres Flexible, ADLS | Postgres Flexible is restricted per subscription and region (this one allows only centralus), so this usually stays centralus |
+| `databricks_location` | workspace, its managed resource group, cluster VMs | regional VM-family vCPU quota (`Standard_DS3_v2`) |
+| `gpu_location` | A10 Spot VM and its network | Spot vCPU quota is per region ("Total Regional Spot vCPUs", default 20) |
+
+Cross-region effects, from the current config and Microsoft's docs:
+
+- Container Apps and Log Analytics: the environment ships logs to the workspace by ID and key, and Microsoft documents no same-region rule for Container Apps, so a workspace in another region is expected to work, but that is not verified here. Cross-region log traffic may add bandwidth charges.
+- Container Apps and Postgres: the `allow-azure-services` firewall rule (0.0.0.0) admits Azure IPs from any region, so apps in another region still connect. Every query pays the inter-region round trip, and the traffic is billed as inter-region egress. The `operator_ip` rule is unaffected.
+- ACR stays beside the Container Apps environment (both follow `apps_location`), so image pulls stay in-region.
+- Databricks: Azure creates the managed resource group's resources (cluster VMs, storage, network) in the workspace's region, so `databricks_location` decides where the cluster's vCPU quota is drawn.
+- GPU: the VM, VNet, NIC and public IP all follow `gpu_location`. Its Spot quota is separate from regular vCPU quota.
+
 ## Checks (what CI runs, no Azure account needed)
 
 ```bash
