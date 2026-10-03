@@ -81,6 +81,8 @@ dbt build --target snowflake      # needs the loaded data and a running warehous
 
 ### Loaders (`olap/dbt/loaders/`)
 
+Setting up Databricks for them (warehouse, catalog, schemas, volume, `DATABRICKS_*` in 1Password): `tools/bootstrap-databricks.sh`, see [`infra/azure/modules/databricks/README.md`](../../infra/azure/modules/databricks/README.md).
+
 `olap/seed.py` loads Postgres. The loaders put the same rows (same table list, columns and
 preparers, imported from `seed.py`) into raw tables on a warehouse. Column types come from
 `olap/oltp/schema.sql`, mapped per warehouse (`NUMERIC(p,s)` to `NUMBER(p,s)` / `DECIMAL(p,s)`,
