@@ -44,6 +44,24 @@ def test_models_and_tests_have_no_postgres_only_sql():
     assert not offenders, "Postgres-only SQL (see olap/dbt/README.md):\n" + "\n".join(offenders)
 
 
+def test_select_distinct_orders_only_by_its_output_columns():
+    """Spark (Databricks) rejects ORDER BY on a column a SELECT DISTINCT does not output,
+    which Postgres and Snowflake accept: `select distinct status as code ... order by status`."""
+    offenders = []
+    for path in sorted([*DBT_DIR.glob("models/**/*.sql"), *DBT_DIR.glob("tests/*.sql")]):
+        sql = _sql_without_comments(path)
+        for m in re.finditer(r"select\s+distinct\s+(.*?)\s+from\b.*?\border\s+by\s+([^;)]*)", sql,
+                             flags=re.IGNORECASE | re.DOTALL):
+            select_list, order_list = m.groups()
+            outputs = {item.strip().split()[-1].split(".")[-1].lower()
+                       for item in select_list.split(",") if item.strip()}
+            for term in order_list.split(","):
+                col = term.strip().split()[0].lower() if term.strip() else ""
+                if col and not col.isdigit() and col not in outputs:
+                    offenders.append(f"{path.relative_to(DBT_DIR)}: order by {col}")
+    assert not offenders, "SELECT DISTINCT ordered by a non-output column:\n" + "\n".join(offenders)
+
+
 def test_profiles_define_the_three_targets():
     outputs = _profile_outputs()
     assert set(outputs) == {"dev", "snowflake", "databricks"}
