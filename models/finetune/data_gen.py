@@ -16,6 +16,8 @@ teacher label, so an interrupted or repeated run never duplicates or re-spends.
     python -m models.finetune.data_gen build
     LLM_PROVIDER=anthropic ANTHROPIC_MODEL=claude-sonnet-5-5 \
         python -m models.finetune.data_gen label
+    LLM_PROVIDER=claude-code CLAUDE_CODE_MODEL=sonnet \
+        python -m models.finetune.data_gen label      # a Claude subscription, no API key
 """
 
 from __future__ import annotations
@@ -23,6 +25,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import sys
 import threading
 import time
@@ -212,6 +215,18 @@ def load_teacher_labels(out_dir: Path, texts: dict[str, str], *, compact: bool =
     return kept
 
 
+def teacher_llm(provider: str | None = None) -> Any:
+    """The teacher for `provider` (default LLM_PROVIDER): `claude-code` runs `claude -p`,
+    anything else is `rag.pipeline.get_llm`."""
+    if (provider or os.getenv("LLM_PROVIDER", "")).lower() == "claude-code":
+        from models.finetune.claude_code import ClaudeCodeTeacher
+
+        return ClaudeCodeTeacher()
+    from rag.pipeline import get_llm
+
+    return get_llm(provider)
+
+
 def _model_name(llm: Any) -> str:
     return str(getattr(llm, "model", None) or getattr(llm, "model_name", None) or "unknown")
 
@@ -238,9 +253,7 @@ def label(
     if not (out_dir / SPLITS).exists():
         raise FileNotFoundError(f"{out_dir / SPLITS} not found; run `build` first")
     if llm is None:
-        from rag.pipeline import get_llm
-
-        llm = get_llm(provider)
+        llm = teacher_llm(provider)
     model = _model_name(llm)
 
     split_ids = json.loads((out_dir / SPLITS).read_text())
