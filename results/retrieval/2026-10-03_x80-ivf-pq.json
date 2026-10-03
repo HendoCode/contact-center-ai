@@ -1,0 +1,323 @@
+{
+  "date": "2026-10-03",
+  "git_sha": "cf53abc7d2fd8591abb9c7bd8babed0ed430dca8-dirty",
+  "area": "retrieval",
+  "run": "x80-ivf-pq",
+  "hardware": "Intel(R) Core(TM) i5-1038NG7 CPU @ 2.00GHz, 8 cores, 15 GB RAM, Linux",
+  "versions": {
+    "python": "3.14.7",
+    "model": "ollama:nomic-embed-text",
+    "lancedb": "0.39.0",
+    "pyarrow": "25.0.1",
+    "pylance": "not installed",
+    "langchain-postgres": "0.0.17",
+    "psycopg2-binary": "2.9.12",
+    "postgres": "16.15 (Debian 16.15-1.pgdg12+2)",
+    "pgvector_ext": "0.8.7"
+  },
+  "params": {
+    "backends": [
+      "pgvector",
+      "lancedb"
+    ],
+    "modes": [
+      "vector",
+      "fts",
+      "hybrid"
+    ],
+    "k": 10,
+    "repeats": 3,
+    "scale": 80,
+    "rows": 100000,
+    "queries": 40,
+    "ingest_batch": 12500,
+    "jitter_eps": 0.05,
+    "index": {
+      "pgvector_index": "hnsw",
+      "hnsw_m": 16,
+      "hnsw_ef_construction": 64,
+      "hnsw_ef_search": 40,
+      "sweep": [
+        {
+          "refine_factor": 1
+        },
+        {
+          "refine_factor": 20
+        }
+      ],
+      "lance_index": "ivf_pq"
+    },
+    "labels_sha256": "14fc5f3c345dd138"
+  },
+  "metrics": {
+    "embed_unique_docs": 0,
+    "embed_docs_s": 4.795001586899161e-06,
+    "embed_query_p50_ms": 44.139510497188894,
+    "pgvector/vector": {
+      "status": "ok",
+      "index": "none (exact scan)",
+      "search": "exact",
+      "recall@5": 0.8,
+      "recall@10": 0.8,
+      "mrr@10": 0.8,
+      "ann_recall@10": 1.0,
+      "p50_ms": 872.8908155026147,
+      "p95_ms": 900.4487978450925,
+      "ingest_s": 177.62406808300148,
+      "index_build_s": null,
+      "recall@10_by_type": {
+        "topical": 1.0,
+        "filter": 0.7,
+        "exact": 0.6,
+        "paraphrase": 0.8888888888888888
+      },
+      "mrr@10_by_type": {
+        "topical": 1.0,
+        "filter": 0.7,
+        "exact": 0.6,
+        "paraphrase": 0.8888888888888888
+      },
+      "p50_ms_by_type": {
+        "topical": 880.9780529991258,
+        "filter": 82.4059295009647,
+        "exact": 874.9187209978118,
+        "paraphrase": 876.286059996346
+      },
+      "p95_ms_by_type": {
+        "topical": 900.396450397966,
+        "filter": 271.8235100979655,
+        "exact": 905.7655710512336,
+        "paraphrase": 899.1611945035402
+      }
+    },
+    "pgvector/fts": {
+      "status": "not supported: pgvector backend supports mode='vector' only, not 'fts'"
+    },
+    "pgvector/hybrid": {
+      "status": "not supported: pgvector backend supports mode='vector' only, not 'hybrid'"
+    },
+    "pgvector-hnsw/vector": {
+      "status": "ok",
+      "index": "hnsw (cosine, m=16, ef_construction=64)",
+      "search": "ef_search=40, iterative_scan=relaxed_order",
+      "recall@5": 0.7,
+      "recall@10": 0.7,
+      "mrr@10": 0.7,
+      "ann_recall@10": 0.495,
+      "p50_ms": 3.7992845027474687,
+      "p95_ms": 92.88474225286335,
+      "ingest_s": 177.62406808300148,
+      "index_build_s": 27.180179490002047,
+      "recall@10_by_type": {
+        "topical": 0.8181818181818182,
+        "filter": 0.8,
+        "exact": 0.5,
+        "paraphrase": 0.6666666666666666
+      },
+      "mrr@10_by_type": {
+        "topical": 0.8181818181818182,
+        "filter": 0.8,
+        "exact": 0.5,
+        "paraphrase": 0.6666666666666666
+      },
+      "p50_ms_by_type": {
+        "topical": 3.766993002500385,
+        "filter": 71.10340349754551,
+        "exact": 3.348976497363765,
+        "paraphrase": 3.4770729980664328
+      },
+      "p95_ms_by_type": {
+        "topical": 5.357171400100924,
+        "filter": 134.66084900101123,
+        "exact": 4.328895499565988,
+        "paraphrase": 5.588847699254984
+      }
+    },
+    "lancedb/vector": {
+      "status": "ok",
+      "index": "ivf_pq (cosine, 316 partitions)",
+      "search": "nprobes=default, refine_factor=none",
+      "recall@5": 0.44000000000000006,
+      "recall@10": 0.44000000000000006,
+      "mrr@10": 0.4333333333333333,
+      "ann_recall@10": 0.025,
+      "p50_ms": 15.994355999282561,
+      "p95_ms": 27.611843253180268,
+      "ingest_s": 146.43192942400492,
+      "index_build_s": 115.43687099500676,
+      "recall@10_by_type": {
+        "topical": 0.509090909090909,
+        "filter": 0.6,
+        "exact": 0.3,
+        "paraphrase": 0.3333333333333333
+      },
+      "mrr@10_by_type": {
+        "topical": 0.4848484848484848,
+        "filter": 0.6,
+        "exact": 0.3,
+        "paraphrase": 0.3333333333333333
+      },
+      "p50_ms_by_type": {
+        "topical": 15.538943000137806,
+        "filter": 25.355983998451848,
+        "exact": 15.568053000606596,
+        "paraphrase": 16.069012999651022
+      },
+      "p95_ms_by_type": {
+        "topical": 16.671306001080666,
+        "filter": 30.329933347093174,
+        "exact": 17.00335510286095,
+        "paraphrase": 17.701762798969867
+      }
+    },
+    "lancedb/fts": {
+      "status": "ok",
+      "index": "fts (BM25)",
+      "search": "",
+      "recall@5": 0.675,
+      "recall@10": 0.675,
+      "mrr@10": 0.675,
+      "ann_recall@10": null,
+      "p50_ms": 11.260454000876052,
+      "p95_ms": 24.411891299314448,
+      "ingest_s": 146.43192942400492,
+      "index_build_s": 115.43687099500676,
+      "recall@10_by_type": {
+        "topical": 0.8181818181818182,
+        "filter": 0.8,
+        "exact": 1.0,
+        "paraphrase": 0.0
+      },
+      "mrr@10_by_type": {
+        "topical": 0.8181818181818182,
+        "filter": 0.8,
+        "exact": 1.0,
+        "paraphrase": 0.0
+      },
+      "p50_ms_by_type": {
+        "topical": 12.019729998428375,
+        "filter": 22.282673500740202,
+        "exact": 10.705383498134324,
+        "paraphrase": 7.53347000136273
+      },
+      "p95_ms_by_type": {
+        "topical": 15.494400801253505,
+        "filter": 25.77615245099878,
+        "exact": 13.556793249153998,
+        "paraphrase": 10.066634602844715
+      }
+    },
+    "lancedb/hybrid": {
+      "status": "ok",
+      "index": "ivf_pq (cosine, 316 partitions)",
+      "search": "nprobes=default, refine_factor=none",
+      "recall@5": 0.5700000000000001,
+      "recall@10": 0.6075,
+      "mrr@10": 0.6,
+      "ann_recall@10": null,
+      "p50_ms": 19.49466799851507,
+      "p95_ms": 33.02371884856256,
+      "ingest_s": 146.43192942400492,
+      "index_build_s": 115.43687099500676,
+      "recall@10_by_type": {
+        "topical": 0.6636363636363636,
+        "filter": 0.75,
+        "exact": 0.65,
+        "paraphrase": 0.3333333333333333
+      },
+      "mrr@10_by_type": {
+        "topical": 0.6363636363636364,
+        "filter": 0.75,
+        "exact": 0.65,
+        "paraphrase": 0.3333333333333333
+      },
+      "p50_ms_by_type": {
+        "topical": 19.30470400111517,
+        "filter": 31.907831500575412,
+        "exact": 19.342321997100953,
+        "paraphrase": 18.608623002364766
+      },
+      "p95_ms_by_type": {
+        "topical": 22.39185219805222,
+        "filter": 36.301389800428296,
+        "exact": 22.424724000666174,
+        "paraphrase": 20.41569979992346
+      }
+    },
+    "lancedb[refine_factor=1]/vector": {
+      "status": "ok",
+      "index": "ivf_pq (cosine, 316 partitions)",
+      "search": "nprobes=default, refine_factor=1",
+      "recall@5": 0.45,
+      "recall@10": 0.44000000000000006,
+      "mrr@10": 0.45,
+      "ann_recall@10": 0.025,
+      "p50_ms": 17.469908998464234,
+      "p95_ms": 28.53813244837511,
+      "ingest_s": 146.43192942400492,
+      "index_build_s": null,
+      "recall@10_by_type": {
+        "topical": 0.509090909090909,
+        "filter": 0.6,
+        "exact": 0.3,
+        "paraphrase": 0.3333333333333333
+      },
+      "mrr@10_by_type": {
+        "topical": 0.5454545454545454,
+        "filter": 0.6,
+        "exact": 0.3,
+        "paraphrase": 0.3333333333333333
+      },
+      "p50_ms_by_type": {
+        "topical": 17.307661000813823,
+        "filter": 26.975140001013642,
+        "exact": 16.861609001352917,
+        "paraphrase": 17.037761994288303
+      },
+      "p95_ms_by_type": {
+        "topical": 19.939599999634083,
+        "filter": 29.85647385030461,
+        "exact": 18.87580370057549,
+        "paraphrase": 18.505690197343938
+      }
+    },
+    "lancedb[refine_factor=20]/vector": {
+      "status": "ok",
+      "index": "ivf_pq (cosine, 316 partitions)",
+      "search": "nprobes=default, refine_factor=20",
+      "recall@5": 0.545,
+      "recall@10": 0.5275000000000001,
+      "mrr@10": 0.575,
+      "ann_recall@10": 0.1625,
+      "p50_ms": 20.282445999328047,
+      "p95_ms": 30.848912198416656,
+      "ingest_s": 146.43192942400492,
+      "index_build_s": null,
+      "recall@10_by_type": {
+        "topical": 0.6272727272727273,
+        "filter": 0.7,
+        "exact": 0.42000000000000004,
+        "paraphrase": 0.3333333333333333
+      },
+      "mrr@10_by_type": {
+        "topical": 0.7272727272727273,
+        "filter": 0.7,
+        "exact": 0.5,
+        "paraphrase": 0.3333333333333333
+      },
+      "p50_ms_by_type": {
+        "topical": 19.9863639936666,
+        "filter": 29.946633498184383,
+        "exact": 20.18470199982403,
+        "paraphrase": 19.71543700346956
+      },
+      "p95_ms_by_type": {
+        "topical": 21.182178998424206,
+        "filter": 32.910408201860264,
+        "exact": 23.95411414981936,
+        "paraphrase": 20.983950099616777
+      }
+    }
+  },
+  "notes": "recall@k is capped recall, |rel \u2229 top-k| / min(k, |rel|). Embeddings are precomputed and cached, so ingest_s and latency exclude the embedding model. pgvector builds no vector index (exact scan), so index_build_s is n/a. SYNTHETIC SCALE-UP: the 1250-call corpus replicated 80x with new call_ids; replicas share text and get seeded vector jitter (eps=0.05), so they are near-duplicates, not identical points. All replicas count as relevant, so recall at scale>1 measures retrieval among near-duplicates; compare ingest and latency across scales, not recall."
+}

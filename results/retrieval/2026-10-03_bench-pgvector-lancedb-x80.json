@@ -1,6 +1,6 @@
 {
   "date": "2026-10-03",
-  "git_sha": "3843d1eddd68e74de19efb9ade569f0efb9894f0",
+  "git_sha": "cf53abc7d2fd8591abb9c7bd8babed0ed430dca8",
   "area": "retrieval",
   "run": "bench-pgvector-lancedb-x80",
   "hardware": "Intel(R) Core(TM) i5-1038NG7 CPU @ 2.00GHz, 8 cores, 15 GB RAM, Linux",
@@ -37,47 +37,19 @@
       "hnsw_m": 16,
       "hnsw_ef_construction": 64,
       "hnsw_ef_search": 40,
-      "sweep": [
-        {
-          "nprobes": 20,
-          "refine_factor": 1
-        },
-        {
-          "nprobes": 20,
-          "refine_factor": 20
-        },
-        {
-          "nprobes": 50,
-          "refine_factor": 1
-        },
-        {
-          "nprobes": 50,
-          "refine_factor": 20
-        },
-        {
-          "nprobes": 100,
-          "refine_factor": 1
-        },
-        {
-          "nprobes": 100,
-          "refine_factor": 20
-        },
-        {
-          "nprobes": 200,
-          "refine_factor": 1
-        },
-        {
-          "nprobes": 200,
-          "refine_factor": 20
-        }
+      "lance_index": "ivf_flat",
+      "sweep_ef_search": [
+        40,
+        100,
+        200
       ]
     },
     "labels_sha256": "14fc5f3c345dd138"
   },
   "metrics": {
     "embed_unique_docs": 0,
-    "embed_docs_s": 4.467998223844916e-06,
-    "embed_query_p50_ms": 43.64720000012312,
+    "embed_docs_s": 4.426001396495849e-06,
+    "embed_query_p50_ms": 42.29070849760319,
     "pgvector/vector": {
       "status": "ok",
       "index": "none (exact scan)",
@@ -85,9 +57,10 @@
       "recall@5": 0.8,
       "recall@10": 0.8,
       "mrr@10": 0.8,
-      "p50_ms": 848.9550595004403,
-      "p95_ms": 914.0699956977187,
-      "ingest_s": 174.37751411500358,
+      "ann_recall@10": 1.0,
+      "p50_ms": 883.9719835013966,
+      "p95_ms": 909.1797071985638,
+      "ingest_s": 179.4725992809981,
       "index_build_s": null,
       "recall@10_by_type": {
         "topical": 1.0,
@@ -100,6 +73,18 @@
         "filter": 0.7,
         "exact": 0.6,
         "paraphrase": 0.8888888888888888
+      },
+      "p50_ms_by_type": {
+        "topical": 887.514961999841,
+        "filter": 78.06352999978117,
+        "exact": 891.643261500576,
+        "paraphrase": 889.0227949959808
+      },
+      "p95_ms_by_type": {
+        "topical": 908.6238709976897,
+        "filter": 277.3812746974727,
+        "exact": 912.4215231018752,
+        "paraphrase": 908.1764659043984
       }
     },
     "pgvector/fts": {
@@ -112,48 +97,185 @@
       "status": "ok",
       "index": "hnsw (cosine, m=16, ef_construction=64)",
       "search": "ef_search=40, iterative_scan=relaxed_order",
-      "recall@5": 0.65,
-      "recall@10": 0.65,
-      "mrr@10": 0.65,
-      "p50_ms": 4.137352498219116,
-      "p95_ms": 98.36850139945452,
-      "ingest_s": 174.37751411500358,
-      "index_build_s": 27.617348094994668,
+      "recall@5": 0.725,
+      "recall@10": 0.725,
+      "mrr@10": 0.725,
+      "ann_recall@10": 0.47750000000000004,
+      "p50_ms": 4.139806496823439,
+      "p95_ms": 89.57319370383627,
+      "ingest_s": 179.4725992809981,
+      "index_build_s": 28.648870579003415,
       "recall@10_by_type": {
-        "topical": 0.7272727272727273,
-        "filter": 0.8,
+        "topical": 0.9090909090909091,
+        "filter": 0.6,
         "exact": 0.5,
-        "paraphrase": 0.5555555555555556
+        "paraphrase": 0.8888888888888888
       },
       "mrr@10_by_type": {
-        "topical": 0.7272727272727273,
-        "filter": 0.8,
+        "topical": 0.9090909090909091,
+        "filter": 0.6,
         "exact": 0.5,
-        "paraphrase": 0.5555555555555556
+        "paraphrase": 0.8888888888888888
+      },
+      "p50_ms_by_type": {
+        "topical": 3.7942470007692464,
+        "filter": 73.74860050185816,
+        "exact": 3.6698525000247173,
+        "paraphrase": 3.986165000242181
+      },
+      "p95_ms_by_type": {
+        "topical": 4.642093999427743,
+        "filter": 135.98083425094956,
+        "exact": 5.662418400606839,
+        "paraphrase": 4.68213390049641
+      }
+    },
+    "pgvector-hnsw[ef_search=40]/vector": {
+      "status": "ok",
+      "index": "hnsw (cosine, m=16, ef_construction=64)",
+      "search": "ef_search=40, iterative_scan=relaxed_order",
+      "recall@5": 0.725,
+      "recall@10": 0.725,
+      "mrr@10": 0.725,
+      "ann_recall@10": 0.47750000000000004,
+      "p50_ms": 4.073614501976408,
+      "p95_ms": 87.33726384780309,
+      "ingest_s": 179.4725992809981,
+      "index_build_s": 0.0005542939979932271,
+      "recall@10_by_type": {
+        "topical": 0.9090909090909091,
+        "filter": 0.6,
+        "exact": 0.5,
+        "paraphrase": 0.8888888888888888
+      },
+      "mrr@10_by_type": {
+        "topical": 0.9090909090909091,
+        "filter": 0.6,
+        "exact": 0.5,
+        "paraphrase": 0.8888888888888888
+      },
+      "p50_ms_by_type": {
+        "topical": 3.9942580042406917,
+        "filter": 77.7975984965451,
+        "exact": 3.850819997751387,
+        "paraphrase": 3.862252997350879
+      },
+      "p95_ms_by_type": {
+        "topical": 4.823712998768315,
+        "filter": 135.35760474660492,
+        "exact": 5.428490600752411,
+        "paraphrase": 5.160939301276812
+      }
+    },
+    "pgvector-hnsw[ef_search=100]/vector": {
+      "status": "ok",
+      "index": "hnsw (cosine, m=16, ef_construction=64)",
+      "search": "ef_search=100, iterative_scan=relaxed_order",
+      "recall@5": 0.725,
+      "recall@10": 0.725,
+      "mrr@10": 0.725,
+      "ann_recall@10": 0.545,
+      "p50_ms": 5.330893003701931,
+      "p95_ms": 85.60878750140542,
+      "ingest_s": 179.4725992809981,
+      "index_build_s": 0.0005065200020908378,
+      "recall@10_by_type": {
+        "topical": 0.9090909090909091,
+        "filter": 0.6,
+        "exact": 0.5,
+        "paraphrase": 0.8888888888888888
+      },
+      "mrr@10_by_type": {
+        "topical": 0.9090909090909091,
+        "filter": 0.6,
+        "exact": 0.5,
+        "paraphrase": 0.8888888888888888
+      },
+      "p50_ms_by_type": {
+        "topical": 4.852555997786112,
+        "filter": 73.25653800216969,
+        "exact": 4.917398000543471,
+        "paraphrase": 5.0814399946830235
+      },
+      "p95_ms_by_type": {
+        "topical": 5.841274595877621,
+        "filter": 134.18040120304795,
+        "exact": 8.001888602302643,
+        "paraphrase": 7.32941929527442
+      }
+    },
+    "pgvector-hnsw[ef_search=200]/vector": {
+      "status": "ok",
+      "index": "hnsw (cosine, m=16, ef_construction=64)",
+      "search": "ef_search=200, iterative_scan=relaxed_order",
+      "recall@5": 0.725,
+      "recall@10": 0.725,
+      "mrr@10": 0.725,
+      "ann_recall@10": 0.7025,
+      "p50_ms": 7.44377649971284,
+      "p95_ms": 89.05454970154094,
+      "ingest_s": 179.4725992809981,
+      "index_build_s": 0.0007356429996434599,
+      "recall@10_by_type": {
+        "topical": 0.9090909090909091,
+        "filter": 0.6,
+        "exact": 0.5,
+        "paraphrase": 0.8888888888888888
+      },
+      "mrr@10_by_type": {
+        "topical": 0.9090909090909091,
+        "filter": 0.6,
+        "exact": 0.5,
+        "paraphrase": 0.8888888888888888
+      },
+      "p50_ms_by_type": {
+        "topical": 6.500222996692173,
+        "filter": 73.40194950302248,
+        "exact": 6.751304001227254,
+        "paraphrase": 7.198028004495427
+      },
+      "p95_ms_by_type": {
+        "topical": 11.066211805155035,
+        "filter": 134.91911485034507,
+        "exact": 11.180057649835362,
+        "paraphrase": 9.533545300655533
       }
     },
     "lancedb/vector": {
       "status": "ok",
-      "index": "ivf_pq (cosine, 316 partitions)",
+      "index": "ivf_flat (cosine, 316 partitions)",
       "search": "nprobes=default, refine_factor=none",
-      "recall@5": 0.43,
-      "recall@10": 0.4325,
-      "mrr@10": 0.4364583333333333,
-      "p50_ms": 16.239028998825233,
-      "p95_ms": 26.813062197470572,
-      "ingest_s": 149.96456095799658,
-      "index_build_s": 117.24317518499447,
+      "recall@5": 0.8,
+      "recall@10": 0.8,
+      "mrr@10": 0.8,
+      "ann_recall@10": 1.0,
+      "p50_ms": 54.97568750070059,
+      "p95_ms": 58.13796910151723,
+      "ingest_s": 65.53846300300211,
+      "index_build_s": 32.075184140012425,
       "recall@10_by_type": {
-        "topical": 0.8181818181818182,
-        "filter": 0.6,
-        "exact": 0.2,
-        "paraphrase": 0.03333333333333333
+        "topical": 1.0,
+        "filter": 0.7,
+        "exact": 0.6,
+        "paraphrase": 0.8888888888888888
       },
       "mrr@10_by_type": {
-        "topical": 0.8295454545454546,
-        "filter": 0.6,
-        "exact": 0.2,
-        "paraphrase": 0.037037037037037035
+        "topical": 1.0,
+        "filter": 0.7,
+        "exact": 0.6,
+        "paraphrase": 0.8888888888888888
+      },
+      "p50_ms_by_type": {
+        "topical": 56.10399000579491,
+        "filter": 29.46148149567307,
+        "exact": 55.34645050283871,
+        "paraphrase": 55.51769500016235
+      },
+      "p95_ms_by_type": {
+        "topical": 59.30026120040566,
+        "filter": 33.884482149005635,
+        "exact": 59.26249010008178,
+        "paraphrase": 57.402660498337355
       }
     },
     "lancedb/fts": {
@@ -163,10 +285,11 @@
       "recall@5": 0.675,
       "recall@10": 0.675,
       "mrr@10": 0.675,
-      "p50_ms": 11.45527650078293,
-      "p95_ms": 23.481494245788777,
-      "ingest_s": 149.96456095799658,
-      "index_build_s": 117.24317518499447,
+      "ann_recall@10": null,
+      "p50_ms": 11.695477001921972,
+      "p95_ms": 23.071913548119483,
+      "ingest_s": 65.53846300300211,
+      "index_build_s": 32.075184140012425,
       "recall@10_by_type": {
         "topical": 0.8181818181818182,
         "filter": 0.8,
@@ -178,222 +301,55 @@
         "filter": 0.8,
         "exact": 1.0,
         "paraphrase": 0.0
+      },
+      "p50_ms_by_type": {
+        "topical": 12.115364996134304,
+        "filter": 21.72584749860107,
+        "exact": 10.365121503127739,
+        "paraphrase": 7.754477002890781
+      },
+      "p95_ms_by_type": {
+        "topical": 16.118525400815997,
+        "filter": 24.97632724698633,
+        "exact": 12.796843203614117,
+        "paraphrase": 11.40822759771254
       }
     },
     "lancedb/hybrid": {
       "status": "ok",
-      "index": "ivf_pq (cosine, 316 partitions)",
+      "index": "ivf_flat (cosine, 316 partitions)",
       "search": "nprobes=default, refine_factor=none",
-      "recall@5": 0.54,
-      "recall@10": 0.5650000000000001,
-      "mrr@10": 0.58,
-      "p50_ms": 19.299486997624626,
-      "p95_ms": 32.027242851108895,
-      "ingest_s": 149.96456095799658,
-      "index_build_s": 117.24317518499447,
-      "recall@10_by_type": {
-        "topical": 0.8181818181818182,
-        "filter": 0.75,
-        "exact": 0.6,
-        "paraphrase": 0.011111111111111112
-      },
-      "mrr@10_by_type": {
-        "topical": 0.8636363636363636,
-        "filter": 0.75,
-        "exact": 0.6,
-        "paraphrase": 0.022222222222222223
-      }
-    },
-    "lancedb[nprobes=20,refine_factor=1]/vector": {
-      "status": "ok",
-      "index": "ivf_pq (cosine, 316 partitions)",
-      "search": "nprobes=20, refine_factor=1",
-      "recall@5": 0.43,
-      "recall@10": 0.4325,
-      "mrr@10": 0.453125,
-      "p50_ms": 17.123374000220792,
-      "p95_ms": 29.915218349196948,
-      "ingest_s": 149.96456095799658,
-      "index_build_s": null,
-      "recall@10_by_type": {
-        "topical": 0.8181818181818182,
-        "filter": 0.6,
-        "exact": 0.2,
-        "paraphrase": 0.03333333333333333
-      },
-      "mrr@10_by_type": {
-        "topical": 0.9090909090909091,
-        "filter": 0.6,
-        "exact": 0.2,
-        "paraphrase": 0.013888888888888888
-      }
-    },
-    "lancedb[nprobes=20,refine_factor=20]/vector": {
-      "status": "ok",
-      "index": "ivf_pq (cosine, 316 partitions)",
-      "search": "nprobes=20, refine_factor=20",
-      "recall@5": 0.475,
-      "recall@10": 0.475,
-      "mrr@10": 0.475,
-      "p50_ms": 19.635893499071244,
-      "p95_ms": 30.494761795489467,
-      "ingest_s": 149.96456095799658,
-      "index_build_s": null,
+      "recall@5": 0.8099999999999999,
+      "recall@10": 0.8125,
+      "mrr@10": 0.875,
+      "ann_recall@10": null,
+      "p50_ms": 57.0942534977803,
+      "p95_ms": 61.10285245194973,
+      "ingest_s": 65.53846300300211,
+      "index_build_s": 32.075184140012425,
       "recall@10_by_type": {
         "topical": 0.9090909090909091,
-        "filter": 0.7,
-        "exact": 0.2,
-        "paraphrase": 0.0
+        "filter": 0.8,
+        "exact": 0.8,
+        "paraphrase": 0.7222222222222222
       },
       "mrr@10_by_type": {
-        "topical": 0.9090909090909091,
-        "filter": 0.7,
-        "exact": 0.2,
-        "paraphrase": 0.0
-      }
-    },
-    "lancedb[nprobes=50,refine_factor=1]/vector": {
-      "status": "ok",
-      "index": "ivf_pq (cosine, 316 partitions)",
-      "search": "nprobes=50, refine_factor=1",
-      "recall@5": 0.43,
-      "recall@10": 0.4325,
-      "mrr@10": 0.453125,
-      "p50_ms": 16.908124500332633,
-      "p95_ms": 28.065394704754,
-      "ingest_s": 149.96456095799658,
-      "index_build_s": null,
-      "recall@10_by_type": {
-        "topical": 0.8181818181818182,
-        "filter": 0.6,
-        "exact": 0.2,
-        "paraphrase": 0.03333333333333333
+        "topical": 1.0,
+        "filter": 0.8,
+        "exact": 0.8,
+        "paraphrase": 0.8888888888888888
       },
-      "mrr@10_by_type": {
-        "topical": 0.9090909090909091,
-        "filter": 0.6,
-        "exact": 0.2,
-        "paraphrase": 0.013888888888888888
-      }
-    },
-    "lancedb[nprobes=50,refine_factor=20]/vector": {
-      "status": "ok",
-      "index": "ivf_pq (cosine, 316 partitions)",
-      "search": "nprobes=50, refine_factor=20",
-      "recall@5": 0.475,
-      "recall@10": 0.475,
-      "mrr@10": 0.475,
-      "p50_ms": 19.527517000824446,
-      "p95_ms": 30.621149147555116,
-      "ingest_s": 149.96456095799658,
-      "index_build_s": null,
-      "recall@10_by_type": {
-        "topical": 0.9090909090909091,
-        "filter": 0.7,
-        "exact": 0.2,
-        "paraphrase": 0.0
+      "p50_ms_by_type": {
+        "topical": 58.08175199490506,
+        "filter": 34.853960500186076,
+        "exact": 57.12491200029035,
+        "paraphrase": 58.19421899650479
       },
-      "mrr@10_by_type": {
-        "topical": 0.9090909090909091,
-        "filter": 0.7,
-        "exact": 0.2,
-        "paraphrase": 0.0
-      }
-    },
-    "lancedb[nprobes=100,refine_factor=1]/vector": {
-      "status": "ok",
-      "index": "ivf_pq (cosine, 316 partitions)",
-      "search": "nprobes=100, refine_factor=1",
-      "recall@5": 0.43,
-      "recall@10": 0.4325,
-      "mrr@10": 0.453125,
-      "p50_ms": 16.991385502478806,
-      "p95_ms": 27.4095456537907,
-      "ingest_s": 149.96456095799658,
-      "index_build_s": null,
-      "recall@10_by_type": {
-        "topical": 0.8181818181818182,
-        "filter": 0.6,
-        "exact": 0.2,
-        "paraphrase": 0.03333333333333333
-      },
-      "mrr@10_by_type": {
-        "topical": 0.9090909090909091,
-        "filter": 0.6,
-        "exact": 0.2,
-        "paraphrase": 0.013888888888888888
-      }
-    },
-    "lancedb[nprobes=100,refine_factor=20]/vector": {
-      "status": "ok",
-      "index": "ivf_pq (cosine, 316 partitions)",
-      "search": "nprobes=100, refine_factor=20",
-      "recall@5": 0.475,
-      "recall@10": 0.475,
-      "mrr@10": 0.475,
-      "p50_ms": 19.58315849697101,
-      "p95_ms": 29.577139055618318,
-      "ingest_s": 149.96456095799658,
-      "index_build_s": null,
-      "recall@10_by_type": {
-        "topical": 0.9090909090909091,
-        "filter": 0.7,
-        "exact": 0.2,
-        "paraphrase": 0.0
-      },
-      "mrr@10_by_type": {
-        "topical": 0.9090909090909091,
-        "filter": 0.7,
-        "exact": 0.2,
-        "paraphrase": 0.0
-      }
-    },
-    "lancedb[nprobes=200,refine_factor=1]/vector": {
-      "status": "ok",
-      "index": "ivf_pq (cosine, 316 partitions)",
-      "search": "nprobes=200, refine_factor=1",
-      "recall@5": 0.43,
-      "recall@10": 0.4325,
-      "mrr@10": 0.453125,
-      "p50_ms": 17.109791999246227,
-      "p95_ms": 27.593808302117395,
-      "ingest_s": 149.96456095799658,
-      "index_build_s": null,
-      "recall@10_by_type": {
-        "topical": 0.8181818181818182,
-        "filter": 0.6,
-        "exact": 0.2,
-        "paraphrase": 0.03333333333333333
-      },
-      "mrr@10_by_type": {
-        "topical": 0.9090909090909091,
-        "filter": 0.6,
-        "exact": 0.2,
-        "paraphrase": 0.013888888888888888
-      }
-    },
-    "lancedb[nprobes=200,refine_factor=20]/vector": {
-      "status": "ok",
-      "index": "ivf_pq (cosine, 316 partitions)",
-      "search": "nprobes=200, refine_factor=20",
-      "recall@5": 0.475,
-      "recall@10": 0.475,
-      "mrr@10": 0.475,
-      "p50_ms": 19.570216500142124,
-      "p95_ms": 30.116274253668962,
-      "ingest_s": 149.96456095799658,
-      "index_build_s": null,
-      "recall@10_by_type": {
-        "topical": 0.9090909090909091,
-        "filter": 0.7,
-        "exact": 0.2,
-        "paraphrase": 0.0
-      },
-      "mrr@10_by_type": {
-        "topical": 0.9090909090909091,
-        "filter": 0.7,
-        "exact": 0.2,
-        "paraphrase": 0.0
+      "p95_ms_by_type": {
+        "topical": 61.415562799084,
+        "filter": 39.54877555297571,
+        "exact": 60.78953000069305,
+        "paraphrase": 61.7653358996904
       }
     }
   },
