@@ -79,6 +79,26 @@ dbt parse --target snowflake      # offline: renders the profile, connects to no
 dbt build --target snowflake      # needs the loaded data and a running warehouse
 ```
 
+### Running against Snowflake or Databricks (settings from 1Password)
+
+One command each. The `SNOWFLAKE_*` / `DATABRICKS_*` settings come from the 1Password items `CMW/snowflake-ccai` and `CMW/databricks-ccai`, written by `tools/bootstrap-snowflake.sh` / `tools/bootstrap-databricks.sh`. `tools/warehouse-run.sh` resolves them through `op run` against the committed reference templates in `tools/op/`, so no `.env` is populated. The Snowflake private key exists only as a mode-600 temp file for the run.
+
+```bash
+make load-snowflake                       # S2 load: raw tables on Snowflake
+make load-databricks                      # S2 load: raw tables on Databricks
+make dbt-build WAREHOUSE=snowflake        # or WAREHOUSE=databricks
+make load-snowflake DRY=1                 # what would run + the variable NAMES resolved; runs nothing
+make load-snowflake DIRECT=1              # skip 1Password: read the variables from the shell, as before
+```
+
+Before running anything, the wrapper checks, with one message each:
+- `op` is installed and signed in (`eval $(op signin)`);
+- the item exists;
+- `uv sync --group dbt --group <warehouse>` has been done;
+- the warehouse answers `SELECT 1` (`tools/warehouse-run.sh --no-check ...` skips this check).
+
+Not run against a real warehouse or 1Password yet; the first run is the test.
+
 ### Loaders (`olap/dbt/loaders/`)
 
 Setting up Databricks for them (warehouse, catalog, schemas, volume, `DATABRICKS_*` in 1Password): `tools/bootstrap-databricks.sh`, see [`infra/azure/modules/databricks/README.md`](../../infra/azure/modules/databricks/README.md).
