@@ -212,6 +212,11 @@ def short_error(exc: BaseException, limit: int = ERROR_CHARS) -> str:
     return text if len(text) <= limit else text[: limit - 15] + " ...[truncated]"
 
 
+def cache_file_for(embeddings) -> Path:
+    """The on-disk embedding cache for this model; every bench caller shares it."""
+    return CACHE_DIR / (re.sub(r"[^A-Za-z0-9_.-]+", "_", embedding_model(embeddings)) + ".jsonl")
+
+
 def _text_key(text: str) -> str:
     return hashlib.sha256(text.encode()).hexdigest()
 
@@ -575,8 +580,7 @@ def _main(args: argparse.Namespace, backends: list[str], modes: list[str]) -> in
     ensure_ollama_model(embeddings)
     print(f"bench: {len(docs)} docs, {len(queries)} queries, backends={backends}, modes={modes}")
 
-    model = embedding_model(embeddings)
-    cache_file = None if args.no_cache else CACHE_DIR / (re.sub(r"[^A-Za-z0-9_.-]+", "_", model) + ".jsonl")
+    cache_file = None if args.no_cache else cache_file_for(embeddings)
     metrics = run_bench(docs, queries, embeddings, backends=backends, modes=modes,
                         repeats=args.repeats, ingest_batch=args.ingest_batch, cache_file=cache_file)
 
