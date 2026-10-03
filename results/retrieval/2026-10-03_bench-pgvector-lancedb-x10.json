@@ -1,0 +1,135 @@
+{
+  "date": "2026-10-03",
+  "git_sha": "6d11fda572547069d99a8c93820db962df6466fb",
+  "area": "retrieval",
+  "run": "bench-pgvector-lancedb-x10",
+  "hardware": "Intel(R) Core(TM) i5-1038NG7 CPU @ 2.00GHz, 8 cores, 15 GB RAM, Linux",
+  "versions": {
+    "python": "3.14.7",
+    "model": "ollama:nomic-embed-text",
+    "lancedb": "0.39.0",
+    "pyarrow": "25.0.1",
+    "pylance": "not installed",
+    "langchain-postgres": "0.0.17",
+    "psycopg2-binary": "2.9.12",
+    "postgres": "16.15 (Debian 16.15-1.pgdg12+2)",
+    "pgvector_ext": "0.8.7"
+  },
+  "params": {
+    "backends": [
+      "pgvector",
+      "lancedb"
+    ],
+    "modes": [
+      "vector",
+      "fts",
+      "hybrid"
+    ],
+    "k": 10,
+    "repeats": 3,
+    "scale": 10,
+    "rows": 12500,
+    "queries": 40,
+    "labels_sha256": "14fc5f3c345dd138"
+  },
+  "metrics": {
+    "embed_unique_docs": 1063,
+    "embed_docs_s": 354.5678029050032,
+    "embed_query_p50_ms": 43.335640999430325,
+    "pgvector/vector": {
+      "status": "ok",
+      "recall@5": 0.8,
+      "recall@10": 0.805,
+      "mrr@10": 0.805,
+      "p50_ms": 81.41144849651027,
+      "p95_ms": 86.64558029995533,
+      "ingest_s": 20.28222263399948,
+      "index_build_s": null,
+      "recall@10_by_type": {
+        "topical": 1.0,
+        "filter": 0.72,
+        "exact": 0.6,
+        "paraphrase": 0.8888888888888888
+      },
+      "mrr@10_by_type": {
+        "topical": 1.0,
+        "filter": 0.72,
+        "exact": 0.6,
+        "paraphrase": 0.8888888888888888
+      }
+    },
+    "pgvector/fts": {
+      "status": "not supported: pgvector backend supports mode='vector' only, not 'fts'"
+    },
+    "pgvector/hybrid": {
+      "status": "not supported: pgvector backend supports mode='vector' only, not 'hybrid'"
+    },
+    "lancedb/vector": {
+      "status": "ok",
+      "recall@5": 0.8,
+      "recall@10": 0.8,
+      "mrr@10": 0.8,
+      "p50_ms": 74.60886150147417,
+      "p95_ms": 89.5032625492604,
+      "ingest_s": 5.278221547996509,
+      "index_build_s": 0.4071024340009899,
+      "recall@10_by_type": {
+        "topical": 1.0,
+        "filter": 0.7,
+        "exact": 0.6,
+        "paraphrase": 0.8888888888888888
+      },
+      "mrr@10_by_type": {
+        "topical": 1.0,
+        "filter": 0.7,
+        "exact": 0.6,
+        "paraphrase": 0.8888888888888888
+      }
+    },
+    "lancedb/fts": {
+      "status": "ok",
+      "recall@5": 0.675,
+      "recall@10": 0.675,
+      "mrr@10": 0.675,
+      "p50_ms": 10.986168501403881,
+      "p95_ms": 14.766240201788605,
+      "ingest_s": 5.278221547996509,
+      "index_build_s": 0.4071024340009899,
+      "recall@10_by_type": {
+        "topical": 0.8181818181818182,
+        "filter": 0.8,
+        "exact": 1.0,
+        "paraphrase": 0.0
+      },
+      "mrr@10_by_type": {
+        "topical": 0.8181818181818182,
+        "filter": 0.8,
+        "exact": 1.0,
+        "paraphrase": 0.0
+      }
+    },
+    "lancedb/hybrid": {
+      "status": "ok",
+      "recall@5": 0.8099999999999999,
+      "recall@10": 0.8125,
+      "mrr@10": 0.875,
+      "p50_ms": 62.65085149789229,
+      "p95_ms": 92.13890185164928,
+      "ingest_s": 5.278221547996509,
+      "index_build_s": 0.4071024340009899,
+      "recall@10_by_type": {
+        "topical": 0.9090909090909091,
+        "filter": 0.8,
+        "exact": 0.8,
+        "paraphrase": 0.7222222222222222
+      },
+      "mrr@10_by_type": {
+        "topical": 1.0,
+        "filter": 0.8,
+        "exact": 0.8,
+        "paraphrase": 0.8888888888888888
+      }
+    }
+  },
+  "notes": "recall@k is capped recall, |rel \u2229 top-k| / min(k, |rel|). Embeddings are precomputed and cached, so ingest_s and latency exclude the embedding model. pgvector builds no vector index (exact scan), so index_build_s is n/a. SYNTHETIC SCALE-UP: the 1250-call corpus replicated 10x with new call_ids; replicas share text and vectors."
+}
