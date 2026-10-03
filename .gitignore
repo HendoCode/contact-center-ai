@@ -130,3 +130,6 @@ src/main/resources/dist/*
 
 # LangGraph dev server state (langgraph dev)
 .langgraph_api/
+
+# Bench embedding cache (retrieval/bench.py)
+.cache/
