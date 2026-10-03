@@ -1,6 +1,6 @@
 {
   "date": "2026-10-03",
-  "git_sha": "ac7aa8182a9bc85a4752d202351102d8f3394c7d",
+  "git_sha": "3843d1eddd68e74de19efb9ade569f0efb9894f0",
   "area": "retrieval",
   "run": "bench-pgvector-lancedb-x80",
   "hardware": "Intel(R) Core(TM) i5-1038NG7 CPU @ 2.00GHz, 8 cores, 15 GB RAM, Linux",
@@ -37,19 +37,47 @@
       "hnsw_m": 16,
       "hnsw_ef_construction": 64,
       "hnsw_ef_search": 40,
-      "sweep_refine": [
-        1,
-        5,
-        10,
-        20
+      "sweep": [
+        {
+          "nprobes": 20,
+          "refine_factor": 1
+        },
+        {
+          "nprobes": 20,
+          "refine_factor": 20
+        },
+        {
+          "nprobes": 50,
+          "refine_factor": 1
+        },
+        {
+          "nprobes": 50,
+          "refine_factor": 20
+        },
+        {
+          "nprobes": 100,
+          "refine_factor": 1
+        },
+        {
+          "nprobes": 100,
+          "refine_factor": 20
+        },
+        {
+          "nprobes": 200,
+          "refine_factor": 1
+        },
+        {
+          "nprobes": 200,
+          "refine_factor": 20
+        }
       ]
     },
     "labels_sha256": "14fc5f3c345dd138"
   },
   "metrics": {
     "embed_unique_docs": 0,
-    "embed_docs_s": 5.369998689275235e-06,
-    "embed_query_p50_ms": 42.67984949910897,
+    "embed_docs_s": 4.467998223844916e-06,
+    "embed_query_p50_ms": 43.64720000012312,
     "pgvector/vector": {
       "status": "ok",
       "index": "none (exact scan)",
@@ -57,9 +85,9 @@
       "recall@5": 0.8,
       "recall@10": 0.8,
       "mrr@10": 0.8,
-      "p50_ms": 849.8675269984233,
-      "p95_ms": 880.3000529034762,
-      "ingest_s": 185.66589635600394,
+      "p50_ms": 848.9550595004403,
+      "p95_ms": 914.0699956977187,
+      "ingest_s": 174.37751411500358,
       "index_build_s": null,
       "recall@10_by_type": {
         "topical": 1.0,
@@ -81,30 +109,51 @@
       "status": "not supported: pgvector backend supports mode='vector' only, not 'hybrid'"
     },
     "pgvector-hnsw/vector": {
-      "status": "failed: DiskFull: could not resize shared memory segment \"/PostgreSQL.1298614002\" to 533761504 bytes: No space left on device"
+      "status": "ok",
+      "index": "hnsw (cosine, m=16, ef_construction=64)",
+      "search": "ef_search=40, iterative_scan=relaxed_order",
+      "recall@5": 0.65,
+      "recall@10": 0.65,
+      "mrr@10": 0.65,
+      "p50_ms": 4.137352498219116,
+      "p95_ms": 98.36850139945452,
+      "ingest_s": 174.37751411500358,
+      "index_build_s": 27.617348094994668,
+      "recall@10_by_type": {
+        "topical": 0.7272727272727273,
+        "filter": 0.8,
+        "exact": 0.5,
+        "paraphrase": 0.5555555555555556
+      },
+      "mrr@10_by_type": {
+        "topical": 0.7272727272727273,
+        "filter": 0.8,
+        "exact": 0.5,
+        "paraphrase": 0.5555555555555556
+      }
     },
     "lancedb/vector": {
       "status": "ok",
       "index": "ivf_pq (cosine, 316 partitions)",
       "search": "nprobes=default, refine_factor=none",
-      "recall@5": 0.5,
-      "recall@10": 0.49749999999999994,
-      "mrr@10": 0.5,
-      "p50_ms": 15.933487000438618,
-      "p95_ms": 26.342974502404104,
-      "ingest_s": 156.39536080200196,
-      "index_build_s": 125.67877592500008,
+      "recall@5": 0.43,
+      "recall@10": 0.4325,
+      "mrr@10": 0.4364583333333333,
+      "p50_ms": 16.239028998825233,
+      "p95_ms": 26.813062197470572,
+      "ingest_s": 149.96456095799658,
+      "index_build_s": 117.24317518499447,
       "recall@10_by_type": {
-        "topical": 0.8090909090909091,
-        "filter": 0.6,
-        "exact": 0.2,
-        "paraphrase": 0.3333333333333333
-      },
-      "mrr@10_by_type": {
         "topical": 0.8181818181818182,
         "filter": 0.6,
         "exact": 0.2,
-        "paraphrase": 0.3333333333333333
+        "paraphrase": 0.03333333333333333
+      },
+      "mrr@10_by_type": {
+        "topical": 0.8295454545454546,
+        "filter": 0.6,
+        "exact": 0.2,
+        "paraphrase": 0.037037037037037035
       }
     },
     "lancedb/fts": {
@@ -114,10 +163,10 @@
       "recall@5": 0.675,
       "recall@10": 0.675,
       "mrr@10": 0.675,
-      "p50_ms": 11.02008149609901,
-      "p95_ms": 23.970531403756468,
-      "ingest_s": 156.39536080200196,
-      "index_build_s": 125.67877592500008,
+      "p50_ms": 11.45527650078293,
+      "p95_ms": 23.481494245788777,
+      "ingest_s": 149.96456095799658,
+      "index_build_s": 117.24317518499447,
       "recall@10_by_type": {
         "topical": 0.8181818181818182,
         "filter": 0.8,
@@ -135,120 +184,216 @@
       "status": "ok",
       "index": "ivf_pq (cosine, 316 partitions)",
       "search": "nprobes=default, refine_factor=none",
-      "recall@5": 0.6,
-      "recall@10": 0.625,
-      "mrr@10": 0.65,
-      "p50_ms": 18.911175000539515,
-      "p95_ms": 31.86018580199743,
-      "ingest_s": 156.39536080200196,
-      "index_build_s": 125.67877592500008,
+      "recall@5": 0.54,
+      "recall@10": 0.5650000000000001,
+      "mrr@10": 0.58,
+      "p50_ms": 19.299486997624626,
+      "p95_ms": 32.027242851108895,
+      "ingest_s": 149.96456095799658,
+      "index_build_s": 117.24317518499447,
       "recall@10_by_type": {
         "topical": 0.8181818181818182,
         "filter": 0.75,
         "exact": 0.6,
-        "paraphrase": 0.2777777777777778
+        "paraphrase": 0.011111111111111112
       },
       "mrr@10_by_type": {
         "topical": 0.8636363636363636,
         "filter": 0.75,
         "exact": 0.6,
-        "paraphrase": 0.3333333333333333
+        "paraphrase": 0.022222222222222223
       }
     },
-    "lancedb[refine_factor=1]/vector": {
+    "lancedb[nprobes=20,refine_factor=1]/vector": {
       "status": "ok",
       "index": "ivf_pq (cosine, 316 partitions)",
-      "search": "nprobes=default, refine_factor=1",
-      "recall@5": 0.5,
-      "recall@10": 0.49749999999999994,
-      "mrr@10": 0.5,
-      "p50_ms": 17.005017500196118,
-      "p95_ms": 28.254870348973782,
-      "ingest_s": 156.39536080200196,
+      "search": "nprobes=20, refine_factor=1",
+      "recall@5": 0.43,
+      "recall@10": 0.4325,
+      "mrr@10": 0.453125,
+      "p50_ms": 17.123374000220792,
+      "p95_ms": 29.915218349196948,
+      "ingest_s": 149.96456095799658,
       "index_build_s": null,
       "recall@10_by_type": {
-        "topical": 0.8090909090909091,
-        "filter": 0.6,
-        "exact": 0.2,
-        "paraphrase": 0.3333333333333333
-      },
-      "mrr@10_by_type": {
         "topical": 0.8181818181818182,
         "filter": 0.6,
         "exact": 0.2,
-        "paraphrase": 0.3333333333333333
-      }
-    },
-    "lancedb[refine_factor=5]/vector": {
-      "status": "ok",
-      "index": "ivf_pq (cosine, 316 partitions)",
-      "search": "nprobes=default, refine_factor=5",
-      "recall@5": 0.5349999999999999,
-      "recall@10": 0.52,
-      "mrr@10": 0.55,
-      "p50_ms": 17.642374499700963,
-      "p95_ms": 28.46486419948633,
-      "ingest_s": 156.39536080200196,
-      "index_build_s": null,
-      "recall@10_by_type": {
-        "topical": 0.8727272727272727,
-        "filter": 0.6,
-        "exact": 0.22000000000000003,
-        "paraphrase": 0.3333333333333333
+        "paraphrase": 0.03333333333333333
       },
       "mrr@10_by_type": {
         "topical": 0.9090909090909091,
         "filter": 0.6,
-        "exact": 0.3,
-        "paraphrase": 0.3333333333333333
+        "exact": 0.2,
+        "paraphrase": 0.013888888888888888
       }
     },
-    "lancedb[refine_factor=10]/vector": {
+    "lancedb[nprobes=20,refine_factor=20]/vector": {
       "status": "ok",
       "index": "ivf_pq (cosine, 316 partitions)",
-      "search": "nprobes=default, refine_factor=10",
-      "recall@5": 0.5549999999999999,
-      "recall@10": 0.5425,
-      "mrr@10": 0.55625,
-      "p50_ms": 18.074383999191923,
-      "p95_ms": 29.08682570196106,
-      "ingest_s": 156.39536080200196,
+      "search": "nprobes=20, refine_factor=20",
+      "recall@5": 0.475,
+      "recall@10": 0.475,
+      "mrr@10": 0.475,
+      "p50_ms": 19.635893499071244,
+      "p95_ms": 30.494761795489467,
+      "ingest_s": 149.96456095799658,
       "index_build_s": null,
       "recall@10_by_type": {
         "topical": 0.9090909090909091,
-        "filter": 0.6,
-        "exact": 0.22000000000000003,
-        "paraphrase": 0.3888888888888889
-      },
-      "mrr@10_by_type": {
-        "topical": 0.9090909090909091,
-        "filter": 0.6,
-        "exact": 0.225,
-        "paraphrase": 0.4444444444444444
-      }
-    },
-    "lancedb[refine_factor=20]/vector": {
-      "status": "ok",
-      "index": "ivf_pq (cosine, 316 partitions)",
-      "search": "nprobes=default, refine_factor=20",
-      "recall@5": 0.5700000000000001,
-      "recall@10": 0.5675,
-      "mrr@10": 0.6,
-      "p50_ms": 19.55450099922018,
-      "p95_ms": 30.607714951474918,
-      "ingest_s": 156.39536080200196,
-      "index_build_s": null,
-      "recall@10_by_type": {
-        "topical": 0.9090909090909091,
-        "filter": 0.62,
-        "exact": 0.25,
-        "paraphrase": 0.4444444444444444
+        "filter": 0.7,
+        "exact": 0.2,
+        "paraphrase": 0.0
       },
       "mrr@10_by_type": {
         "topical": 0.9090909090909091,
         "filter": 0.7,
-        "exact": 0.3,
-        "paraphrase": 0.4444444444444444
+        "exact": 0.2,
+        "paraphrase": 0.0
+      }
+    },
+    "lancedb[nprobes=50,refine_factor=1]/vector": {
+      "status": "ok",
+      "index": "ivf_pq (cosine, 316 partitions)",
+      "search": "nprobes=50, refine_factor=1",
+      "recall@5": 0.43,
+      "recall@10": 0.4325,
+      "mrr@10": 0.453125,
+      "p50_ms": 16.908124500332633,
+      "p95_ms": 28.065394704754,
+      "ingest_s": 149.96456095799658,
+      "index_build_s": null,
+      "recall@10_by_type": {
+        "topical": 0.8181818181818182,
+        "filter": 0.6,
+        "exact": 0.2,
+        "paraphrase": 0.03333333333333333
+      },
+      "mrr@10_by_type": {
+        "topical": 0.9090909090909091,
+        "filter": 0.6,
+        "exact": 0.2,
+        "paraphrase": 0.013888888888888888
+      }
+    },
+    "lancedb[nprobes=50,refine_factor=20]/vector": {
+      "status": "ok",
+      "index": "ivf_pq (cosine, 316 partitions)",
+      "search": "nprobes=50, refine_factor=20",
+      "recall@5": 0.475,
+      "recall@10": 0.475,
+      "mrr@10": 0.475,
+      "p50_ms": 19.527517000824446,
+      "p95_ms": 30.621149147555116,
+      "ingest_s": 149.96456095799658,
+      "index_build_s": null,
+      "recall@10_by_type": {
+        "topical": 0.9090909090909091,
+        "filter": 0.7,
+        "exact": 0.2,
+        "paraphrase": 0.0
+      },
+      "mrr@10_by_type": {
+        "topical": 0.9090909090909091,
+        "filter": 0.7,
+        "exact": 0.2,
+        "paraphrase": 0.0
+      }
+    },
+    "lancedb[nprobes=100,refine_factor=1]/vector": {
+      "status": "ok",
+      "index": "ivf_pq (cosine, 316 partitions)",
+      "search": "nprobes=100, refine_factor=1",
+      "recall@5": 0.43,
+      "recall@10": 0.4325,
+      "mrr@10": 0.453125,
+      "p50_ms": 16.991385502478806,
+      "p95_ms": 27.4095456537907,
+      "ingest_s": 149.96456095799658,
+      "index_build_s": null,
+      "recall@10_by_type": {
+        "topical": 0.8181818181818182,
+        "filter": 0.6,
+        "exact": 0.2,
+        "paraphrase": 0.03333333333333333
+      },
+      "mrr@10_by_type": {
+        "topical": 0.9090909090909091,
+        "filter": 0.6,
+        "exact": 0.2,
+        "paraphrase": 0.013888888888888888
+      }
+    },
+    "lancedb[nprobes=100,refine_factor=20]/vector": {
+      "status": "ok",
+      "index": "ivf_pq (cosine, 316 partitions)",
+      "search": "nprobes=100, refine_factor=20",
+      "recall@5": 0.475,
+      "recall@10": 0.475,
+      "mrr@10": 0.475,
+      "p50_ms": 19.58315849697101,
+      "p95_ms": 29.577139055618318,
+      "ingest_s": 149.96456095799658,
+      "index_build_s": null,
+      "recall@10_by_type": {
+        "topical": 0.9090909090909091,
+        "filter": 0.7,
+        "exact": 0.2,
+        "paraphrase": 0.0
+      },
+      "mrr@10_by_type": {
+        "topical": 0.9090909090909091,
+        "filter": 0.7,
+        "exact": 0.2,
+        "paraphrase": 0.0
+      }
+    },
+    "lancedb[nprobes=200,refine_factor=1]/vector": {
+      "status": "ok",
+      "index": "ivf_pq (cosine, 316 partitions)",
+      "search": "nprobes=200, refine_factor=1",
+      "recall@5": 0.43,
+      "recall@10": 0.4325,
+      "mrr@10": 0.453125,
+      "p50_ms": 17.109791999246227,
+      "p95_ms": 27.593808302117395,
+      "ingest_s": 149.96456095799658,
+      "index_build_s": null,
+      "recall@10_by_type": {
+        "topical": 0.8181818181818182,
+        "filter": 0.6,
+        "exact": 0.2,
+        "paraphrase": 0.03333333333333333
+      },
+      "mrr@10_by_type": {
+        "topical": 0.9090909090909091,
+        "filter": 0.6,
+        "exact": 0.2,
+        "paraphrase": 0.013888888888888888
+      }
+    },
+    "lancedb[nprobes=200,refine_factor=20]/vector": {
+      "status": "ok",
+      "index": "ivf_pq (cosine, 316 partitions)",
+      "search": "nprobes=200, refine_factor=20",
+      "recall@5": 0.475,
+      "recall@10": 0.475,
+      "mrr@10": 0.475,
+      "p50_ms": 19.570216500142124,
+      "p95_ms": 30.116274253668962,
+      "ingest_s": 149.96456095799658,
+      "index_build_s": null,
+      "recall@10_by_type": {
+        "topical": 0.9090909090909091,
+        "filter": 0.7,
+        "exact": 0.2,
+        "paraphrase": 0.0
+      },
+      "mrr@10_by_type": {
+        "topical": 0.9090909090909091,
+        "filter": 0.7,
+        "exact": 0.2,
+        "paraphrase": 0.0
       }
     }
   },
