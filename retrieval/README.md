@@ -2,7 +2,16 @@
 
 One `Retriever` interface (`base.py`) over two stores: `pgvector_backend.py` and
 `lancedb_backend.py`. `bench.py` is the R3 benchmark (`make bench`); its tables live in
-`results/retrieval/`. This README only records the DuckDB check.
+`results/retrieval/`. This README records the bench prerequisites and the DuckDB check.
+
+## Running the bench
+
+`make bench` needs `make up` (Postgres for the pgvector backend; `ARGS="--backends lancedb"`
+skips it) and an embedding provider. With `EMBEDDING_PROVIDER=ollama` it uses
+`nomic-embed-text` and pulls it on first run if Ollama lacks it: about 270 MB in the `ollama`
+volume, skipped once present. Every unique transcript (about 1,060) is embedded once up front,
+with a progress line roughly every 10%. On a CPU-only Ollama that step is slow: about 6 minutes
+on an 8-core laptop, about 45 minutes on 2 cores.
 
 ## DuckDB over the Lance dataset (R3 stretch)
 

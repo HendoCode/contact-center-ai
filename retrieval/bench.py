@@ -161,6 +161,44 @@ def scale_up(docs: list[dict], queries: list[dict], n: int) -> tuple[list[dict],
 
 # ── embeddings ────────────────────────────────────────────────────────────────
 
+def ensure_ollama_model(embeddings, client=None) -> None:
+    """Pull the Ollama embedding model when the server lacks it; a no-op otherwise.
+
+    Only `make demo` pulls models (the Compose `ollama-pull` service), so after a bare
+    `make up` the first embed call would 404. Other embedding providers are skipped.
+    """
+    if type(embeddings).__name__ != "OllamaEmbeddings":
+        return
+    if client is None:
+        import ollama
+
+        client = ollama.Client(host=embeddings.base_url)
+    model = embeddings.model
+    tagged = model if ":" in model else f"{model}:latest"
+    if tagged in {m.model for m in client.list().models}:
+        return
+    print(f"bench: pulling Ollama model {model} (one-time download; nomic-embed-text is "
+          "~270 MB)", flush=True)
+    client.pull(model)
+
+
+def embed_progress() -> Callable[[int, int], None]:
+    """A `warm_documents` progress callback: a notice up front, then a line per ~10%."""
+    last = 0
+
+    def report(done: int, total: int) -> None:
+        nonlocal last
+        step = max(1, total // 10)
+        if done == 0:
+            print(f"bench: embedding {total} unique docs once up front; on a CPU this can "
+                  "take several minutes", flush=True)
+        elif done == total or done // step > last // step:
+            print(f"  embedded {done}/{total}", flush=True)
+        last = done
+
+    return report
+
+
 class CachedEmbeddings:
     """Embed each unique text once; later calls (ingest, search) hit the cache."""
 
@@ -169,12 +207,18 @@ class CachedEmbeddings:
         self._docs: dict[str, list[float]] = {}
         self._queries: dict[str, list[float]] = {}
 
-    def warm_documents(self, texts: Iterable[str], batch: int = 64) -> tuple[int, float]:
+    def warm_documents(self, texts: Iterable[str], batch: int = 64,
+                       progress: Callable[[int, int], None] | None = None) -> tuple[int, float]:
+        """Embed every uncached text; `progress(done, total)` runs at 0 and after each batch."""
         todo = [t for t in dict.fromkeys(texts) if t not in self._docs]
+        if progress and todo:
+            progress(0, len(todo))
         t0 = time.perf_counter()
         for i in range(0, len(todo), batch):
             chunk = todo[i : i + batch]
             self._docs.update(zip(chunk, self.inner.embed_documents(chunk)))
+            if progress:
+                progress(i + len(chunk), len(todo))
         return len(todo), time.perf_counter() - t0
 
     def warm_queries(self, texts: Iterable[str]) -> list[float]:
@@ -305,7 +349,8 @@ def run_bench(docs: list[dict], queries: list[dict], embeddings, *,
     """Run the benchmark; returns the `metrics` block of the results record."""
     openers = openers or OPENERS
     cached = CachedEmbeddings(embeddings)
-    n_unique, embed_s = cached.warm_documents(d["text"] for d in docs)
+    n_unique, embed_s = cached.warm_documents((d["text"] for d in docs),
+                                              progress=embed_progress())
     q_times = cached.warm_queries(q["query"] for q in queries)
 
     metrics: dict = {
@@ -437,6 +482,7 @@ def main(argv: list[str] | None = None) -> int:
     queries = load_queries(labels)
     docs, queries = scale_up(load_corpus(), queries, args.scale)
     embeddings = get_embeddings()
+    ensure_ollama_model(embeddings)
     print(f"bench: {len(docs)} docs, {len(queries)} queries, backends={backends}, modes={modes}")
 
     metrics = run_bench(docs, queries, embeddings, backends=backends, modes=modes,
