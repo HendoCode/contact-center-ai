@@ -4,4 +4,4 @@ select distinct
     channel as channel_code,
     channel as channel_name
 from {{ source('oltp', 'interaction') }}
-order by channel
+order by channel_code
