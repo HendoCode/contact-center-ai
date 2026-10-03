@@ -1,8 +1,8 @@
 {
   "date": "2026-10-03",
-  "git_sha": "bbcec499a3ea8fb0ba69a8dd28ed41038409f01c",
+  "git_sha": "bbcec499a3ea8fb0ba69a8dd28ed41038409f01c-dirty",
   "area": "retrieval",
-  "run": "bench-pgvector-lancedb-x10",
+  "run": "bench-pgvector-lancedb-x80",
   "hardware": "Intel(R) Core(TM) i5-1038NG7 CPU @ 2.00GHz, 8 cores, 15 GB RAM, Linux",
   "versions": {
     "python": "3.14.7",
@@ -27,34 +27,34 @@
     ],
     "k": 10,
     "repeats": 3,
-    "scale": 10,
-    "rows": 12500,
+    "scale": 80,
+    "rows": 100000,
     "queries": 40,
     "ingest_batch": 12500,
     "labels_sha256": "14fc5f3c345dd138"
   },
   "metrics": {
-    "embed_unique_docs": 1063,
-    "embed_docs_s": 348.83061618500506,
-    "embed_query_p50_ms": 42.970405502273934,
+    "embed_unique_docs": 0,
+    "embed_docs_s": 5.1489987527020276e-06,
+    "embed_query_p50_ms": 45.760530498228036,
     "pgvector/vector": {
       "status": "ok",
       "recall@5": 0.8,
-      "recall@10": 0.805,
-      "mrr@10": 0.805,
-      "p50_ms": 82.41082249878673,
-      "p95_ms": 89.98126184887951,
-      "ingest_s": 19.354503463000583,
+      "recall@10": 0.8,
+      "mrr@10": 0.8,
+      "p50_ms": 853.6563925044902,
+      "p95_ms": 926.7984553949645,
+      "ingest_s": 156.71092994300125,
       "index_build_s": null,
       "recall@10_by_type": {
         "topical": 1.0,
-        "filter": 0.72,
+        "filter": 0.7,
         "exact": 0.6,
         "paraphrase": 0.8888888888888888
       },
       "mrr@10_by_type": {
         "topical": 1.0,
-        "filter": 0.72,
+        "filter": 0.7,
         "exact": 0.6,
         "paraphrase": 0.8888888888888888
       }
@@ -67,24 +67,24 @@
     },
     "lancedb/vector": {
       "status": "ok",
-      "recall@5": 0.8,
-      "recall@10": 0.8,
-      "mrr@10": 0.8,
-      "p50_ms": 64.9413170031039,
-      "p95_ms": 80.69914054831315,
-      "ingest_s": 3.771649984002579,
-      "index_build_s": 0.38481489100377075,
+      "recall@5": 0.275,
+      "recall@10": 0.275,
+      "mrr@10": 0.275,
+      "p50_ms": 17.58610699835117,
+      "p95_ms": 29.105523300677305,
+      "ingest_s": 79.53563785900042,
+      "index_build_s": 69.26249187900248,
       "recall@10_by_type": {
-        "topical": 1.0,
-        "filter": 0.7,
-        "exact": 0.6,
-        "paraphrase": 0.8888888888888888
+        "topical": 0.2727272727272727,
+        "filter": 0.5,
+        "exact": 0.2,
+        "paraphrase": 0.1111111111111111
       },
       "mrr@10_by_type": {
-        "topical": 1.0,
-        "filter": 0.7,
-        "exact": 0.6,
-        "paraphrase": 0.8888888888888888
+        "topical": 0.2727272727272727,
+        "filter": 0.5,
+        "exact": 0.2,
+        "paraphrase": 0.1111111111111111
       }
     },
     "lancedb/fts": {
@@ -92,10 +92,10 @@
       "recall@5": 0.675,
       "recall@10": 0.675,
       "mrr@10": 0.675,
-      "p50_ms": 9.189039501507068,
-      "p95_ms": 12.870793753609178,
-      "ingest_s": 3.771649984002579,
-      "index_build_s": 0.38481489100377075,
+      "p50_ms": 13.14488999923924,
+      "p95_ms": 25.229728248086758,
+      "ingest_s": 79.53563785900042,
+      "index_build_s": 69.26249187900248,
       "recall@10_by_type": {
         "topical": 0.8181818181818182,
         "filter": 0.8,
@@ -111,26 +111,26 @@
     },
     "lancedb/hybrid": {
       "status": "ok",
-      "recall@5": 0.8099999999999999,
-      "recall@10": 0.8125,
-      "mrr@10": 0.875,
-      "p50_ms": 54.20065850194078,
-      "p95_ms": 74.42211749657872,
-      "ingest_s": 3.771649984002579,
-      "index_build_s": 0.38481489100377075,
+      "recall@5": 0.45499999999999996,
+      "recall@10": 0.5,
+      "mrr@10": 0.5,
+      "p50_ms": 19.11019299950567,
+      "p95_ms": 33.28395239805104,
+      "ingest_s": 79.53563785900042,
+      "index_build_s": 69.26249187900248,
       "recall@10_by_type": {
-        "topical": 0.9090909090909091,
-        "filter": 0.8,
-        "exact": 0.8,
-        "paraphrase": 0.7222222222222222
+        "topical": 0.5454545454545454,
+        "filter": 0.7,
+        "exact": 0.6,
+        "paraphrase": 0.1111111111111111
       },
       "mrr@10_by_type": {
-        "topical": 1.0,
-        "filter": 0.8,
-        "exact": 0.8,
-        "paraphrase": 0.8888888888888888
+        "topical": 0.5454545454545454,
+        "filter": 0.7,
+        "exact": 0.6,
+        "paraphrase": 0.1111111111111111
       }
     }
   },
-  "notes": "recall@k is capped recall, |rel \u2229 top-k| / min(k, |rel|). Embeddings are precomputed and cached, so ingest_s and latency exclude the embedding model. pgvector builds no vector index (exact scan), so index_build_s is n/a. SYNTHETIC SCALE-UP: the 1250-call corpus replicated 10x with new call_ids; replicas share text and vectors."
+  "notes": "recall@k is capped recall, |rel \u2229 top-k| / min(k, |rel|). Embeddings are precomputed and cached, so ingest_s and latency exclude the embedding model. pgvector builds no vector index (exact scan), so index_build_s is n/a. SYNTHETIC SCALE-UP: the 1250-call corpus replicated 80x with new call_ids; replicas share text and vectors."
 }
