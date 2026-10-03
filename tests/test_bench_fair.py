@@ -86,7 +86,7 @@ def test_flags_reach_the_openers_and_the_results(monkeypatch, tmp_path):
         "--hnsw-ef-search", "80", "--sweep", "nprobes=10,20"])
     cfg = seen["cfg"]
     assert (cfg.nprobes, cfg.refine_factor, cfg.num_partitions, cfg.hnsw_ef_search) == (30, 5, 64, 80)
-    assert cfg.sweep_nprobes == (10, 20) and cfg.pgvector_index == "hnsw"
+    assert cfg.sweep == ({"nprobes": 10}, {"nprobes": 20}) and cfg.pgvector_index == "hnsw"
     assert seen["jitter"] is True  # default on for --scale > 1
     assert '"jitter_eps": 0.05' in record and '"nprobes": 30' in record
 
@@ -96,10 +96,49 @@ def test_x1_default_has_no_jitter(monkeypatch, tmp_path):
     assert seen["jitter"] is False and '"jitter_eps": 0.0' in record
 
 
-@pytest.mark.parametrize("sweep", ["nprobes=", "probes=1,2", "nprobes=0", "nprobes=a"])
+@pytest.mark.parametrize("sweep", [["nprobes="], ["probes=1,2"], ["nprobes=0"], ["nprobes=a"],
+                                   ["nprobes=1", "nprobes=2"]])
 def test_bad_sweep_is_refused(sweep):
     with pytest.raises(SystemExit):
-        bench.main(["--sweep", sweep])
+        bench.main([a for v in sweep for a in ("--sweep", v)])
+
+
+def test_sweep_combines_into_a_grid():
+    assert bench.parse_sweep(["nprobes=20,50", "refine_factor=1,20"]) == (
+        {"nprobes": 20, "refine_factor": 1}, {"nprobes": 20, "refine_factor": 20},
+        {"nprobes": 50, "refine_factor": 1}, {"nprobes": 50, "refine_factor": 20})
+    assert bench.parse_sweep([]) == ()
+
+
+def test_grid_flags_and_new_knobs_reach_the_config(monkeypatch, tmp_path):
+    seen, record = _fake_main(monkeypatch, tmp_path, [
+        "--sweep", "nprobes=20,50", "--sweep", "refine_factor=1,20", "--num-sub-vectors", "48",
+        "--pgvector-parallel-workers", "0"])
+    cfg = seen["cfg"]
+    assert len(cfg.sweep) == 4 and cfg.num_sub_vectors == 48 and cfg.pgvector_parallel_workers == 0
+    assert '"num_sub_vectors": 48' in record and '"pgvector_parallel_workers": 0' in record
+
+
+def test_sweep_table_is_compact():
+    ok = {"status": "ok", "recall@10": 0.5, "mrr@10": 0.6, "p50_ms": 12.34, "p95_ms": 20.0}
+    table = bench.sweep_table({"lancedb/vector": ok, "lancedb[nprobes=20,refine_factor=5]/vector": ok,
+                               "lancedb/fts": ok, "pgvector-hnsw/vector": {"status": "failed: DiskFull: x"},
+                               "embed_docs_s": 1.0})
+    assert table.splitlines() == [
+        "| config | recall@10 | mrr@10 | p50 ms | p95 ms |", "|---|---|---|---|---|",
+        "| lancedb/vector | 0.500 | 0.600 | 12.3 | 20.0 |",
+        "| lancedb[nprobes=20,refine_factor=5]/vector | 0.500 | 0.600 | 12.3 | 20.0 |",
+        "| pgvector-hnsw/vector | failed | | | |"]
+
+
+def test_shared_memory_exhaustion_gets_the_one_line_fix():
+    shm = OSError("could not resize shared memory segment /PostgreSQL.1298614002 to 533761504 bytes: "
+                  "No space left on device" + " x" * 500)
+    err = bench.explain_build_error(shm)
+    assert str(err).startswith("HNSW build ran out of /dev/shm: raise the db container's shm_size")
+    assert "--pgvector-parallel-workers 0" in str(err) and len(str(err)) < 400
+    other = ValueError("something else")
+    assert bench.explain_build_error(other) is other
 
 
 def test_results_table_shows_index_and_search_columns():

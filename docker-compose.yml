@@ -43,6 +43,10 @@ x-app: &app
 services:
   db:
     image: pgvector/pgvector:pg16
+    # Docker's default /dev/shm is 64 MB. Parallel index builds (pgvector HNSW at 100,000
+    # rows in `make bench ARGS="--scale 80"`) put their dynamic shared memory there and fail
+    # with "could not resize shared memory segment ... No space left on device".
+    shm_size: 1gb
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres

@@ -38,8 +38,15 @@ Every row records its `index` and `search` settings in the results JSON and tabl
   `embedding::vector(<dim>)`, because LangChain's column has no fixed dimension. It is queried with
   bench-only SQL through that expression and dropped afterwards.
 - **LanceDB:** `--nprobes`, `--refine-factor` and `--num-partitions` set the IVF-PQ knobs.
-- **Sweep:** `--sweep nprobes=10,20,50,100` or `--sweep refine_factor=1,5,10,20` adds one row per value,
-  scored on the same table, as a compact recall-vs-latency table.
+- **LanceDB build knobs:** `--num-partitions` and `--num-sub-vectors` (PQ) change the index build.
+- **Sweep:** `--sweep` takes `nprobes=...` or `refine_factor=...`. Repeat it to combine the two into a grid,
+  for example `--sweep nprobes=20,50,100,200 --sweep refine_factor=1,20`. Each combination is scored on the
+  same table, and the run ends with one compact table (recall@10, MRR@10, p50 and p95) that includes the
+  pgvector rows for reference.
+- **Shared memory:** the Compose `db` service sets `shm_size: 1gb`, because Docker's 64 MB `/dev/shm` is too
+  small for a parallel HNSW build at 100,000 rows (`could not resize shared memory segment ... No space
+  left on device`). With a small `/dev/shm`, `--pgvector-parallel-workers 0` builds serially; the failure
+  row names both fixes.
 
 **Replica jitter.** `--scale N` repeats the same texts with new ids. Identical vectors made k-means
 degenerate (empty clusters, "many duplicate vectors"), so for `--scale > 1` each repeat now gets a seeded
