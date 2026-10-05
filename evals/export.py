@@ -6,7 +6,8 @@ For runs made before `make evals-live` kept per-item detail in its own results f
 item has the same shape as a results file's `items`: golden id and kind, the inputs, the
 agent's outputs (answer, route, metric names, SQL, citations, grounded), the run error, and
 every evaluator's score and comment, including the judge's score and reasoning. Needs
-LANGSMITH_API_KEY; it only reads from LangSmith.
+LANGSMITH_API_KEY; it only reads from LangSmith. Home-directory paths in stored text become
+~/ (the file may be committed to a public repo).
 """
 
 from __future__ import annotations
@@ -17,7 +18,7 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
-from evals.run import OUTPUT_KEYS, REPO_ROOT
+from evals.run import OUTPUT_KEYS, REPO_ROOT, redact_home
 
 # Outside results/evals/*.json, which holds only aggregate run records (tools.results renders them).
 ITEMS_DIR = REPO_ROOT / "results" / "evals" / "items"
@@ -45,7 +46,7 @@ def export(client, experiment: str) -> dict:
                         for fb in sorted(feedback[str(run.id)], key=lambda f: f.key)},
         })
     items.sort(key=lambda i: (i["id"] is None, str(i["id"])))
-    return {"experiment": experiment, "n": len(items), "items": items}
+    return {"experiment": experiment, "n": len(items), "items": redact_home(items)}
 
 
 def main(argv: list[str] | None = None, client=None) -> int:

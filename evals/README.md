@@ -84,3 +84,20 @@ make evals-compare A=results/evals/<before>.json            # B: the file LATEST
 It prints what each side ran (agent model, judge model, judge prompt, golden set hash, `--limit`), then one table per group (`all`, then each kind) with every check's score before, after, and the delta. It warns when any of those differ. A different judge model or prompt makes the judge column incomparable; a different golden set or limit makes every column incomparable; a different agent model is what the delta then measures.
 
 For a run made before results files kept `items`, `make evals-export EXP=<experiment>` reads that LangSmith experiment (read-only) and writes the same per-item detail to `results/evals/items/<experiment>.json`: golden id and kind, inputs, the agent's outputs, the run error, and every evaluator's score and comment, including the judge's reasoning. It needs `LANGSMITH_API_KEY`, taken from 1Password when `LANGSMITH_KEY_REF` is set and otherwise from the shell or `.env`, and it never overwrites a file (`OUT=<file>` picks another).
+
+## Findings
+
+### 2026-10-05 baseline: the metric answers were MetricFlow errors (environment, not agent)
+
+The first full live run (`results/evals/baseline-2026-10-05-pre-fix.json`, LangSmith experiment `agent-golden-openai-74042631`, agent `z-ai/glm-5.3-flash`, judge `anthropic/claude-opus-5.5`) scored route, interrupt, metric and call_id at 1.00, but sql at 0.00 and the judge at 0.16 (ambiguous) and 0.19 (metric). Its per-item export shows why: every one of the 29 ambiguous and metric items answered with a `query_metric` error, not a result: a Postgres `syntax error at or near` a backtick in `` FROM `ccai`.`marts`.`f_account_snapshot` ``.
+
+The cause was the environment. `olap/dbt/target/semantic_manifest.json`, which `mf` reads, had last been written by `dbt build --target databricks`, which quotes with backticks. The live run's metric tool then ran that Databricks SQL against the local Postgres. The route, interrupt and metric checks compare names only, so they passed; the answer text held no result and no SQL, so sql and the judge failed.
+
+**The baseline is invalid for the ambiguous and metric groups.** Its call_lookup and open scores stand. The comparison that means something is this baseline (manifest poisoned) against a rerun with a correct dev manifest, read with `make evals-compare`.
+
+What changed so it cannot recur (no change to the golden set, the judge prompt or the agent's answer text):
+
+- `make dbt-build WAREHOUSE=...` writes its artifacts to `olap/dbt/target/<warehouse>/` (`--target-path`), so a warehouse build no longer overwrites the dev `target/semantic_manifest.json`. The warehouse commands in `olap/dbt/README.md` show the same flag. Per-target directories were chosen over moving the dev manifest because `mf` has no flag for a manifest path and always reads `target/`.
+- `query_metric` checks the manifest before running `mf` and refuses with one line naming the adapter it was built for and the fix (`cd olap/dbt && uv run --group dbt dbt parse`). The adapter comes from `target/manifest.json` metadata, or from backtick-quoted relation names when that file is absent. The `make evals-live` preflight runs the same check, so a poisoned manifest stops the run before anything is paid for.
+- Results files and exports replace `/home/<user>/` and `/Users/<user>/` with `~/`, because tool errors quote absolute paths and these files are committed to a public repo.
+
