@@ -7,12 +7,27 @@ Tools:
     query_csat           — query CSAT data with optional filters
 """
 
+import os
+
 import psycopg2
+
 from psycopg2 import errors as pg_errors
 
 from rag.embeddings import CONNECTION_STRING
 from rag.pipeline import rag_query, get_llm
 from retrieval import get_retriever
+
+
+RETRIEVAL_MODES = ("vector", "fts", "hybrid")
+
+
+def retrieval_mode() -> str:
+    """The search mode for search_transcripts: AGENT_RETRIEVAL_MODE, default vector (pgvector
+    serves vector only; fts and hybrid need RETRIEVER_BACKEND=lancedb)."""
+    mode = os.getenv("AGENT_RETRIEVAL_MODE", "vector").strip().lower() or "vector"
+    if mode not in RETRIEVAL_MODES:
+        raise ValueError(f"AGENT_RETRIEVAL_MODE={mode!r}: use one of {', '.join(RETRIEVAL_MODES)}")
+    return mode
 
 
 def search_transcripts(query: str, k: int = 5) -> str:
@@ -26,7 +41,7 @@ def search_transcripts(query: str, k: int = 5) -> str:
     Returns:
         AI-generated answer grounded in retrieved transcripts
     """
-    return rag_query(query, k=k)
+    return rag_query(query, k=k, mode=retrieval_mode())
 
 
 def get_call_summary(call_id: str) -> str:

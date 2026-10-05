@@ -355,6 +355,8 @@ async def run_live(limit: int | None, max_concurrency: int, run_name: str | None
         "judge_provider": os.getenv("EVAL_JUDGE_PROVIDER", "anthropic"),
         "judge_model": judge_model, "judge_prompt": JUDGE_PROMPT_VERSION,
         "retriever_backend": os.getenv("RETRIEVER_BACKEND", "pgvector"),
+        "retrieval_mode": os.getenv("AGENT_RETRIEVAL_MODE", "vector") or "vector",
+        "retrieval_k": int(os.getenv("AGENT_RETRIEVAL_K") or 5),
         "embedding_provider": os.getenv("EMBEDDING_PROVIDER", provider),
     }
     results = await aevaluate(
