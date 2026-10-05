@@ -87,7 +87,8 @@ def test_judge_equal_to_agent_is_refused(monkeypatch):
 
 def test_checks_skip_postgres_and_ollama_when_not_used(monkeypatch):
     monkeypatch.setattr(preflight, "check_models_differ", lambda: "models ok")
+    monkeypatch.setattr(preflight, "check_manifest", lambda: "manifest ok")
     monkeypatch.setattr(preflight, "check_postgres", lambda *a: pytest.fail("pgvector not in use"))
     monkeypatch.setattr(preflight, "check_ollama", lambda *a: pytest.fail("ollama not in use"))
     env = {"RETRIEVER_BACKEND": "lancedb", "EMBEDDING_PROVIDER": "openai"}
-    assert list(preflight.run_checks(env)) == ["models ok"]
+    assert list(preflight.run_checks(env)) == ["models ok", "manifest ok"]
