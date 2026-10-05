@@ -13,7 +13,7 @@ volume, skipped once present. Every unique transcript (about 1,060) is embedded 
 with a progress line roughly every 10%. On a CPU-only Ollama that step is slow: about 6 minutes
 on an 8-core laptop, about 45 minutes on 2 cores.
 
-Reruns reuse the document embeddings cached under `.cache/bench-embeddings/` (gitignored, one file per
+Reruns reuse the document embeddings cached under `.cache/embeddings/` (gitignored, one file per
 embedding model, keyed by text hash), so only the first run pays for the embedding step; `--no-cache` skips the
 cache. Ingest goes in batches of `--ingest-batch` rows (default 12,500, the largest single insert proven at x10),
 so `--scale 80` never sends 100,000 rows in one call. A backend or mode that fails becomes a one-line
@@ -110,7 +110,7 @@ crate) gets a storage token from `az` for the signed-in user. If that is refused
 Blank `AZURE_*` values (a `.env` copied from `.env.example` has empty `AZURE_TENANT_ID`,
 `AZURE_CLIENT_ID` and `AZURE_CLIENT_SECRET`) are dropped before connecting, and with `az login` auth so are
 those three when they come from `.env`, so they cannot switch the store to a client-secret flow.
-Embeddings come from the same `.cache/bench-embeddings/` cache as `make bench` (`--no-cache` skips it).
+Embeddings come from the same `.cache/embeddings/` cache as `make bench` and `make ingest` (`--no-cache` skips it).
 
 **What the results mean.** Recall should match the local numbers exactly, because the data,
 vectors and queries are the same. A difference would point at the storage path, not the

@@ -9,7 +9,8 @@ check prints one clear message and the run stops at the first failure:
   loading the corpus);
 - Postgres is reachable and the transcripts are embedded in it (the agent searches them),
   when RETRIEVER_BACKEND is pgvector;
-- Ollama answers, when EMBEDDING_PROVIDER is ollama.
+- Ollama answers and has the embedding model (pulled once if missing), when
+  EMBEDDING_PROVIDER is ollama.
 
 The estimate prices the agent and judge models from OpenRouter's public model list
 (https://openrouter.ai/api/v1/models, no key needed), using the token assumptions in
@@ -163,14 +164,15 @@ def check_postgres(url: str, collection: str) -> str:
     return f"Postgres reachable, {n} transcripts embedded in {collection!r}"
 
 
-def check_ollama(base_url: str, timeout: float = 5) -> str:
+def check_ollama(base_url: str, model: str, client=None) -> str:
+    """Ollama answers and has the embedding model, pulling it once when missing."""
+    from rag.ollama_models import OllamaUnavailable, ensure_model
+
     try:
-        with urllib.request.urlopen(base_url.rstrip("/") + "/api/tags", timeout=timeout):
-            pass
-    except OSError as exc:
-        raise PreflightError(f"Ollama is not reachable at {base_url} ({exc}): run 'make up',"
-                             " or set EMBEDDING_PROVIDER to another provider") from exc
-    return f"Ollama reachable at {base_url}"
+        ensure_model(model, base_url, client=client)
+    except OllamaUnavailable as exc:
+        raise PreflightError(f"{exc}, or set EMBEDDING_PROVIDER to another provider") from exc
+    return f"Ollama reachable at {base_url}, {model} present"
 
 
 def run_checks(env: os._Environ | dict = os.environ) -> Iterator[str]:
@@ -181,7 +183,8 @@ def run_checks(env: os._Environ | dict = os.environ) -> Iterator[str]:
                              env.get("COLLECTION_NAME", "call_transcripts"))
     embed = env.get("EMBEDDING_PROVIDER", env.get("LLM_PROVIDER", "openai")).lower()
     if embed == "ollama":
-        yield check_ollama(env.get("OLLAMA_BASE_URL", "http://localhost:11434"))
+        yield check_ollama(env.get("OLLAMA_BASE_URL", "http://localhost:11434"),
+                           env.get("OLLAMA_EMBEDDING_MODEL", "nomic-embed-text"))
 
 
 def print_estimate(limit: int | None) -> None:
