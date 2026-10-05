@@ -118,8 +118,14 @@ evals:
 	uv run --group agent python -m evals.run
 
 # The same set against the real models and MCP tools, as a LangSmith experiment with an
-# LLM-as-judge; writes results/evals/. Needs the stack (`make up seed ingest`, dbt build),
-# provider keys, LANGSMITH_API_KEY and a judge model unlike the agent's. Costs API money.
-# Pass flags with ARGS, e.g. ARGS="--limit 5".
+# LLM-as-judge through OpenRouter; writes results/evals/. Needs the stack (`make up seed
+# ingest`, dbt build). Costs API money. LANGSMITH_API_KEY and the OpenRouter OPENAI_API_KEY
+# come from 1Password through tools/evals-live-run.sh: set LANGSMITH_KEY_REF and
+# EVALS_OPENAI_KEY_REF to your op:// references. It checks the prerequisites and prints a
+# cost estimate first. Pass flags with ARGS, e.g. ARGS="--limit 5" for a smoke run.
+# DRY=1 prints the variable names and the plan; DIRECT=1 skips 1Password and reads the
+# keys and judge settings from the shell or .env, as before.
+EVALS_RUN = $(if $(DIRECT),,tools/evals-live-run.sh $(if $(DRY),--dry-run) --)
+
 evals-live:
-	uv run --group agent python -m evals.run --live $(ARGS)
+	$(EVALS_RUN) uv run --group agent python -m evals.run --live $(ARGS)
