@@ -1,0 +1,2779 @@
+{
+  "date": "2026-10-05",
+  "git_sha": "657fe1e1f96edafa714f7ff70c352ef7220a6c3e",
+  "area": "evals",
+  "run": "post-env-fix",
+  "hardware": "Intel(R) Core(TM) i5-1038NG7 CPU @ 2.00GHz, 8 cores, 15 GB RAM, Linux",
+  "versions": {
+    "python": "3.14.7",
+    "agent_model": "z-ai/glm-5.3-flash",
+    "judge_model": "anthropic/claude-opus-5.5",
+    "langgraph": "1.2.12",
+    "langsmith": "0.8.9",
+    "langchain-core": "1.6.6"
+  },
+  "params": {
+    "dataset": "ccai-agent-golden-35328593",
+    "golden_sha256": "353285937ec0a4ecf583a1965a25047b24601be47859e546b13054344419c68b",
+    "limit": null,
+    "llm_provider": "openai",
+    "agent_model": "z-ai/glm-5.3-flash",
+    "judge_provider": "openai",
+    "judge_model": "anthropic/claude-opus-5.5",
+    "judge_prompt": "v1",
+    "retriever_backend": "pgvector",
+    "embedding_provider": "ollama",
+    "experiment": "agent-golden-openai-01efefc0"
+  },
+  "metrics": {
+    "all": {
+      "n": 51,
+      "route": 1.0,
+      "interrupt": 1.0,
+      "metric": 1.0,
+      "sql": 1.0,
+      "citations": 0.955,
+      "call_id": 1.0,
+      "judge": 0.824
+    },
+    "ambiguous": {
+      "n": 11,
+      "route": 1.0,
+      "interrupt": 1.0,
+      "metric": 1.0,
+      "sql": 1.0,
+      "citations": null,
+      "call_id": null,
+      "judge": 0.932
+    },
+    "metric": {
+      "n": 18,
+      "route": 1.0,
+      "interrupt": 1.0,
+      "metric": 1.0,
+      "sql": 1.0,
+      "citations": null,
+      "call_id": null,
+      "judge": 0.958
+    },
+    "call_lookup": {
+      "n": 10,
+      "route": 1.0,
+      "interrupt": 1.0,
+      "metric": null,
+      "sql": null,
+      "citations": 1.0,
+      "call_id": 1.0,
+      "judge": 0.75
+    },
+    "open": {
+      "n": 12,
+      "route": 1.0,
+      "interrupt": 1.0,
+      "metric": null,
+      "sql": null,
+      "citations": 0.917,
+      "call_id": null,
+      "judge": 0.583
+    },
+    "errors": 0
+  },
+  "notes": "make evals-live: every golden item through the real graph, MCP tools and models; LLM-as-judge prompt v1, judge score scaled (score - 1) / 4. Pass rates count applicable items only.",
+  "items": [
+    {
+      "id": "g39",
+      "kind": "call_lookup",
+      "error": null,
+      "results": {
+        "route": {
+          "key": "route",
+          "score": true,
+          "comment": "expected summarize_call, got summarize_call"
+        },
+        "interrupt": {
+          "key": "interrupt",
+          "score": true,
+          "comment": "no interrupt"
+        },
+        "metric": {
+          "key": "metric",
+          "score": null,
+          "comment": ""
+        },
+        "sql": {
+          "key": "sql",
+          "score": null,
+          "comment": ""
+        },
+        "citations": {
+          "key": "citations",
+          "score": true,
+          "comment": "none cited"
+        },
+        "call_id": {
+          "key": "call_id",
+          "score": true,
+          "comment": "CALL-01251 named, cited []"
+        },
+        "judge": {
+          "key": "judge",
+          "score": 1.0,
+          "comment": "5/5 (prompt v1): The answer correctly states that no transcript exists for CALL-01251 and invents no content, which matches the reference. It is plainly honest about the data limit. It could have noted the valid ID range, but that is a minor omission at most."
+        }
+      },
+      "outputs": {
+        "answer": "Not grounded: treat this answer as unverified.\n\nNo transcript found for call ID: CALL-01251",
+        "route": "summarize_call",
+        "metric_names": [],
+        "sql": null,
+        "citations": [],
+        "grounded": false
+      }
+    },
+    {
+      "id": "g26",
+      "kind": "metric",
+      "error": null,
+      "results": {
+        "route": {
+          "key": "route",
+          "score": true,
+          "comment": "expected resolve_metric, got resolve_metric"
+        },
+        "interrupt": {
+          "key": "interrupt",
+          "score": true,
+          "comment": "no interrupt"
+        },
+        "metric": {
+          "key": "metric",
+          "score": true,
+          "comment": "expected ['member_lifetime_value'], got ['member_lifetime_value']"
+        },
+        "sql": {
+          "key": "sql",
+          "score": true,
+          "comment": ""
+        },
+        "citations": {
+          "key": "citations",
+          "score": null,
+          "comment": ""
+        },
+        "call_id": {
+          "key": "call_id",
+          "score": null,
+          "comment": ""
+        },
+        "judge": {
+          "key": "judge",
+          "score": 1.0,
+          "comment": "5/5 (prompt v1): The answer reports the declared member_lifetime_value metric as its own figure, together with the MetricFlow-generated SQL. This matches the reference. Nothing is blended or invented, and it directly answers the question."
+        }
+      },
+      "outputs": {
+        "answer": "MetricFlow result (1 metric(s)):\nmember_lifetime_value: 760635.2454339623\n\nSQL:\nWITH sma_10005_cte AS (\n  SELECT\n    fee_revenue_amount AS __total_fee_revenue\n    , interest_earned_amount AS __total_interest_income\n    , member_id AS __active_members\n  FROM \"contactcenter\".\"marts\".\"f_transaction\" transactions_src_10000\n)\n\nSELECT\n  relationship_revenue * 24 / active_members AS member_lifetime_value\nFROM (\n  SELECT\n    MAX(subq_6.relationship_revenue) AS relationship_revenue\n    , MAX(subq_11.active_members) AS active_members\n  FROM (\n    SELECT\n      total_fee_revenue + total_interest_income AS relationship_revenue\n    FROM (\n      SELECT\n        SUM(__total_fee_revenue) AS total_fee_revenue\n        , SUM(__total_interest_income) AS total_interest_income\n      FROM sma_10005_cte\n    ) subq_5\n  ) subq_6\n  CROSS JOIN (\n    SELECT\n      COUNT(DISTINCT __active_members) AS active_members\n    FROM sma_10005_cte\n  ) subq_11\n) subq_12",
+        "route": "resolve_metric",
+        "metric_names": [
+          "member_lifetime_value"
+        ],
+        "sql": "WITH sma_10005_cte AS (\n  SELECT\n    fee_revenue_amount AS __total_fee_revenue\n    , interest_earned_amount AS __total_interest_income\n    , member_id AS __active_members\n  FROM \"contactcenter\".\"marts\".\"f_transaction\" transactions_src_10000\n)\n\nSELECT\n  relationship_revenue * 24 / active_members AS member_lifetime_value\nFROM (\n  SELECT\n    MAX(subq_6.relationship_revenue) AS relationship_revenue\n    , MAX(subq_11.active_members) AS active_members\n  FROM (\n    SELECT\n      total_fee_revenue + total_interest_income AS relationship_revenue\n    FROM (\n      SELECT\n        SUM(__total_fee_revenue) AS total_fee_revenue\n        , SUM(__total_interest_income) AS total_interest_income\n      FROM sma_10005_cte\n    ) subq_5\n  ) subq_6\n  CROSS JOIN (\n    SELECT\n      COUNT(DISTINCT __active_members) AS active_members\n    FROM sma_10005_cte\n  ) subq_11\n) subq_12",
+        "citations": [],
+        "grounded": true
+      }
+    },
+    {
+      "id": "g10",
+      "kind": "ambiguous",
+      "error": null,
+      "results": {
+        "route": {
+          "key": "route",
+          "score": true,
+          "comment": "expected resolve_metric, got resolve_metric"
+        },
+        "interrupt": {
+          "key": "interrupt",
+          "score": true,
+          "comment": "\"lcv\""
+        },
+        "metric": {
+          "key": "metric",
+          "score": true,
+          "comment": "expected ['loan_to_value'], got ['loan_to_value']"
+        },
+        "sql": {
+          "key": "sql",
+          "score": true,
+          "comment": ""
+        },
+        "citations": {
+          "key": "citations",
+          "score": null,
+          "comment": ""
+        },
+        "call_id": {
+          "key": "call_id",
+          "score": null,
+          "comment": ""
+        },
+        "judge": {
+          "key": "judge",
+          "score": 1.0,
+          "comment": "5/5 (prompt v1): The answer reports the clarified loan_to_value metric as its own figure along with the MetricFlow-generated SQL, as the reference requires, and it invents and blends nothing. It is responsive and usable, though it does not mention that the SQL limits the figure to mortgage loans."
+        }
+      },
+      "outputs": {
+        "answer": "MetricFlow result (1 metric(s)):\nloan_to_value: 77.62741176470588\n\nSQL:\nSELECT\n  AVG(loan_to_value) AS loan_to_value\nFROM (\n  SELECT\n    products_src_10000.lob AS product__lob\n    , account_snapshot_src_10000.ltv_at_origination AS loan_to_value\n  FROM \"contactcenter\".\"marts\".\"f_account_snapshot\" account_snapshot_src_10000\n  LEFT OUTER JOIN\n    \"contactcenter\".\"marts\".\"d_product\" products_src_10000\n  ON\n    account_snapshot_src_10000.product_id = products_src_10000.product_id\n) subq_5\nWHERE product__lob = 'mortgage'",
+        "route": "resolve_metric",
+        "metric_names": [
+          "loan_to_value"
+        ],
+        "sql": "SELECT\n  AVG(loan_to_value) AS loan_to_value\nFROM (\n  SELECT\n    products_src_10000.lob AS product__lob\n    , account_snapshot_src_10000.ltv_at_origination AS loan_to_value\n  FROM \"contactcenter\".\"marts\".\"f_account_snapshot\" account_snapshot_src_10000\n  LEFT OUTER JOIN\n    \"contactcenter\".\"marts\".\"d_product\" products_src_10000\n  ON\n    account_snapshot_src_10000.product_id = products_src_10000.product_id\n) subq_5\nWHERE product__lob = 'mortgage'",
+        "citations": [],
+        "grounded": true
+      }
+    },
+    {
+      "id": "g11",
+      "kind": "ambiguous",
+      "error": null,
+      "results": {
+        "route": {
+          "key": "route",
+          "score": true,
+          "comment": "expected resolve_metric, got resolve_metric"
+        },
+        "interrupt": {
+          "key": "interrupt",
+          "score": true,
+          "comment": "\"rate\", \"balance\""
+        },
+        "metric": {
+          "key": "metric",
+          "score": true,
+          "comment": "expected ['average_deposit_apy', 'savings_balance'], got ['average_deposit_apy', 'savings_balance']"
+        },
+        "sql": {
+          "key": "sql",
+          "score": true,
+          "comment": ""
+        },
+        "citations": {
+          "key": "citations",
+          "score": null,
+          "comment": ""
+        },
+        "call_id": {
+          "key": "call_id",
+          "score": null,
+          "comment": ""
+        },
+        "judge": {
+          "key": "judge",
+          "score": 1.0,
+          "comment": "5/5 (prompt v1): The answer reports average_deposit_apy and savings_balance, the two metrics the user chose, as separate figures, and includes the MetricFlow-generated SQL. Nothing is blended or invented. Presentation is raw (an unrounded APY with no units), and the SQL's banking-line filter goes unexplained, but neither contradicts the reference."
+        }
+      },
+      "outputs": {
+        "answer": "MetricFlow result (2 metric(s)):\n  average_deposit_apy: 1.9372905660377358\n  savings_balance: 16056942.24\n\nSQL:\nSELECT\n  AVG(average_deposit_apy) AS average_deposit_apy\n  , SUM(savings_balance) AS savings_balance\nFROM (\n  SELECT\n    products_src_10000.lob AS product__lob\n    , account_snapshot_src_10000.deposit_apy AS average_deposit_apy\n    , account_snapshot_src_10000.savings_balance AS savings_balance\n  FROM \"contactcenter\".\"marts\".\"f_account_snapshot\" account_snapshot_src_10000\n  LEFT OUTER JOIN\n    \"contactcenter\".\"marts\".\"d_product\" products_src_10000\n  ON\n    account_snapshot_src_10000.product_id = products_src_10000.product_id\n) subq_5\nWHERE product__lob = 'banking'",
+        "route": "resolve_metric",
+        "metric_names": [
+          "average_deposit_apy",
+          "savings_balance"
+        ],
+        "sql": "SELECT\n  AVG(average_deposit_apy) AS average_deposit_apy\n  , SUM(savings_balance) AS savings_balance\nFROM (\n  SELECT\n    products_src_10000.lob AS product__lob\n    , account_snapshot_src_10000.deposit_apy AS average_deposit_apy\n    , account_snapshot_src_10000.savings_balance AS savings_balance\n  FROM \"contactcenter\".\"marts\".\"f_account_snapshot\" account_snapshot_src_10000\n  LEFT OUTER JOIN\n    \"contactcenter\".\"marts\".\"d_product\" products_src_10000\n  ON\n    account_snapshot_src_10000.product_id = products_src_10000.product_id\n) subq_5\nWHERE product__lob = 'banking'",
+        "citations": [],
+        "grounded": true
+      }
+    },
+    {
+      "id": "g27",
+      "kind": "metric",
+      "error": null,
+      "results": {
+        "route": {
+          "key": "route",
+          "score": true,
+          "comment": "expected resolve_metric, got resolve_metric"
+        },
+        "interrupt": {
+          "key": "interrupt",
+          "score": true,
+          "comment": "no interrupt"
+        },
+        "metric": {
+          "key": "metric",
+          "score": true,
+          "comment": "expected ['loan_to_value'], got ['loan_to_value']"
+        },
+        "sql": {
+          "key": "sql",
+          "score": true,
+          "comment": ""
+        },
+        "citations": {
+          "key": "citations",
+          "score": null,
+          "comment": ""
+        },
+        "call_id": {
+          "key": "call_id",
+          "score": null,
+          "comment": ""
+        },
+        "judge": {
+          "key": "judge",
+          "score": 0.75,
+          "comment": "4/5 (prompt v1): The answer reports the declared loan_to_value metric as its own figure, together with the MetricFlow SQL. That is faithful and responsive. The only minor gap is that it gives no plain-language note that the figure is the average LTV at origination, filtered to mortgage products."
+        }
+      },
+      "outputs": {
+        "answer": "MetricFlow result (1 metric(s)):\nloan_to_value: 77.62741176470588\n\nSQL:\nSELECT\n  AVG(loan_to_value) AS loan_to_value\nFROM (\n  SELECT\n    products_src_10000.lob AS product__lob\n    , account_snapshot_src_10000.ltv_at_origination AS loan_to_value\n  FROM \"contactcenter\".\"marts\".\"f_account_snapshot\" account_snapshot_src_10000\n  LEFT OUTER JOIN\n    \"contactcenter\".\"marts\".\"d_product\" products_src_10000\n  ON\n    account_snapshot_src_10000.product_id = products_src_10000.product_id\n) subq_5\nWHERE product__lob = 'mortgage'",
+        "route": "resolve_metric",
+        "metric_names": [
+          "loan_to_value"
+        ],
+        "sql": "SELECT\n  AVG(loan_to_value) AS loan_to_value\nFROM (\n  SELECT\n    products_src_10000.lob AS product__lob\n    , account_snapshot_src_10000.ltv_at_origination AS loan_to_value\n  FROM \"contactcenter\".\"marts\".\"f_account_snapshot\" account_snapshot_src_10000\n  LEFT OUTER JOIN\n    \"contactcenter\".\"marts\".\"d_product\" products_src_10000\n  ON\n    account_snapshot_src_10000.product_id = products_src_10000.product_id\n) subq_5\nWHERE product__lob = 'mortgage'",
+        "citations": [],
+        "grounded": true
+      }
+    },
+    {
+      "id": "g01",
+      "kind": "ambiguous",
+      "error": null,
+      "results": {
+        "route": {
+          "key": "route",
+          "score": true,
+          "comment": "expected resolve_metric, got resolve_metric"
+        },
+        "interrupt": {
+          "key": "interrupt",
+          "score": true,
+          "comment": "\"rate\""
+        },
+        "metric": {
+          "key": "metric",
+          "score": true,
+          "comment": "expected ['average_mortgage_note_rate'], got ['average_mortgage_note_rate']"
+        },
+        "sql": {
+          "key": "sql",
+          "score": true,
+          "comment": ""
+        },
+        "citations": {
+          "key": "citations",
+          "score": null,
+          "comment": ""
+        },
+        "call_id": {
+          "key": "call_id",
+          "score": null,
+          "comment": ""
+        },
+        "judge": {
+          "key": "judge",
+          "score": 1.0,
+          "comment": "5/5 (prompt v1): The answer reports the clarified metric average_mortgage_note_rate as a single figure with its MetricFlow SQL, so it is faithful and responsive. It blends nothing and invents no figures. The only gap is minor: the raw value is unrounded and has no unit (percent), which slightly limits readability."
+        }
+      },
+      "outputs": {
+        "answer": "MetricFlow result (1 metric(s)):\naverage_mortgage_note_rate: 6.588841176470588\n\nSQL:\nSELECT\n  AVG(average_mortgage_note_rate) AS average_mortgage_note_rate\nFROM (\n  SELECT\n    products_src_10000.lob AS product__lob\n    , account_snapshot_src_10000.mortgage_note_rate AS average_mortgage_note_rate\n  FROM \"contactcenter\".\"marts\".\"f_account_snapshot\" account_snapshot_src_10000\n  LEFT OUTER JOIN\n    \"contactcenter\".\"marts\".\"d_product\" products_src_10000\n  ON\n    account_snapshot_src_10000.product_id = products_src_10000.product_id\n) subq_5\nWHERE product__lob = 'mortgage'",
+        "route": "resolve_metric",
+        "metric_names": [
+          "average_mortgage_note_rate"
+        ],
+        "sql": "SELECT\n  AVG(average_mortgage_note_rate) AS average_mortgage_note_rate\nFROM (\n  SELECT\n    products_src_10000.lob AS product__lob\n    , account_snapshot_src_10000.mortgage_note_rate AS average_mortgage_note_rate\n  FROM \"contactcenter\".\"marts\".\"f_account_snapshot\" account_snapshot_src_10000\n  LEFT OUTER JOIN\n    \"contactcenter\".\"marts\".\"d_product\" products_src_10000\n  ON\n    account_snapshot_src_10000.product_id = products_src_10000.product_id\n) subq_5\nWHERE product__lob = 'mortgage'",
+        "citations": [],
+        "grounded": true
+      }
+    },
+    {
+      "id": "g28",
+      "kind": "metric",
+      "error": null,
+      "results": {
+        "route": {
+          "key": "route",
+          "score": true,
+          "comment": "expected resolve_metric, got resolve_metric"
+        },
+        "interrupt": {
+          "key": "interrupt",
+          "score": true,
+          "comment": "no interrupt"
+        },
+        "metric": {
+          "key": "metric",
+          "score": true,
+          "comment": "expected ['active_members'], got ['active_members']"
+        },
+        "sql": {
+          "key": "sql",
+          "score": true,
+          "comment": ""
+        },
+        "citations": {
+          "key": "citations",
+          "score": null,
+          "comment": ""
+        },
+        "call_id": {
+          "key": "call_id",
+          "score": null,
+          "comment": ""
+        },
+        "judge": {
+          "key": "judge",
+          "score": 1.0,
+          "comment": "5/5 (prompt v1): The answer reports the declared metric active_members as its own figure (530) with the MetricFlow SQL and no blended or invented numbers, which matches the reference. The boilerplate about 'N distinct metrics' is slightly awkward but harmless. The SQL has no window filter even though the definition mentions 'in the window', but this is a minor point and does not contradict the reference."
+        }
+      },
+      "outputs": {
+        "answer": "Question: \"How many active members do we have?\"\nResolved to 1 declared metric(s) \u2014 there is no single blended number; each word maps to N distinct, auditable metrics:\n\n- active_members \u2014 Distinct members with ledger activity in the window.\n\nMetricFlow result (1 metric(s)):\nactive_members: 530\n\nSQL:\nSELECT\n  COUNT(DISTINCT member_id) AS active_members\nFROM \"contactcenter\".\"marts\".\"f_transaction\" transactions_src_10000",
+        "route": "resolve_metric",
+        "metric_names": [
+          "active_members"
+        ],
+        "sql": "SELECT\n  COUNT(DISTINCT member_id) AS active_members\nFROM \"contactcenter\".\"marts\".\"f_transaction\" transactions_src_10000",
+        "citations": [],
+        "grounded": true
+      }
+    },
+    {
+      "id": "g44",
+      "kind": "open",
+      "error": null,
+      "results": {
+        "route": {
+          "key": "route",
+          "score": true,
+          "comment": "expected retrieve, got retrieve"
+        },
+        "interrupt": {
+          "key": "interrupt",
+          "score": true,
+          "comment": "no interrupt"
+        },
+        "metric": {
+          "key": "metric",
+          "score": null,
+          "comment": ""
+        },
+        "sql": {
+          "key": "sql",
+          "score": null,
+          "comment": ""
+        },
+        "citations": {
+          "key": "citations",
+          "score": true,
+          "comment": "CALL-00247, CALL-00079, CALL-00192, CALL-00117, CALL-00330"
+        },
+        "call_id": {
+          "key": "call_id",
+          "score": null,
+          "comment": ""
+        },
+        "judge": {
+          "key": "judge",
+          "score": 0.75,
+          "comment": "4/5 (prompt v1): The answer is responsive: it describes the recurring member questions (lock status, expiration, loan amount) and cites specific call ids, with no clear contradiction of the reference. Its gap is coverage. It reviews only 5 of the 17 rate_lock_status calls and calls them 'all five transcripts' without saying it is a sample, and some impact claims are hedged speculation."
+        }
+      },
+      "outputs": {
+        "answer": "## What Members Ask When Checking on a Rate Lock\n\nAcross all five transcripts (CALL-00247, CALL-00079, CALL-00192, CALL-00117, CALL-00330), members follow a consistent three-part inquiry:\n\n1. **\"I want to check on my rate lock\"** \u2014 The opening request in every call is a general status check on their active lock.\n2. **\"When does it expire?\"** \u2014 Members want to confirm their lock expiration date to ensure they're covered while underwriting finishes.\n3. **\"What was the loan amount again?\"** \u2014 Members verify the loan amount on their application, suggesting they want confirmation of key deal terms.\n\n## Notable Pattern / Data Quality Concern\n\nEvery agent response contains **placeholder or missing data**:\n- Rate of **0.000%**\n- Expiration of **\"n/a\"**\n- Loan amount of **$0.00**\n\nThis is identical across all five calls spanning May\u2013August 2026, which strongly suggests a **data integration or system display issue** \u2014 agents cannot see actual rate lock details (rate, expiration date, loan amount) on these inquiries.\n\n## Likely Impact\n\n- Members are calling because they can't self-serve this information, and agents can't provide real answers, so calls may not actually resolve the underlying concern.\n- **CALL-00079 (2026-07-17)** is the only call that was **escalated** \u2014 plausibly because the agent had no substantive lock details to share.\n- The other four calls were marked \"resolved,\" but given the generic responses, resolution likely reflects member acceptance of \"you're covered while we finish underwriting\" rather than answers to their specific questions (rate, expiration, amount).\n\n**Recommendation for supervisors:** Investigate the rate lock data feed or CRM screen used by agents for these inquiries, since the recurring \"0.000% / n/a / $0.00\" pattern is unlikely to reflect real loan data.\n\nSources: CALL-00247, CALL-00079, CALL-00192, CALL-00117, CALL-00330",
+        "route": "retrieve",
+        "metric_names": [],
+        "sql": null,
+        "citations": [
+          "CALL-00247",
+          "CALL-00079",
+          "CALL-00192",
+          "CALL-00117",
+          "CALL-00330"
+        ],
+        "grounded": true
+      }
+    },
+    {
+      "id": "g46",
+      "kind": "open",
+      "error": null,
+      "results": {
+        "route": {
+          "key": "route",
+          "score": true,
+          "comment": "expected retrieve, got retrieve"
+        },
+        "interrupt": {
+          "key": "interrupt",
+          "score": true,
+          "comment": "no interrupt"
+        },
+        "metric": {
+          "key": "metric",
+          "score": null,
+          "comment": ""
+        },
+        "sql": {
+          "key": "sql",
+          "score": null,
+          "comment": ""
+        },
+        "citations": {
+          "key": "citations",
+          "score": true,
+          "comment": "CALL-00268, CALL-00420, CALL-00785, CALL-01236, CALL-01046"
+        },
+        "call_id": {
+          "key": "call_id",
+          "score": null,
+          "comment": ""
+        },
+        "judge": {
+          "key": "judge",
+          "score": 0.75,
+          "comment": "4/5 (prompt v1): The answer is responsive and usable. It describes a clear handling flow and cites specific call ids with outcomes, and nothing in it contradicts the reference. Minor gap: it rests on five transcripts without noting they are a small sample of the 113 payment_assistance calls, yet it generalizes to 'all payment-assistance calls'."
+        }
+      },
+      "outputs": {
+        "answer": "## How Agents Handle Payment Difficulty Calls\n\nAcross all five transcripts, agents follow a consistent, scripted process:\n\n1. **Acknowledge with empathy** \u2013 The agent opens with an apology/empathy statement (\"I'm sorry to hear that\").\n2. **Confirm the specific amount due** \u2013 The agent pulls up the member's account and states the exact minimum payment and last four digits of the account (e.g., $342.26 for account ending 1031 in CALL-00268; $35.00 for accounts ending 1026, 1023, and 1087 in CALL-00420, CALL-00785, and CALL-01236; $301.68 for account ending 1234 in CALL-01046).\n3. **Offer the hardship program** \u2013 When the member says they can't afford the payment, the agent presents a hardship program option that may defer that month's payment to the end of the loan term.\n4. **Get explicit consent before acting** \u2013 The agent asks, \"Would you like me to submit that request?\" rather than enrolling automatically.\n5. **Submit the request and confirm follow-up** \u2013 Upon agreement, the agent submits the request immediately and tells the member to expect an email confirmation.\n\n## Observations for Supervisors\n\n- **Process adherence appears strong** \u2013 All five calls follow the identical flow with no deviations or missed steps.\n- **Outcomes vary despite identical handling** \u2013 Two calls resolved (CALL-00268, CALL-01236), while others resulted in a transfer (CALL-00420), an escalation (CALL-00785), and a scheduled callback (CALL-01046). Since the transcripts show no point of divergence, the differing outcomes likely stem from account-specific factors or post-conversation system actions not captured in the transcripts \u2014 worth investigating if the transfer/escalation rates become a trend.\n- **Payment amounts vary widely** ($35 to $342.26), but the offer is the same regardless of amount, suggesting the hardship deferral is a standard first-line remedy for all payment-assistance calls.\n\nSources: CALL-00268, CALL-00420, CALL-00785, CALL-01236, CALL-01046",
+        "route": "retrieve",
+        "metric_names": [],
+        "sql": null,
+        "citations": [
+          "CALL-00268",
+          "CALL-00420",
+          "CALL-00785",
+          "CALL-01236",
+          "CALL-01046"
+        ],
+        "grounded": true
+      }
+    },
+    {
+      "id": "g19",
+      "kind": "metric",
+      "error": null,
+      "results": {
+        "route": {
+          "key": "route",
+          "score": true,
+          "comment": "expected resolve_metric, got resolve_metric"
+        },
+        "interrupt": {
+          "key": "interrupt",
+          "score": true,
+          "comment": "no interrupt"
+        },
+        "metric": {
+          "key": "metric",
+          "score": true,
+          "comment": "expected ['average_mortgage_note_rate'], got ['average_mortgage_note_rate']"
+        },
+        "sql": {
+          "key": "sql",
+          "score": true,
+          "comment": ""
+        },
+        "citations": {
+          "key": "citations",
+          "score": null,
+          "comment": ""
+        },
+        "call_id": {
+          "key": "call_id",
+          "score": null,
+          "comment": ""
+        },
+        "judge": {
+          "key": "judge",
+          "score": 1.0,
+          "comment": "5/5 (prompt v1): The answer reports the declared metric average_mortgage_note_rate as a single figure, together with the MetricFlow-generated SQL, which matches the reference. It contains no blended or invented numbers. A minor quibble is that it gives no units or formatting (presumably percent), but it is faithful and usable."
+        }
+      },
+      "outputs": {
+        "answer": "MetricFlow result (1 metric(s)):\naverage_mortgage_note_rate: 6.588841176470588\n\nSQL:\nSELECT\n  AVG(average_mortgage_note_rate) AS average_mortgage_note_rate\nFROM (\n  SELECT\n    products_src_10000.lob AS product__lob\n    , account_snapshot_src_10000.mortgage_note_rate AS average_mortgage_note_rate\n  FROM \"contactcenter\".\"marts\".\"f_account_snapshot\" account_snapshot_src_10000\n  LEFT OUTER JOIN\n    \"contactcenter\".\"marts\".\"d_product\" products_src_10000\n  ON\n    account_snapshot_src_10000.product_id = products_src_10000.product_id\n) subq_5\nWHERE product__lob = 'mortgage'",
+        "route": "resolve_metric",
+        "metric_names": [
+          "average_mortgage_note_rate"
+        ],
+        "sql": "SELECT\n  AVG(average_mortgage_note_rate) AS average_mortgage_note_rate\nFROM (\n  SELECT\n    products_src_10000.lob AS product__lob\n    , account_snapshot_src_10000.mortgage_note_rate AS average_mortgage_note_rate\n  FROM \"contactcenter\".\"marts\".\"f_account_snapshot\" account_snapshot_src_10000\n  LEFT OUTER JOIN\n    \"contactcenter\".\"marts\".\"d_product\" products_src_10000\n  ON\n    account_snapshot_src_10000.product_id = products_src_10000.product_id\n) subq_5\nWHERE product__lob = 'mortgage'",
+        "citations": [],
+        "grounded": true
+      }
+    },
+    {
+      "id": "g16",
+      "kind": "metric",
+      "error": null,
+      "results": {
+        "route": {
+          "key": "route",
+          "score": true,
+          "comment": "expected resolve_metric, got resolve_metric"
+        },
+        "interrupt": {
+          "key": "interrupt",
+          "score": true,
+          "comment": "no interrupt"
+        },
+        "metric": {
+          "key": "metric",
+          "score": true,
+          "comment": "expected ['nps'], got ['nps']"
+        },
+        "sql": {
+          "key": "sql",
+          "score": true,
+          "comment": ""
+        },
+        "citations": {
+          "key": "citations",
+          "score": null,
+          "comment": ""
+        },
+        "call_id": {
+          "key": "call_id",
+          "score": null,
+          "comment": ""
+        },
+        "judge": {
+          "key": "judge",
+          "score": 0.75,
+          "comment": "4/5 (prompt v1): The answer resolves the question to the declared nps metric and reports it as its own figure with the MetricFlow SQL, which matches the reference. A value of exactly 0 offered without context is a little suspect, since the SQL could truncate under integer division. The templated 'N distinct' wording is a minor usability blemish."
+        }
+      },
+      "outputs": {
+        "answer": "Question: \"What is our net promoter score?\"\nResolved to 1 declared metric(s) \u2014 there is no single blended number; each word maps to N distinct, auditable metrics:\n\n- nps \u2014 NPS = (promoters - detractors) / responses x 100, on the 1-5 mapping (5=promoter, 4/3=passive, 2/1=detractor). A derived metric, never stored.\n\nMetricFlow result (1 metric(s)):\nnps: 0\n\nSQL:\nSELECT\n  (promoters - detractors) / responses * 100 AS nps\nFROM (\n  SELECT\n    SUM(is_promoter) AS promoters\n    , SUM(is_detractor) AS detractors\n    , SUM(1) AS responses\n  FROM \"contactcenter\".\"marts\".\"f_csat\" csat_surveys_src_10000\n) subq_5",
+        "route": "resolve_metric",
+        "metric_names": [
+          "nps"
+        ],
+        "sql": "SELECT\n  (promoters - detractors) / responses * 100 AS nps\nFROM (\n  SELECT\n    SUM(is_promoter) AS promoters\n    , SUM(is_detractor) AS detractors\n    , SUM(1) AS responses\n  FROM \"contactcenter\".\"marts\".\"f_csat\" csat_surveys_src_10000\n) subq_5",
+        "citations": [],
+        "grounded": true
+      }
+    },
+    {
+      "id": "g33",
+      "kind": "call_lookup",
+      "error": null,
+      "results": {
+        "route": {
+          "key": "route",
+          "score": true,
+          "comment": "expected summarize_call, got summarize_call"
+        },
+        "interrupt": {
+          "key": "interrupt",
+          "score": true,
+          "comment": "no interrupt"
+        },
+        "metric": {
+          "key": "metric",
+          "score": null,
+          "comment": ""
+        },
+        "sql": {
+          "key": "sql",
+          "score": null,
+          "comment": ""
+        },
+        "citations": {
+          "key": "citations",
+          "score": true,
+          "comment": "CALL-00139"
+        },
+        "call_id": {
+          "key": "call_id",
+          "score": true,
+          "comment": "expected CALL-00139, cited ['CALL-00139']"
+        },
+        "judge": {
+          "key": "judge",
+          "score": 0.75,
+          "comment": "4/5 (prompt v1): The answer correctly identifies CALL-00139 as an escrow analysis call that was resolved, and it explains the member's reason for calling: a notice raising a question about a possible shortage. The specific dollar figures and transcript details are not in the reference, but they plausibly come from the transcript and nothing contradicts the reference. It omits the date, member, and agent, which is a minor gap."
+        }
+      },
+      "outputs": {
+        "answer": "**Call Summary \u2014 CALL-00139 (Escrow Analysis)**\n\n- **Member's issue:** The member received a notice about their escrow account and wanted to understand it, specifically asking whether there was a shortage.\n- **Agent's handling:** The agent pulled up the escrow analysis, reported an escrow balance of $5,967.66 (with escrow included in the $2,272.16 monthly payment), and explained that a slight change in property taxes caused a small adjustment to the payment.\n- **Outcome:** The adjustment was minor; the member's concern was addressed and the call was resolved.\n\nSources: CALL-00139",
+        "route": "summarize_call",
+        "metric_names": [],
+        "sql": null,
+        "citations": [
+          "CALL-00139"
+        ],
+        "grounded": true
+      }
+    },
+    {
+      "id": "g13",
+      "kind": "metric",
+      "error": null,
+      "results": {
+        "route": {
+          "key": "route",
+          "score": true,
+          "comment": "expected resolve_metric, got resolve_metric"
+        },
+        "interrupt": {
+          "key": "interrupt",
+          "score": true,
+          "comment": "no interrupt"
+        },
+        "metric": {
+          "key": "metric",
+          "score": true,
+          "comment": "expected ['average_handle_time'], got ['average_handle_time']"
+        },
+        "sql": {
+          "key": "sql",
+          "score": true,
+          "comment": ""
+        },
+        "citations": {
+          "key": "citations",
+          "score": null,
+          "comment": ""
+        },
+        "call_id": {
+          "key": "call_id",
+          "score": null,
+          "comment": ""
+        },
+        "judge": {
+          "key": "judge",
+          "score": 1.0,
+          "comment": "5/5 (prompt v1): The answer resolves to the declared metric average_handle_time, reports one figure (510.2344), and includes the MetricFlow SQL, which matches the reference. A minor gap: it gives no units (seconds), and the boilerplate wording ('each word maps to N distinct') is slightly awkward, though neither is a material error."
+        }
+      },
+      "outputs": {
+        "answer": "Question: \"What is our average handle time?\"\nResolved to 1 declared metric(s) \u2014 there is no single blended number; each word maps to N distinct, auditable metrics:\n\n- average_handle_time \u2014 AHT = total talk time / number of calls \u2014 a derived RATIO, never a stored column.\n\nMetricFlow result (1 metric(s)):\naverage_handle_time: 510.2344\n\nSQL:\nSELECT\n  CAST(SUM(duration_seconds) AS DOUBLE PRECISION) / CAST(NULLIF(SUM(1), 0) AS DOUBLE PRECISION) AS average_handle_time\nFROM \"contactcenter\".\"marts\".\"f_interaction\" interactions_src_10000",
+        "route": "resolve_metric",
+        "metric_names": [
+          "average_handle_time"
+        ],
+        "sql": "SELECT\n  CAST(SUM(duration_seconds) AS DOUBLE PRECISION) / CAST(NULLIF(SUM(1), 0) AS DOUBLE PRECISION) AS average_handle_time\nFROM \"contactcenter\".\"marts\".\"f_interaction\" interactions_src_10000",
+        "citations": [],
+        "grounded": true
+      }
+    },
+    {
+      "id": "g04",
+      "kind": "ambiguous",
+      "error": null,
+      "results": {
+        "route": {
+          "key": "route",
+          "score": true,
+          "comment": "expected resolve_metric, got resolve_metric"
+        },
+        "interrupt": {
+          "key": "interrupt",
+          "score": true,
+          "comment": "\"rate\""
+        },
+        "metric": {
+          "key": "metric",
+          "score": true,
+          "comment": "expected ['average_mortgage_note_rate', 'average_heloc_current_rate'], got ['average_mortgage_note_rate', 'average_heloc_current_rate']"
+        },
+        "sql": {
+          "key": "sql",
+          "score": true,
+          "comment": ""
+        },
+        "citations": {
+          "key": "citations",
+          "score": null,
+          "comment": ""
+        },
+        "call_id": {
+          "key": "call_id",
+          "score": null,
+          "comment": ""
+        },
+        "judge": {
+          "key": "judge",
+          "score": 1.0,
+          "comment": "5/5 (prompt v1): The answer reports both chosen metrics as separate figures with the MetricFlow SQL, does not blend them, and matches the clarification. Its presentation is raw, with unrounded numbers and no labels, but it is faithful and complete."
+        }
+      },
+      "outputs": {
+        "answer": "MetricFlow result (2 metric(s)):\n  average_mortgage_note_rate: 6.588841176470588\n  average_heloc_current_rate: 10.110072727272728\n\nSQL:\nWITH sma_10001_cte AS (\n  SELECT\n    product_id AS product\n    , mortgage_note_rate AS __average_mortgage_note_rate\n    , heloc_current_rate AS __average_heloc_current_rate\n  FROM \"contactcenter\".\"marts\".\"f_account_snapshot\" account_snapshot_src_10000\n)\n\n, rss_10007_cte AS (\n  SELECT\n    lob\n    , product_id AS product\n  FROM \"contactcenter\".\"marts\".\"d_product\" products_src_10000\n)\n\nSELECT\n  MAX(subq_9.average_mortgage_note_rate) AS average_mortgage_note_rate\n  , MAX(subq_18.average_heloc_current_rate) AS average_heloc_current_rate\nFROM (\n  SELECT\n    AVG(average_mortgage_note_rate) AS average_mortgage_note_rate\n  FROM (\n    SELECT\n      rss_10007_cte.lob AS product__lob\n      , sma_10001_cte.__average_mortgage_note_rate AS average_mortgage_note_rate\n    FROM sma_10001_cte\n    LEFT OUTER JOIN\n      rss_10007_cte\n    ON\n      sma_10001_cte.product = rss_10007_cte.product\n  ) subq_5\n  WHERE product__lob = 'mortgage'\n) subq_9\nCROSS JOIN (\n  SELECT\n    AVG(average_heloc_current_rate) AS average_heloc_current_rate\n  FROM (\n    SELECT\n      rss_10007_cte.lob AS product__lob\n      , sma_10001_cte.__average_heloc_current_rate AS average_heloc_current_rate\n    FROM sma_10001_cte\n    LEFT OUTER JOIN\n      rss_10007_cte\n    ON\n      sma_10001_cte.product = rss_10007_cte.product\n  ) subq_14\n  WHERE product__lob = 'home'\n) subq_18",
+        "route": "resolve_metric",
+        "metric_names": [
+          "average_mortgage_note_rate",
+          "average_heloc_current_rate"
+        ],
+        "sql": "WITH sma_10001_cte AS (\n  SELECT\n    product_id AS product\n    , mortgage_note_rate AS __average_mortgage_note_rate\n    , heloc_current_rate AS __average_heloc_current_rate\n  FROM \"contactcenter\".\"marts\".\"f_account_snapshot\" account_snapshot_src_10000\n)\n\n, rss_10007_cte AS (\n  SELECT\n    lob\n    , product_id AS product\n  FROM \"contactcenter\".\"marts\".\"d_product\" products_src_10000\n)\n\nSELECT\n  MAX(subq_9.average_mortgage_note_rate) AS average_mortgage_note_rate\n  , MAX(subq_18.average_heloc_current_rate) AS average_heloc_current_rate\nFROM (\n  SELECT\n    AVG(average_mortgage_note_rate) AS average_mortgage_note_rate\n  FROM (\n    SELECT\n      rss_10007_cte.lob AS product__lob\n      , sma_10001_cte.__average_mortgage_note_rate AS average_mortgage_note_rate\n    FROM sma_10001_cte\n    LEFT OUTER JOIN\n      rss_10007_cte\n    ON\n      sma_10001_cte.product = rss_10007_cte.product\n  ) subq_5\n  WHERE product__lob = 'mortgage'\n) subq_9\nCROSS JOIN (\n  SELECT\n    AVG(average_heloc_current_rate) AS average_heloc_current_rate\n  FROM (\n    SELECT\n      rss_10007_cte.lob AS product__lob\n      , sma_10001_cte.__average_heloc_current_rate AS average_heloc_current_rate\n    FROM sma_10001_cte\n    LEFT OUTER JOIN\n      rss_10007_cte\n    ON\n      sma_10001_cte.product = rss_10007_cte.product\n  ) subq_14\n  WHERE product__lob = 'home'\n) subq_18",
+        "citations": [],
+        "grounded": true
+      }
+    },
+    {
+      "id": "g40",
+      "kind": "open",
+      "error": null,
+      "results": {
+        "route": {
+          "key": "route",
+          "score": true,
+          "comment": "expected retrieve, got retrieve"
+        },
+        "interrupt": {
+          "key": "interrupt",
+          "score": true,
+          "comment": "no interrupt"
+        },
+        "metric": {
+          "key": "metric",
+          "score": null,
+          "comment": ""
+        },
+        "sql": {
+          "key": "sql",
+          "score": null,
+          "comment": ""
+        },
+        "citations": {
+          "key": "citations",
+          "score": true,
+          "comment": "CALL-00494, CALL-00578, CALL-00074, CALL-00888, CALL-01065"
+        },
+        "call_id": {
+          "key": "call_id",
+          "score": null,
+          "comment": ""
+        },
+        "judge": {
+          "key": "judge",
+          "score": 0.5,
+          "comment": "3/5 (prompt v1): The answer cites real-looking call ids and describes consistent member statements, so it is responsive. But it generalizes from five calls without noting there are 143 fraud_dispute calls, and \"all five fraud dispute calls\" could be read as the full population. It also adds unsupported speculation: a shared compromise vector, and a link between the escalation and the large balance."
+        }
+      },
+      "outputs": {
+        "answer": "## What Members Say in Fraud Dispute Calls\n\nAcross all five fraud dispute calls in this sample (CALL-00494, CALL-00578, CALL-00074, CALL-00888, and CALL-01065), members present with a highly consistent pattern of statements:\n\n**1. Reporting an unrecognized charge from an online retailer**\nEvery member opens the call by stating they see a charge they don't recognize on their account, and specifically that it's from an online retailer. This is the trigger for all five contacts.\n\n**2. Firmly denying the purchase**\nEach member explicitly states, \"I definitely didn't make that purchase\" \u2014 indicating they are asserting unauthorized/fraudulent activity rather than disputing a legitimate charge (e.g., billing amount or merchant error).\n\n**3. Asking about resolution timeline**\nEvery member follows up with \"How long until the full resolution?\" \u2014 the timeline for the dispute investigation is clearly the member's top secondary concern after getting the charge flagged.\n\n## Supervisory Takeaways\n\n- **Scripted consistency:** The member language is nearly identical across all calls, which may suggest genuine card fraud (e.g., compromised card numbers used at online merchants) rather than one-off disputes. It may be worth investigating whether these accounts share a compromise vector.\n- **Provisional credit is working:** Agents consistently open disputes and issue provisional credits up front, so members express no balance concerns. The escalation in CALL-00074 (Aug 27) is the notable exception \u2014 notably, that call also involved the largest balance ($356,823.21 on account ending 0006), which may warrant a look at whether high-value disputes need a different handling path.\n- **Timeline communication:** The \"10 business days\" answer is given uniformly and, based on outcomes (4 of 5 resolved), appears to satisfy most members.\n\nSources: CALL-00494, CALL-00578, CALL-00074, CALL-00888, CALL-01065",
+        "route": "retrieve",
+        "metric_names": [],
+        "sql": null,
+        "citations": [
+          "CALL-00494",
+          "CALL-00578",
+          "CALL-00074",
+          "CALL-00888",
+          "CALL-01065"
+        ],
+        "grounded": true
+      }
+    },
+    {
+      "id": "g35",
+      "kind": "call_lookup",
+      "error": null,
+      "results": {
+        "route": {
+          "key": "route",
+          "score": true,
+          "comment": "expected summarize_call, got summarize_call"
+        },
+        "interrupt": {
+          "key": "interrupt",
+          "score": true,
+          "comment": "no interrupt"
+        },
+        "metric": {
+          "key": "metric",
+          "score": null,
+          "comment": ""
+        },
+        "sql": {
+          "key": "sql",
+          "score": null,
+          "comment": ""
+        },
+        "citations": {
+          "key": "citations",
+          "score": true,
+          "comment": "CALL-00047"
+        },
+        "call_id": {
+          "key": "call_id",
+          "score": true,
+          "comment": "expected CALL-00047, cited ['CALL-00047']"
+        },
+        "judge": {
+          "key": "judge",
+          "score": 0.75,
+          "comment": "4/5 (prompt v1): The answer is consistent with the reference: the call is a rate inquiry, it was escalated, and the account ending 0239 matches MBR-000239. Its transcript details (5.209% APY, the balance) cannot be checked against the reference but contradict nothing. It omits the date, the 332-second duration and agent AGT-052, gives a speculative reason for the escalation, and does not flag that the call was about a deposit APY rather than the loan rate the question assumed."
+        }
+      },
+      "outputs": {
+        "answer": "**Member's issue:** Wanted to know the interest rate (APY) on their account and whether it was fixed or variable.\n\n**Agent's handling:** The agent pulled up the account (ending 0239) and provided the APY of 5.209%. However, when asked whether the rate was fixed or subject to change, the agent gave only a vague reply (\"That depends on the product\") without clarifying the actual rate structure. The agent also volunteered the ledger balance ($326,458.52), which wasn't requested.\n\n**Outcome:** The call was escalated \u2014 likely because the agent failed to fully answer the fixed-vs-variable question and the member's core concern remained unresolved.\n\nSources: CALL-00047",
+        "route": "summarize_call",
+        "metric_names": [],
+        "sql": null,
+        "citations": [
+          "CALL-00047"
+        ],
+        "grounded": true
+      }
+    },
+    {
+      "id": "g03",
+      "kind": "ambiguous",
+      "error": null,
+      "results": {
+        "route": {
+          "key": "route",
+          "score": true,
+          "comment": "expected resolve_metric, got resolve_metric"
+        },
+        "interrupt": {
+          "key": "interrupt",
+          "score": true,
+          "comment": "\"rate\""
+        },
+        "metric": {
+          "key": "metric",
+          "score": true,
+          "comment": "expected ['weighted_mortgage_portfolio_rate'], got ['weighted_mortgage_portfolio_rate']"
+        },
+        "sql": {
+          "key": "sql",
+          "score": true,
+          "comment": ""
+        },
+        "citations": {
+          "key": "citations",
+          "score": null,
+          "comment": ""
+        },
+        "call_id": {
+          "key": "call_id",
+          "score": null,
+          "comment": ""
+        },
+        "judge": {
+          "key": "judge",
+          "score": 1.0,
+          "comment": "5/5 (prompt v1): The answer reports the clarified metric weighted_mortgage_portfolio_rate as its own figure with the MetricFlow SQL, consistent with the reference. It invents nothing and blends no figures. It is a minor presentation gap that the figure (6.57) is unrounded and carries no unit or explanation, but this does not affect correctness."
+        }
+      },
+      "outputs": {
+        "answer": "MetricFlow result (1 metric(s)):\nweighted_mortgage_portfolio_rate: 6.569519350411952\n\nSQL:\nSELECT\n  CAST(SUM(note_rate_times_balance) AS DOUBLE PRECISION) / CAST(NULLIF(SUM(mortgage_principal_balance), 0) AS DOUBLE PRECISION) AS weighted_mortgage_portfolio_rate\nFROM (\n  SELECT\n    products_src_10000.lob AS product__lob\n    , subq_1.__note_rate_times_balance AS note_rate_times_balance\n    , subq_1.__mortgage_principal_balance AS mortgage_principal_balance\n  FROM (\n    SELECT\n      product_id AS product\n      , mortgage_note_rate * mortgage_principal_balance AS __note_rate_times_balance\n      , mortgage_principal_balance AS __mortgage_principal_balance\n    FROM \"contactcenter\".\"marts\".\"f_account_snapshot\" account_snapshot_src_10000\n  ) subq_1\n  LEFT OUTER JOIN\n    \"contactcenter\".\"marts\".\"d_product\" products_src_10000\n  ON\n    subq_1.product = products_src_10000.product_id\n) subq_5\nWHERE product__lob = 'mortgage'",
+        "route": "resolve_metric",
+        "metric_names": [
+          "weighted_mortgage_portfolio_rate"
+        ],
+        "sql": "SELECT\n  CAST(SUM(note_rate_times_balance) AS DOUBLE PRECISION) / CAST(NULLIF(SUM(mortgage_principal_balance), 0) AS DOUBLE PRECISION) AS weighted_mortgage_portfolio_rate\nFROM (\n  SELECT\n    products_src_10000.lob AS product__lob\n    , subq_1.__note_rate_times_balance AS note_rate_times_balance\n    , subq_1.__mortgage_principal_balance AS mortgage_principal_balance\n  FROM (\n    SELECT\n      product_id AS product\n      , mortgage_note_rate * mortgage_principal_balance AS __note_rate_times_balance\n      , mortgage_principal_balance AS __mortgage_principal_balance\n    FROM \"contactcenter\".\"marts\".\"f_account_snapshot\" account_snapshot_src_10000\n  ) subq_1\n  LEFT OUTER JOIN\n    \"contactcenter\".\"marts\".\"d_product\" products_src_10000\n  ON\n    subq_1.product = products_src_10000.product_id\n) subq_5\nWHERE product__lob = 'mortgage'",
+        "citations": [],
+        "grounded": true
+      }
+    },
+    {
+      "id": "g45",
+      "kind": "open",
+      "error": null,
+      "results": {
+        "route": {
+          "key": "route",
+          "score": true,
+          "comment": "expected retrieve, got retrieve"
+        },
+        "interrupt": {
+          "key": "interrupt",
+          "score": true,
+          "comment": "no interrupt"
+        },
+        "metric": {
+          "key": "metric",
+          "score": null,
+          "comment": ""
+        },
+        "sql": {
+          "key": "sql",
+          "score": null,
+          "comment": ""
+        },
+        "citations": {
+          "key": "citations",
+          "score": true,
+          "comment": "CALL-00436, CALL-01104, CALL-00893, CALL-00769, CALL-01133"
+        },
+        "call_id": {
+          "key": "call_id",
+          "score": null,
+          "comment": ""
+        },
+        "judge": {
+          "key": "judge",
+          "score": 0.75,
+          "comment": "4/5 (prompt v1): The answer describes plausible rate-inquiry content and cites specific call ids with details, and nothing in it contradicts the reference. However, it generalizes from only five transcripts without noting the scale of the relevant calls (111 rate_inquiry and 101 loan_inquiry). It also adds mild speculation about a repeat caller's motive and contains a stray garbled character."
+        }
+      },
+      "outputs": {
+        "answer": "**Members ask about the current loan rates they would qualify for today, framed around a product comparable to their existing loan.**\n\nAcross all five transcripts, members open with the same request \u2014 \"I'd like to ask about your current loan rates\" \u2014 and when asked what they're looking to finance, they specify \"something comparable to my account ending in [last four digits].\" They are essentially asking: *what rate would I get today if I took out a loan like the one I already have?*\n\nIn each case, the agent responds with:\n- The current rate expressed as **base plus margin**, and\n- The member's **existing drawn balance**\n\nExamples:\n- **CALL-00436** (2026-03-20): Member with account ending 0803 was quoted 10.679% with a drawn balance of $48,277.28.\n- **CALL-01104** (2026-03-30): Account ending 0755 \u2014 quoted 10.046%, balance $53,200.77.\n- **CALL-00893** (2026-08-19): Account ending 0750 \u2014 quoted 11.057%, balance $62,407.07.\n- **CALL-00769** and **CALL-01133**: The same member (account ending 0721) called twice about the identical rate (9.348%, balance $116,351.70) \u2014 worth noting, as this repeat inquiry may indicate the member was comparison-shopping or\u672a satisfied after the first contact.\n\nNotably, members do not ask about APR details, rate changes, or refinance specifics in these transcripts \u2014 the inquiry is limited to the current quoted rate, and every call ends with the agent offering (but not completing) a pre-qualification.\n\nSources: CALL-00436, CALL-01104, CALL-00893, CALL-00769, CALL-01133",
+        "route": "retrieve",
+        "metric_names": [],
+        "sql": null,
+        "citations": [
+          "CALL-00436",
+          "CALL-01104",
+          "CALL-00893",
+          "CALL-00769",
+          "CALL-01133"
+        ],
+        "grounded": true
+      }
+    },
+    {
+      "id": "g14",
+      "kind": "metric",
+      "error": null,
+      "results": {
+        "route": {
+          "key": "route",
+          "score": true,
+          "comment": "expected resolve_metric, got resolve_metric"
+        },
+        "interrupt": {
+          "key": "interrupt",
+          "score": true,
+          "comment": "no interrupt"
+        },
+        "metric": {
+          "key": "metric",
+          "score": true,
+          "comment": "expected ['first_contact_resolution_rate'], got ['first_contact_resolution_rate']"
+        },
+        "sql": {
+          "key": "sql",
+          "score": true,
+          "comment": ""
+        },
+        "citations": {
+          "key": "citations",
+          "score": null,
+          "comment": ""
+        },
+        "call_id": {
+          "key": "call_id",
+          "score": null,
+          "comment": ""
+        },
+        "judge": {
+          "key": "judge",
+          "score": 1.0,
+          "comment": "5/5 (prompt v1): The answer reports the declared metric first_contact_resolution_rate as its own figure (0.5752) with the MetricFlow SQL, which matches the reference and contains nothing invented. The only flaws are templated boilerplate (\"each word maps to N distinct\") and the raw decimal not being shown as a percentage, both minor."
+        }
+      },
+      "outputs": {
+        "answer": "Question: \"What is our first contact resolution rate?\"\nResolved to 1 declared metric(s) \u2014 there is no single blended number; each word maps to N distinct, auditable metrics:\n\n- first_contact_resolution_rate \u2014 Share of interactions resolved on first contact.\n\nMetricFlow result (1 metric(s)):\nfirst_contact_resolution_rate: 0.5752\n\nSQL:\nSELECT\n  CAST(SUM(case when first_contact_resolved then 1 else 0 end) AS DOUBLE PRECISION) / CAST(NULLIF(SUM(1), 0) AS DOUBLE PRECISION) AS first_contact_resolution_rate\nFROM \"contactcenter\".\"marts\".\"f_interaction\" interactions_src_10000",
+        "route": "resolve_metric",
+        "metric_names": [
+          "first_contact_resolution_rate"
+        ],
+        "sql": "SELECT\n  CAST(SUM(case when first_contact_resolved then 1 else 0 end) AS DOUBLE PRECISION) / CAST(NULLIF(SUM(1), 0) AS DOUBLE PRECISION) AS first_contact_resolution_rate\nFROM \"contactcenter\".\"marts\".\"f_interaction\" interactions_src_10000",
+        "citations": [],
+        "grounded": true
+      }
+    },
+    {
+      "id": "g30",
+      "kind": "call_lookup",
+      "error": null,
+      "results": {
+        "route": {
+          "key": "route",
+          "score": true,
+          "comment": "expected summarize_call, got summarize_call"
+        },
+        "interrupt": {
+          "key": "interrupt",
+          "score": true,
+          "comment": "no interrupt"
+        },
+        "metric": {
+          "key": "metric",
+          "score": null,
+          "comment": ""
+        },
+        "sql": {
+          "key": "sql",
+          "score": null,
+          "comment": ""
+        },
+        "citations": {
+          "key": "citations",
+          "score": true,
+          "comment": "CALL-00040"
+        },
+        "call_id": {
+          "key": "call_id",
+          "score": true,
+          "comment": "expected CALL-00040, cited ['CALL-00040']"
+        },
+        "judge": {
+          "key": "judge",
+          "score": 0.75,
+          "comment": "4/5 (prompt v1): The answer correctly identifies CALL-00040 as a fraud/dispute call with an escalated outcome, and nothing in it contradicts the reference. The added transcript details (provisional credit, 10 business days, balance) cannot be checked against the reference but are plausible call content. It leaves out the date, duration and agent ID, a minor gap for a summary."
+        }
+      },
+      "outputs": {
+        "answer": "**Call Summary \u2014 CALL-00040 (Fraud/Dispute)**\n\n- **Issue:** The member reported an unrecognized charge from an online retailer on their account (ending 0439) and confirmed they did not make the purchase.\n- **Agent handling:** The agent verified the account (ledger balance $11,413.34), opened a dispute, and issued a provisional credit so the member's balance would not be impacted during the investigation. They advised that full resolution typically takes 10 business days.\n- **Outcome:** The case was escalated for further investigation.\n\nSources: CALL-00040",
+        "route": "summarize_call",
+        "metric_names": [],
+        "sql": null,
+        "citations": [
+          "CALL-00040"
+        ],
+        "grounded": true
+      }
+    },
+    {
+      "id": "g42",
+      "kind": "open",
+      "error": null,
+      "results": {
+        "route": {
+          "key": "route",
+          "score": true,
+          "comment": "expected retrieve, got retrieve"
+        },
+        "interrupt": {
+          "key": "interrupt",
+          "score": true,
+          "comment": "no interrupt"
+        },
+        "metric": {
+          "key": "metric",
+          "score": null,
+          "comment": ""
+        },
+        "sql": {
+          "key": "sql",
+          "score": null,
+          "comment": ""
+        },
+        "citations": {
+          "key": "citations",
+          "score": true,
+          "comment": "CALL-00932, CALL-01184, CALL-01094, CALL-00746, CALL-01093"
+        },
+        "call_id": {
+          "key": "call_id",
+          "score": null,
+          "comment": ""
+        },
+        "judge": {
+          "key": "judge",
+          "score": 0.75,
+          "comment": "4/5 (prompt v1): The answer is grounded in five real cited calls and accurately describes the password-rejection problem and the reset-link handling. However, it treats the five-call sample without noting that the category holds 147 calls. Its 'verification mismatch' point also wrongly compares an account's last four digits with the member number suffix, which is an unsupported inference, though it is hedged."
+        }
+      },
+      "outputs": {
+        "answer": "## Online Banking Login Issues\n\nAcross all five transcripts, members report a single consistent problem: **they cannot sign in to online banking because the system repeatedly rejects their password** (\"It keeps saying my password is wrong\").\n\n### Affected Calls\n- **CALL-00932** (Tyrone White, MBR-000403) \u2013 resolved\n- **CALL-01184** (Holly Wood, MBR-000004) \u2013 unresolved\n- **CALL-01094** (Christina White, MBR-000452) \u2013 escalated\n- **CALL-00746** (Victoria Delgado, MBR-000565) \u2013 escalated \u2014 *note: the member stated the account ends in 0505, which did not match their member number suffix 0565, possibly indicating a mismatch or transcription error during verification*\n- **CALL-01093** (Elijah White, MBR-000113) \u2013 callback_scheduled\n\n### How It Was Handled\nIn every case, the agent followed the same script: verified the member number and last four digits of the account, then sent a **secure password reset link to the email on file**, telling the member it would take effect within a minute or two.\n\n### Supervisor Takeaways\n1. **Resolution inconsistency:** Despite the identical issue and identical handling, outcomes varied widely \u2014 1 resolved, 1 unresolved, 2 escalated, 1 callback scheduled. This suggests the reset link alone didn't reliably fix the problem for many members, and follow-up may be needed on the unresolved/escalated/callback cases (CALL-01184, CALL-01094, CALL-00746, CALL-01093).\n2. **Possible systemic issue:** The same login failure appearing repeatedly may point to a password policy change, credential sync problem, or authentication system issue rather than individual member errors.\n3. **Verification mismatch:** The discrepancy in CALL-00746 (member said account ends in 0505) is worth reviewing for verification accuracy and training.\n4. **Scripted responses:** Agents are providing reset links as a one-size-fits-all solution; exploring root causes (e.g., locked accounts, expired credentials, MFA issues) could improve first-call resolution rates.\n\nSources: CALL-00932, CALL-01184, CALL-01094, CALL-00746, CALL-01093",
+        "route": "retrieve",
+        "metric_names": [],
+        "sql": null,
+        "citations": [
+          "CALL-00932",
+          "CALL-01184",
+          "CALL-01094",
+          "CALL-00746",
+          "CALL-01093"
+        ],
+        "grounded": true
+      }
+    },
+    {
+      "id": "g25",
+      "kind": "metric",
+      "error": null,
+      "results": {
+        "route": {
+          "key": "route",
+          "score": true,
+          "comment": "expected resolve_metric, got resolve_metric"
+        },
+        "interrupt": {
+          "key": "interrupt",
+          "score": true,
+          "comment": "no interrupt"
+        },
+        "metric": {
+          "key": "metric",
+          "score": true,
+          "comment": "expected ['checking_available_balance'], got ['checking_available_balance']"
+        },
+        "sql": {
+          "key": "sql",
+          "score": true,
+          "comment": ""
+        },
+        "citations": {
+          "key": "citations",
+          "score": null,
+          "comment": ""
+        },
+        "call_id": {
+          "key": "call_id",
+          "score": null,
+          "comment": ""
+        },
+        "judge": {
+          "key": "judge",
+          "score": 1.0,
+          "comment": "5/5 (prompt v1): The answer reports the declared metric checking_available_balance as a single figure along with the MetricFlow SQL, which matches the reference. It invents nothing. The SQL applies a banking LOB filter that the question did not request, but that filter is plausibly part of the metric definition, and the answer is terse but usable."
+        }
+      },
+      "outputs": {
+        "answer": "MetricFlow result (1 metric(s)):\nchecking_available_balance: 3789876.9\n\nSQL:\nSELECT\n  SUM(checking_available_balance) AS checking_available_balance\nFROM (\n  SELECT\n    products_src_10000.lob AS product__lob\n    , account_snapshot_src_10000.checking_available_balance AS checking_available_balance\n  FROM \"contactcenter\".\"marts\".\"f_account_snapshot\" account_snapshot_src_10000\n  LEFT OUTER JOIN\n    \"contactcenter\".\"marts\".\"d_product\" products_src_10000\n  ON\n    account_snapshot_src_10000.product_id = products_src_10000.product_id\n) subq_5\nWHERE product__lob = 'banking'",
+        "route": "resolve_metric",
+        "metric_names": [
+          "checking_available_balance"
+        ],
+        "sql": "SELECT\n  SUM(checking_available_balance) AS checking_available_balance\nFROM (\n  SELECT\n    products_src_10000.lob AS product__lob\n    , account_snapshot_src_10000.checking_available_balance AS checking_available_balance\n  FROM \"contactcenter\".\"marts\".\"f_account_snapshot\" account_snapshot_src_10000\n  LEFT OUTER JOIN\n    \"contactcenter\".\"marts\".\"d_product\" products_src_10000\n  ON\n    account_snapshot_src_10000.product_id = products_src_10000.product_id\n) subq_5\nWHERE product__lob = 'banking'",
+        "citations": [],
+        "grounded": true
+      }
+    },
+    {
+      "id": "g15",
+      "kind": "metric",
+      "error": null,
+      "results": {
+        "route": {
+          "key": "route",
+          "score": true,
+          "comment": "expected resolve_metric, got resolve_metric"
+        },
+        "interrupt": {
+          "key": "interrupt",
+          "score": true,
+          "comment": "no interrupt"
+        },
+        "metric": {
+          "key": "metric",
+          "score": true,
+          "comment": "expected ['csat_average_score'], got ['csat_average_score']"
+        },
+        "sql": {
+          "key": "sql",
+          "score": true,
+          "comment": ""
+        },
+        "citations": {
+          "key": "citations",
+          "score": null,
+          "comment": ""
+        },
+        "call_id": {
+          "key": "call_id",
+          "score": null,
+          "comment": ""
+        },
+        "judge": {
+          "key": "judge",
+          "score": 1.0,
+          "comment": "5/5 (prompt v1): The answer resolves the question to the declared metric csat_average_score and reports a concrete figure (about 4.09). It includes the generated SQL, matching the reference with no blended or invented figures. The 'each word maps to N distinct' phrasing is slightly templated, but that is cosmetic."
+        }
+      },
+      "outputs": {
+        "answer": "Question: \"What is our CSAT average score?\"\nResolved to 1 declared metric(s) \u2014 there is no single blended number; each word maps to N distinct, auditable metrics:\n\n- csat_average_score \u2014 Average CSAT survey score (1-5).\n\nMetricFlow result (1 metric(s)):\ncsat_average_score: 4.085896076352068\n\nSQL:\nSELECT\n  AVG(score) AS csat_average_score\nFROM \"contactcenter\".\"marts\".\"f_csat\" csat_surveys_src_10000",
+        "route": "resolve_metric",
+        "metric_names": [
+          "csat_average_score"
+        ],
+        "sql": "SELECT\n  AVG(score) AS csat_average_score\nFROM \"contactcenter\".\"marts\".\"f_csat\" csat_surveys_src_10000",
+        "citations": [],
+        "grounded": true
+      }
+    },
+    {
+      "id": "g17",
+      "kind": "metric",
+      "error": null,
+      "results": {
+        "route": {
+          "key": "route",
+          "score": true,
+          "comment": "expected resolve_metric, got resolve_metric"
+        },
+        "interrupt": {
+          "key": "interrupt",
+          "score": true,
+          "comment": "no interrupt"
+        },
+        "metric": {
+          "key": "metric",
+          "score": true,
+          "comment": "expected ['rate_locks_expired'], got ['rate_locks_expired']"
+        },
+        "sql": {
+          "key": "sql",
+          "score": true,
+          "comment": ""
+        },
+        "citations": {
+          "key": "citations",
+          "score": null,
+          "comment": ""
+        },
+        "call_id": {
+          "key": "call_id",
+          "score": null,
+          "comment": ""
+        },
+        "judge": {
+          "key": "judge",
+          "score": 1.0,
+          "comment": "5/5 (prompt v1): The answer resolves to the declared metric rate_locks_expired and reports a single figure (183) with the MetricFlow SQL, which is what the reference requires. Nothing is blended or invented. The boilerplate about 'each word maps to N distinct metrics' is slightly awkward but harmless."
+        }
+      },
+      "outputs": {
+        "answer": "Question: \"How many rate locks expired?\"\nResolved to 1 declared metric(s) \u2014 there is no single blended number; each word maps to N distinct, auditable metrics:\n\n- rate_locks_expired \u2014 Count of rate locks whose status is 'expired'.\n\nMetricFlow result (1 metric(s)):\nrate_locks_expired: 183\n\nSQL:\nSELECT\n  SUM(is_expired) AS rate_locks_expired\nFROM \"contactcenter\".\"marts\".\"f_rate_lock\" rate_locks_src_10000",
+        "route": "resolve_metric",
+        "metric_names": [
+          "rate_locks_expired"
+        ],
+        "sql": "SELECT\n  SUM(is_expired) AS rate_locks_expired\nFROM \"contactcenter\".\"marts\".\"f_rate_lock\" rate_locks_src_10000",
+        "citations": [],
+        "grounded": true
+      }
+    },
+    {
+      "id": "g38",
+      "kind": "call_lookup",
+      "error": null,
+      "results": {
+        "route": {
+          "key": "route",
+          "score": true,
+          "comment": "expected summarize_call, got summarize_call"
+        },
+        "interrupt": {
+          "key": "interrupt",
+          "score": true,
+          "comment": "no interrupt"
+        },
+        "metric": {
+          "key": "metric",
+          "score": null,
+          "comment": ""
+        },
+        "sql": {
+          "key": "sql",
+          "score": null,
+          "comment": ""
+        },
+        "citations": {
+          "key": "citations",
+          "score": true,
+          "comment": "CALL-00025"
+        },
+        "call_id": {
+          "key": "call_id",
+          "score": true,
+          "comment": "expected CALL-00025, cited ['CALL-00025']"
+        },
+        "judge": {
+          "key": "judge",
+          "score": 0.75,
+          "comment": "4/5 (prompt v1): The answer identifies CALL-00025 with the correct date and category, and it reports the 'escalated' outcome from the record while flagging the conflict with the transcript. Its transcript details do not contradict the reference. It omits the duration (722s), member ID and agent ID, a minor gap in completeness."
+        }
+      },
+      "outputs": {
+        "answer": "**Call Summary \u2014 CALL-00025 (2026-03-12, fee dispute)**\n\n- **Member's issue:** An unexpected $6.20 monthly fee appeared on their account (ending 0159); they believed the fee was waived.\n- **Agent's handling:** Explained the fee is only waived with a $2,027.28 minimum balance, then offered and processed a one-time courtesy refund and noted the account.\n- **Outcome:** Fee refunded on the spot and the member appeared satisfied. Note: the call record lists the outcome as \"escalated,\" which conflicts with the transcript's apparent resolution \u2014 worth verifying in the system.\n\nSources: CALL-00025",
+        "route": "summarize_call",
+        "metric_names": [],
+        "sql": null,
+        "citations": [
+          "CALL-00025"
+        ],
+        "grounded": true
+      }
+    },
+    {
+      "id": "g47",
+      "kind": "open",
+      "error": null,
+      "results": {
+        "route": {
+          "key": "route",
+          "score": true,
+          "comment": "expected retrieve, got retrieve"
+        },
+        "interrupt": {
+          "key": "interrupt",
+          "score": true,
+          "comment": "no interrupt"
+        },
+        "metric": {
+          "key": "metric",
+          "score": null,
+          "comment": ""
+        },
+        "sql": {
+          "key": "sql",
+          "score": null,
+          "comment": ""
+        },
+        "citations": {
+          "key": "citations",
+          "score": true,
+          "comment": "CALL-00957, CALL-00445, CALL-00008, CALL-00830, CALL-01116"
+        },
+        "call_id": {
+          "key": "call_id",
+          "score": null,
+          "comment": ""
+        },
+        "judge": {
+          "key": "judge",
+          "score": 0.75,
+          "comment": "4/5 (prompt v1): The answer cites real-looking call IDs from the account_opening category and describes consistent transcript content: the checking-vs-savings choice, the 4.816% rate as the close, and the account-details confirmation. It is upfront that it draws on only five of the 53 calls, but still generalizes from them. It also slightly stretches the transcripts: the agent asks about account type rather than members asking, and the back-end friction point is speculation, though it is framed as a suggestion."
+        }
+      },
+      "outputs": {
+        "answer": "Based on these five account-opening calls (CALL-00957, CALL-00445, CALL-00008, CALL-00830, CALL-01116), members' core interest is the **interest rate on savings accounts**, along with the account type options.\n\nSpecifically, members want to know:\n\n1. **Account type options (checking vs. savings)** \u2014 In every call, the agent asks \"Were you thinking checking or savings?\" and every member chooses savings (e.g., CALL-00957 with MBR-000087, CALL-00445 with MBR-000082). Members are drawn to savings products over checking.\n\n2. **The current yield/rate** \u2014 This is the deciding factor. Once the agent quotes the high-yield savings rate of 4.816%, members immediately react positively (\"That's a good rate. Let's open it.\") and commit to opening the account. This pattern is consistent across all five calls, including CALL-00008 (MBR-000384) and CALL-00830/CALL-01116 (both MBR-000194).\n\n3. **What happens next** \u2014 Members accept the assurance that they'll \"receive the account details in a few minutes\" without asking follow-up questions, indicating they simply want confirmation the process is underway.\n\n**Supervisor takeaway:** Members calling to open accounts are rate-sensitive shoppers \u2014 the 4.816% high-yield savings rate is effectively the close. Notably, even though the transcripts all end on a positive note, outcomes vary (CALL-00830 was escalated and CALL-00008 had a callback scheduled), which suggests the back-end account setup step \u2014 not the member conversation \u2014 may be where friction occurs and is worth investigating.\n\nSources: CALL-00957, CALL-00445, CALL-00008, CALL-00830, CALL-01116",
+        "route": "retrieve",
+        "metric_names": [],
+        "sql": null,
+        "citations": [
+          "CALL-00957",
+          "CALL-00445",
+          "CALL-00008",
+          "CALL-00830",
+          "CALL-01116"
+        ],
+        "grounded": true
+      }
+    },
+    {
+      "id": "g20",
+      "kind": "metric",
+      "error": null,
+      "results": {
+        "route": {
+          "key": "route",
+          "score": true,
+          "comment": "expected resolve_metric, got resolve_metric"
+        },
+        "interrupt": {
+          "key": "interrupt",
+          "score": true,
+          "comment": "no interrupt"
+        },
+        "metric": {
+          "key": "metric",
+          "score": true,
+          "comment": "expected ['average_heloc_current_rate'], got ['average_heloc_current_rate']"
+        },
+        "sql": {
+          "key": "sql",
+          "score": true,
+          "comment": ""
+        },
+        "citations": {
+          "key": "citations",
+          "score": null,
+          "comment": ""
+        },
+        "call_id": {
+          "key": "call_id",
+          "score": null,
+          "comment": ""
+        },
+        "judge": {
+          "key": "judge",
+          "score": 1.0,
+          "comment": "5/5 (prompt v1): The answer reports the declared metric average_heloc_current_rate as its own figure and includes the generated SQL, which matches the reference. It is faithful and responsive. The raw unformatted number and the lack of a percent unit or interpretation are a small usability nit, but they don't amount to an error."
+        }
+      },
+      "outputs": {
+        "answer": "MetricFlow result (1 metric(s)):\naverage_heloc_current_rate: 10.110072727272728\n\nSQL:\nSELECT\n  AVG(average_heloc_current_rate) AS average_heloc_current_rate\nFROM (\n  SELECT\n    products_src_10000.lob AS product__lob\n    , account_snapshot_src_10000.heloc_current_rate AS average_heloc_current_rate\n  FROM \"contactcenter\".\"marts\".\"f_account_snapshot\" account_snapshot_src_10000\n  LEFT OUTER JOIN\n    \"contactcenter\".\"marts\".\"d_product\" products_src_10000\n  ON\n    account_snapshot_src_10000.product_id = products_src_10000.product_id\n) subq_5\nWHERE product__lob = 'home'",
+        "route": "resolve_metric",
+        "metric_names": [
+          "average_heloc_current_rate"
+        ],
+        "sql": "SELECT\n  AVG(average_heloc_current_rate) AS average_heloc_current_rate\nFROM (\n  SELECT\n    products_src_10000.lob AS product__lob\n    , account_snapshot_src_10000.heloc_current_rate AS average_heloc_current_rate\n  FROM \"contactcenter\".\"marts\".\"f_account_snapshot\" account_snapshot_src_10000\n  LEFT OUTER JOIN\n    \"contactcenter\".\"marts\".\"d_product\" products_src_10000\n  ON\n    account_snapshot_src_10000.product_id = products_src_10000.product_id\n) subq_5\nWHERE product__lob = 'home'",
+        "citations": [],
+        "grounded": true
+      }
+    },
+    {
+      "id": "g24",
+      "kind": "metric",
+      "error": null,
+      "results": {
+        "route": {
+          "key": "route",
+          "score": true,
+          "comment": "expected resolve_metric, got resolve_metric"
+        },
+        "interrupt": {
+          "key": "interrupt",
+          "score": true,
+          "comment": "no interrupt"
+        },
+        "metric": {
+          "key": "metric",
+          "score": true,
+          "comment": "expected ['banking_ledger_balance'], got ['banking_ledger_balance']"
+        },
+        "sql": {
+          "key": "sql",
+          "score": true,
+          "comment": ""
+        },
+        "citations": {
+          "key": "citations",
+          "score": null,
+          "comment": ""
+        },
+        "call_id": {
+          "key": "call_id",
+          "score": null,
+          "comment": ""
+        },
+        "judge": {
+          "key": "judge",
+          "score": 1.0,
+          "comment": "5/5 (prompt v1): The answer reports the declared metric banking_ledger_balance as a single figure with the MetricFlow-generated SQL, which is exactly what the reference requires. Nothing is blended or invented, and it directly answers the question."
+        }
+      },
+      "outputs": {
+        "answer": "MetricFlow result (1 metric(s)):\nbanking_ledger_balance: 38419236.37\n\nSQL:\nSELECT\n  SUM(banking_ledger_balance) AS banking_ledger_balance\nFROM (\n  SELECT\n    products_src_10000.lob AS product__lob\n    , account_snapshot_src_10000.banking_ledger_balance AS banking_ledger_balance\n  FROM \"contactcenter\".\"marts\".\"f_account_snapshot\" account_snapshot_src_10000\n  LEFT OUTER JOIN\n    \"contactcenter\".\"marts\".\"d_product\" products_src_10000\n  ON\n    account_snapshot_src_10000.product_id = products_src_10000.product_id\n) subq_5\nWHERE product__lob = 'banking'",
+        "route": "resolve_metric",
+        "metric_names": [
+          "banking_ledger_balance"
+        ],
+        "sql": "SELECT\n  SUM(banking_ledger_balance) AS banking_ledger_balance\nFROM (\n  SELECT\n    products_src_10000.lob AS product__lob\n    , account_snapshot_src_10000.banking_ledger_balance AS banking_ledger_balance\n  FROM \"contactcenter\".\"marts\".\"f_account_snapshot\" account_snapshot_src_10000\n  LEFT OUTER JOIN\n    \"contactcenter\".\"marts\".\"d_product\" products_src_10000\n  ON\n    account_snapshot_src_10000.product_id = products_src_10000.product_id\n) subq_5\nWHERE product__lob = 'banking'",
+        "citations": [],
+        "grounded": true
+      }
+    },
+    {
+      "id": "g31",
+      "kind": "call_lookup",
+      "error": null,
+      "results": {
+        "route": {
+          "key": "route",
+          "score": true,
+          "comment": "expected summarize_call, got summarize_call"
+        },
+        "interrupt": {
+          "key": "interrupt",
+          "score": true,
+          "comment": "no interrupt"
+        },
+        "metric": {
+          "key": "metric",
+          "score": null,
+          "comment": ""
+        },
+        "sql": {
+          "key": "sql",
+          "score": null,
+          "comment": ""
+        },
+        "citations": {
+          "key": "citations",
+          "score": true,
+          "comment": "CALL-00069"
+        },
+        "call_id": {
+          "key": "call_id",
+          "score": true,
+          "comment": "expected CALL-00069, cited ['CALL-00069']"
+        },
+        "judge": {
+          "key": "judge",
+          "score": 0.75,
+          "comment": "4/5 (prompt v1): The answer identifies the call and matches the reference on date, category and unresolved outcome. The transcript-level details ($152.51 payment, hardship deferral) are plausible and contradict nothing. It omits the duration, member ID and agent ID, and it hedges a speculative explanation for the unresolved status, which is a minor gap."
+        }
+      },
+      "outputs": {
+        "answer": "**Call Summary \u2013 CALL-00069 (2026-06-01, payment_assistance)**\n\n- **Member's issue:** Couldn't afford this month's minimum payment of $152.51 on their account (ending 1288).\n- **Agent's handling:** Offered the hardship program, which would defer the month's payment to the end of the loan term. Member agreed, and the agent submitted the request.\n- **Outcome:** Hardship deferral request submitted; confirmation email expected shortly. Call logged as unresolved, likely pending that confirmation.\n\nSources: CALL-00069",
+        "route": "summarize_call",
+        "metric_names": [],
+        "sql": null,
+        "citations": [
+          "CALL-00069"
+        ],
+        "grounded": true
+      }
+    },
+    {
+      "id": "g43",
+      "kind": "open",
+      "error": null,
+      "results": {
+        "route": {
+          "key": "route",
+          "score": true,
+          "comment": "expected retrieve, got retrieve"
+        },
+        "interrupt": {
+          "key": "interrupt",
+          "score": true,
+          "comment": "no interrupt"
+        },
+        "metric": {
+          "key": "metric",
+          "score": null,
+          "comment": ""
+        },
+        "sql": {
+          "key": "sql",
+          "score": null,
+          "comment": ""
+        },
+        "citations": {
+          "key": "citations",
+          "score": true,
+          "comment": "CALL-00626, CALL-00326, CALL-00014, CALL-00388, CALL-00127"
+        },
+        "call_id": {
+          "key": "call_id",
+          "score": null,
+          "comment": ""
+        },
+        "judge": {
+          "key": "judge",
+          "score": 0.5,
+          "comment": "3/5 (prompt v1): The answer describes what balance calls contain (an opening balance request, then a question about whether the figure matches online banking) and cites specific call ids, which fits the reference. However, it frames its findings as covering \"all five calls\" when the category holds 179, never saying it looked at a sample. It then generalizes, saying members raise no disputes and the calls suit automation, without that caveat."
+        }
+      },
+      "outputs": {
+        "answer": "When members call about their balance, their requests are highly consistent across all five calls. They ask two things:\n\n1. **Initial request:** Members open with a request to check their account balance \u2014 \"Hi, I'd like to check my account balance\" (identical phrasing in CALL-00626, CALL-00326, CALL-00014, CALL-00388, and CALL-00127).\n\n2. **Follow-up question:** After the agent provides the ledger balance, every member asks, \"Is that the same number I'd see in online banking?\" \u2014 indicating they want to confirm consistency between the phone quote and what they see themselves in digital banking. This occurred in all five calls (CALL-00626, CALL-00326, CALL-00014, CALL-00388, CALL-00127).\n\n**Takeaway for supervisors:** Balance inquiries follow a predictable, scriptable flow \u2014 the agent verifies the member number, quotes the ledger balance, and then addresses the online banking comparison by also providing the available balance. Members aren't raising disputes or complications here; they simply want to reconcile the two figures (ledger vs. available). This consistency suggests the calls could be well-suited to automation or self-service deflection.\n\nSources: CALL-00626, CALL-00326, CALL-00014, CALL-00388, CALL-00127",
+        "route": "retrieve",
+        "metric_names": [],
+        "sql": null,
+        "citations": [
+          "CALL-00626",
+          "CALL-00326",
+          "CALL-00014",
+          "CALL-00388",
+          "CALL-00127"
+        ],
+        "grounded": true
+      }
+    },
+    {
+      "id": "g06",
+      "kind": "ambiguous",
+      "error": null,
+      "results": {
+        "route": {
+          "key": "route",
+          "score": true,
+          "comment": "expected resolve_metric, got resolve_metric"
+        },
+        "interrupt": {
+          "key": "interrupt",
+          "score": true,
+          "comment": "\"balance\""
+        },
+        "metric": {
+          "key": "metric",
+          "score": true,
+          "comment": "expected ['banking_ledger_balance'], got ['banking_ledger_balance']"
+        },
+        "sql": {
+          "key": "sql",
+          "score": true,
+          "comment": ""
+        },
+        "citations": {
+          "key": "citations",
+          "score": null,
+          "comment": ""
+        },
+        "call_id": {
+          "key": "call_id",
+          "score": null,
+          "comment": ""
+        },
+        "judge": {
+          "key": "judge",
+          "score": 0.75,
+          "comment": "4/5 (prompt v1): The answer reports banking_ledger_balance as its own figure with the generated SQL, matching the clarified metric, and invents nothing. Minor gap: the question asked about 'this quarter', but the SQL has no time filter and the answer does not mention the time scope."
+        }
+      },
+      "outputs": {
+        "answer": "MetricFlow result (1 metric(s)):\nbanking_ledger_balance: 38419236.37\n\nSQL:\nSELECT\n  SUM(banking_ledger_balance) AS banking_ledger_balance\nFROM (\n  SELECT\n    products_src_10000.lob AS product__lob\n    , account_snapshot_src_10000.banking_ledger_balance AS banking_ledger_balance\n  FROM \"contactcenter\".\"marts\".\"f_account_snapshot\" account_snapshot_src_10000\n  LEFT OUTER JOIN\n    \"contactcenter\".\"marts\".\"d_product\" products_src_10000\n  ON\n    account_snapshot_src_10000.product_id = products_src_10000.product_id\n) subq_5\nWHERE product__lob = 'banking'",
+        "route": "resolve_metric",
+        "metric_names": [
+          "banking_ledger_balance"
+        ],
+        "sql": "SELECT\n  SUM(banking_ledger_balance) AS banking_ledger_balance\nFROM (\n  SELECT\n    products_src_10000.lob AS product__lob\n    , account_snapshot_src_10000.banking_ledger_balance AS banking_ledger_balance\n  FROM \"contactcenter\".\"marts\".\"f_account_snapshot\" account_snapshot_src_10000\n  LEFT OUTER JOIN\n    \"contactcenter\".\"marts\".\"d_product\" products_src_10000\n  ON\n    account_snapshot_src_10000.product_id = products_src_10000.product_id\n) subq_5\nWHERE product__lob = 'banking'",
+        "citations": [],
+        "grounded": true
+      }
+    },
+    {
+      "id": "g21",
+      "kind": "metric",
+      "error": null,
+      "results": {
+        "route": {
+          "key": "route",
+          "score": true,
+          "comment": "expected resolve_metric, got resolve_metric"
+        },
+        "interrupt": {
+          "key": "interrupt",
+          "score": true,
+          "comment": "no interrupt"
+        },
+        "metric": {
+          "key": "metric",
+          "score": true,
+          "comment": "expected ['average_deposit_apy'], got ['average_deposit_apy']"
+        },
+        "sql": {
+          "key": "sql",
+          "score": true,
+          "comment": ""
+        },
+        "citations": {
+          "key": "citations",
+          "score": null,
+          "comment": ""
+        },
+        "call_id": {
+          "key": "call_id",
+          "score": null,
+          "comment": ""
+        },
+        "judge": {
+          "key": "judge",
+          "score": 0.75,
+          "comment": "4/5 (prompt v1): The answer reports the declared metric average_deposit_apy as a single figure alongside the generated SQL, which matches the reference and invents nothing. It responds to the question directly. A minor gap is that it does not label units (whether 1.937 means a percent) and does not explain the filter to the banking line of business, which leaves it slightly less usable for a supervisor."
+        }
+      },
+      "outputs": {
+        "answer": "MetricFlow result (1 metric(s)):\naverage_deposit_apy: 1.9372905660377358\n\nSQL:\nSELECT\n  AVG(average_deposit_apy) AS average_deposit_apy\nFROM (\n  SELECT\n    products_src_10000.lob AS product__lob\n    , account_snapshot_src_10000.deposit_apy AS average_deposit_apy\n  FROM \"contactcenter\".\"marts\".\"f_account_snapshot\" account_snapshot_src_10000\n  LEFT OUTER JOIN\n    \"contactcenter\".\"marts\".\"d_product\" products_src_10000\n  ON\n    account_snapshot_src_10000.product_id = products_src_10000.product_id\n) subq_5\nWHERE product__lob = 'banking'",
+        "route": "resolve_metric",
+        "metric_names": [
+          "average_deposit_apy"
+        ],
+        "sql": "SELECT\n  AVG(average_deposit_apy) AS average_deposit_apy\nFROM (\n  SELECT\n    products_src_10000.lob AS product__lob\n    , account_snapshot_src_10000.deposit_apy AS average_deposit_apy\n  FROM \"contactcenter\".\"marts\".\"f_account_snapshot\" account_snapshot_src_10000\n  LEFT OUTER JOIN\n    \"contactcenter\".\"marts\".\"d_product\" products_src_10000\n  ON\n    account_snapshot_src_10000.product_id = products_src_10000.product_id\n) subq_5\nWHERE product__lob = 'banking'",
+        "citations": [],
+        "grounded": true
+      }
+    },
+    {
+      "id": "g50",
+      "kind": "open",
+      "error": null,
+      "results": {
+        "route": {
+          "key": "route",
+          "score": true,
+          "comment": "expected retrieve, got retrieve"
+        },
+        "interrupt": {
+          "key": "interrupt",
+          "score": true,
+          "comment": "no interrupt"
+        },
+        "metric": {
+          "key": "metric",
+          "score": null,
+          "comment": ""
+        },
+        "sql": {
+          "key": "sql",
+          "score": null,
+          "comment": ""
+        },
+        "citations": {
+          "key": "citations",
+          "score": true,
+          "comment": "CALL-01107, CALL-01151, CALL-00019, CALL-01128, CALL-00732"
+        },
+        "call_id": {
+          "key": "call_id",
+          "score": null,
+          "comment": ""
+        },
+        "judge": {
+          "key": "judge",
+          "score": 0.75,
+          "comment": "4/5 (prompt v1): The answer describes what members ask in investment review calls (an account review, then year-to-date performance) and cites specific call ids with figures that look grounded in the transcripts. It draws from only 5 of the 59 calls without saying the category is larger, which is a minor completeness gap. Some supervisor observations, such as the possible duplicate contact, go beyond the question but are hedged."
+        }
+      },
+      "outputs": {
+        "answer": "## Member Questions in Investment Review Calls\n\nAcross all five transcripts, member asks are consistent and fall into two categories:\n\n**1. Initial request \u2014 account review**\nEvery call opens with the member asking to review their investment account (CALL-01107, CALL-01151, CALL-00019, CALL-01128, CALL-00732).\n\n**2. Follow-up question \u2014 year-to-date performance**\nIn each call, after hearing their balances, members ask some version of *\"How has it performed this year?\"* This is the only substantive question members ask. In response, agents report:\n- YTD return (ranging widely: **-11.16%** in CALL-00019 to **+23.14%** in CALL-01107, with 3.51% in CALL-01128/CALL-00732 and 9.97% in CALL-01151)\n- Cost basis relative to contributions\n\n## Observations for Supervisors\n\n- **Highly scripted interactions:** All five calls follow an identical template with no probing follow-ups from members \u2014 no one asks about fees, allocations, risk, or specific holdings, even when performance is negative (CALL-00019 at -11.16%).\n- **No tie between performance and escalation:** The only escalated call, CALL-01151, had a solid +9.97% YTD return, and the transcript shows no visible trigger for the escalation. Worth investigating what happened off-script.\n- **Possible duplicate contact:** CALL-01128 (2026-04-01) and CALL-00732 (2026-03-13) show identical market values ($357,747.41) and settled cash ($21,943.99), suggesting the same member called twice within three weeks \u2014 a repeat-contact opportunity.\n- **Member engagement gap:** Despite agents referencing \"advice,\" no member asks a follow-up question about what to do with the information. The uniform sign-off (\"That's good to know\") across calls suggests these reviews may be transactional rather than advisory.\n\nSources: CALL-01107, CALL-01151, CALL-00019, CALL-01128, CALL-00732",
+        "route": "retrieve",
+        "metric_names": [],
+        "sql": null,
+        "citations": [
+          "CALL-01107",
+          "CALL-01151",
+          "CALL-00019",
+          "CALL-01128",
+          "CALL-00732"
+        ],
+        "grounded": true
+      }
+    },
+    {
+      "id": "g49",
+      "kind": "open",
+      "error": null,
+      "results": {
+        "route": {
+          "key": "route",
+          "score": true,
+          "comment": "expected retrieve, got retrieve"
+        },
+        "interrupt": {
+          "key": "interrupt",
+          "score": true,
+          "comment": "no interrupt"
+        },
+        "metric": {
+          "key": "metric",
+          "score": null,
+          "comment": ""
+        },
+        "sql": {
+          "key": "sql",
+          "score": null,
+          "comment": ""
+        },
+        "citations": {
+          "key": "citations",
+          "score": true,
+          "comment": "CALL-00650, CALL-01066, CALL-00690, CALL-00131, CALL-00711"
+        },
+        "call_id": {
+          "key": "call_id",
+          "score": null,
+          "comment": ""
+        },
+        "judge": {
+          "key": "judge",
+          "score": 0.75,
+          "comment": "4/5 (prompt v1): The answer describes the content of insurance_service calls: policy review requests, coverage walkthroughs and full-coverage upgrade questions. It cites specific call ids and figures that appear grounded in the transcripts. The gap is that it rests on only five transcripts, says 'every call' without noting the category holds 72 calls, and never mentions that total."
+        }
+      },
+      "outputs": {
+        "answer": "## What Members Ask About Their Insurance Policies\n\nAcross all five transcripts, members ask a consistent set of three questions about their auto insurance policies:\n\n**1. Request a policy review**\nEvery call opens with the member asking to review their auto insurance policy (e.g., CALL-00650, CALL-01066, CALL-00690, CALL-00131, CALL-00711). In response, agents share key policy figures \u2014 annual premium, monthly premium, and deductible \u2014 which vary by member (e.g., $1,016.94/year with a $448.07 deductible in CALL-00690 vs. $2,422.80/year with a $733.78 deductible in CALL-01066).\n\n**2. Ask for a walkthrough of their coverage**\nAfter hearing the premium and deductible details, members consistently ask, \"Can you walk through the coverage?\" \u2014 indicating they want a clearer explanation of what their policy actually includes, not just the cost figures. Agents respond that coverage includes the liability and collision components the member selected.\n\n**3. Ask what full coverage would add**\nEvery member follows up with \"And what would full coverage add?\" \u2014 signaling interest in upgrading from their current liability + collision setup to full coverage. Agents offer to provide a quote for the member's vehicle on the spot.\n\n## Takeaway for Supervisors\n\nThese calls are essentially **policy review + upgrade-inquiry** calls. Members understand their costs (premium/deductible) but appear to need more help understanding their coverage details and their options for enhancing coverage. All five calls were categorized as insurance_service and resolved, suggesting this is a well-handled, routine call type \u2014 but the uniform pattern suggests potential value in proactive outreach (e.g., annual policy review emails or full-coverage quote offers) that could reduce inbound volume.\n\nSources: CALL-00650, CALL-01066, CALL-00690, CALL-00131, CALL-00711",
+        "route": "retrieve",
+        "metric_names": [],
+        "sql": null,
+        "citations": [
+          "CALL-00650",
+          "CALL-01066",
+          "CALL-00690",
+          "CALL-00131",
+          "CALL-00711"
+        ],
+        "grounded": true
+      }
+    },
+    {
+      "id": "g09",
+      "kind": "ambiguous",
+      "error": null,
+      "results": {
+        "route": {
+          "key": "route",
+          "score": true,
+          "comment": "expected resolve_metric, got resolve_metric"
+        },
+        "interrupt": {
+          "key": "interrupt",
+          "score": true,
+          "comment": "\"lcv\""
+        },
+        "metric": {
+          "key": "metric",
+          "score": true,
+          "comment": "expected ['loan_to_value'], got ['loan_to_value']"
+        },
+        "sql": {
+          "key": "sql",
+          "score": true,
+          "comment": ""
+        },
+        "citations": {
+          "key": "citations",
+          "score": null,
+          "comment": ""
+        },
+        "call_id": {
+          "key": "call_id",
+          "score": null,
+          "comment": ""
+        },
+        "judge": {
+          "key": "judge",
+          "score": 0.75,
+          "comment": "4/5 (prompt v1): The answer reports the single declared metric loan_to_value as its own figure along with the MetricFlow SQL, which matches the clarification and the reference. It blends no figures and invents nothing. The mortgage filter comes from the metric definition, but the answer does not tell the supervisor it is mortgage-only, which is a minor usability gap."
+        }
+      },
+      "outputs": {
+        "answer": "MetricFlow result (1 metric(s)):\nloan_to_value: 77.62741176470588\n\nSQL:\nSELECT\n  AVG(loan_to_value) AS loan_to_value\nFROM (\n  SELECT\n    products_src_10000.lob AS product__lob\n    , account_snapshot_src_10000.ltv_at_origination AS loan_to_value\n  FROM \"contactcenter\".\"marts\".\"f_account_snapshot\" account_snapshot_src_10000\n  LEFT OUTER JOIN\n    \"contactcenter\".\"marts\".\"d_product\" products_src_10000\n  ON\n    account_snapshot_src_10000.product_id = products_src_10000.product_id\n) subq_5\nWHERE product__lob = 'mortgage'",
+        "route": "resolve_metric",
+        "metric_names": [
+          "loan_to_value"
+        ],
+        "sql": "SELECT\n  AVG(loan_to_value) AS loan_to_value\nFROM (\n  SELECT\n    products_src_10000.lob AS product__lob\n    , account_snapshot_src_10000.ltv_at_origination AS loan_to_value\n  FROM \"contactcenter\".\"marts\".\"f_account_snapshot\" account_snapshot_src_10000\n  LEFT OUTER JOIN\n    \"contactcenter\".\"marts\".\"d_product\" products_src_10000\n  ON\n    account_snapshot_src_10000.product_id = products_src_10000.product_id\n) subq_5\nWHERE product__lob = 'mortgage'",
+        "citations": [],
+        "grounded": true
+      }
+    },
+    {
+      "id": "g22",
+      "kind": "metric",
+      "error": null,
+      "results": {
+        "route": {
+          "key": "route",
+          "score": true,
+          "comment": "expected resolve_metric, got resolve_metric"
+        },
+        "interrupt": {
+          "key": "interrupt",
+          "score": true,
+          "comment": "no interrupt"
+        },
+        "metric": {
+          "key": "metric",
+          "score": true,
+          "comment": "expected ['escrow_balance'], got ['escrow_balance']"
+        },
+        "sql": {
+          "key": "sql",
+          "score": true,
+          "comment": ""
+        },
+        "citations": {
+          "key": "citations",
+          "score": null,
+          "comment": ""
+        },
+        "call_id": {
+          "key": "call_id",
+          "score": null,
+          "comment": ""
+        },
+        "judge": {
+          "key": "judge",
+          "score": 1.0,
+          "comment": "5/5 (prompt v1): The answer reports the declared escrow_balance metric as a single figure alongside its generated SQL, exactly as the reference requires, with no blended or invented numbers. The mortgage line-of-business filter in the SQL most likely comes from the metric's own definition. The answer would have been slightly clearer had it noted that scope."
+        }
+      },
+      "outputs": {
+        "answer": "MetricFlow result (1 metric(s)):\nescrow_balance: 667888.11\n\nSQL:\nSELECT\n  SUM(escrow_balance) AS escrow_balance\nFROM (\n  SELECT\n    products_src_10000.lob AS product__lob\n    , account_snapshot_src_10000.escrow_balance AS escrow_balance\n  FROM \"contactcenter\".\"marts\".\"f_account_snapshot\" account_snapshot_src_10000\n  LEFT OUTER JOIN\n    \"contactcenter\".\"marts\".\"d_product\" products_src_10000\n  ON\n    account_snapshot_src_10000.product_id = products_src_10000.product_id\n) subq_5\nWHERE product__lob = 'mortgage'",
+        "route": "resolve_metric",
+        "metric_names": [
+          "escrow_balance"
+        ],
+        "sql": "SELECT\n  SUM(escrow_balance) AS escrow_balance\nFROM (\n  SELECT\n    products_src_10000.lob AS product__lob\n    , account_snapshot_src_10000.escrow_balance AS escrow_balance\n  FROM \"contactcenter\".\"marts\".\"f_account_snapshot\" account_snapshot_src_10000\n  LEFT OUTER JOIN\n    \"contactcenter\".\"marts\".\"d_product\" products_src_10000\n  ON\n    account_snapshot_src_10000.product_id = products_src_10000.product_id\n) subq_5\nWHERE product__lob = 'mortgage'",
+        "citations": [],
+        "grounded": true
+      }
+    },
+    {
+      "id": "g23",
+      "kind": "metric",
+      "error": null,
+      "results": {
+        "route": {
+          "key": "route",
+          "score": true,
+          "comment": "expected resolve_metric, got resolve_metric"
+        },
+        "interrupt": {
+          "key": "interrupt",
+          "score": true,
+          "comment": "no interrupt"
+        },
+        "metric": {
+          "key": "metric",
+          "score": true,
+          "comment": "expected ['credit_card_outstanding'], got ['credit_card_outstanding']"
+        },
+        "sql": {
+          "key": "sql",
+          "score": true,
+          "comment": ""
+        },
+        "citations": {
+          "key": "citations",
+          "score": null,
+          "comment": ""
+        },
+        "call_id": {
+          "key": "call_id",
+          "score": null,
+          "comment": ""
+        },
+        "judge": {
+          "key": "judge",
+          "score": 1.0,
+          "comment": "5/5 (prompt v1): The answer reports the declared metric credit_card_outstanding as a single figure along with its generated SQL, which matches the reference. No blended or invented figures appear. It is responsive and usable for a supervisor."
+        }
+      },
+      "outputs": {
+        "answer": "MetricFlow result (1 metric(s)):\ncredit_card_outstanding: 2354869.83\n\nSQL:\nSELECT\n  SUM(credit_card_outstanding) AS credit_card_outstanding\nFROM (\n  SELECT\n    products_src_10000.lob AS product__lob\n    , account_snapshot_src_10000.card_outstanding_balance AS credit_card_outstanding\n  FROM \"contactcenter\".\"marts\".\"f_account_snapshot\" account_snapshot_src_10000\n  LEFT OUTER JOIN\n    \"contactcenter\".\"marts\".\"d_product\" products_src_10000\n  ON\n    account_snapshot_src_10000.product_id = products_src_10000.product_id\n) subq_5\nWHERE product__lob = 'cards'",
+        "route": "resolve_metric",
+        "metric_names": [
+          "credit_card_outstanding"
+        ],
+        "sql": "SELECT\n  SUM(credit_card_outstanding) AS credit_card_outstanding\nFROM (\n  SELECT\n    products_src_10000.lob AS product__lob\n    , account_snapshot_src_10000.card_outstanding_balance AS credit_card_outstanding\n  FROM \"contactcenter\".\"marts\".\"f_account_snapshot\" account_snapshot_src_10000\n  LEFT OUTER JOIN\n    \"contactcenter\".\"marts\".\"d_product\" products_src_10000\n  ON\n    account_snapshot_src_10000.product_id = products_src_10000.product_id\n) subq_5\nWHERE product__lob = 'cards'",
+        "citations": [],
+        "grounded": true
+      }
+    },
+    {
+      "id": "g34",
+      "kind": "call_lookup",
+      "error": null,
+      "results": {
+        "route": {
+          "key": "route",
+          "score": true,
+          "comment": "expected summarize_call, got summarize_call"
+        },
+        "interrupt": {
+          "key": "interrupt",
+          "score": true,
+          "comment": "no interrupt"
+        },
+        "metric": {
+          "key": "metric",
+          "score": null,
+          "comment": ""
+        },
+        "sql": {
+          "key": "sql",
+          "score": null,
+          "comment": ""
+        },
+        "citations": {
+          "key": "citations",
+          "score": true,
+          "comment": "CALL-00079"
+        },
+        "call_id": {
+          "key": "call_id",
+          "score": true,
+          "comment": "expected CALL-00079, cited ['CALL-00079']"
+        },
+        "judge": {
+          "key": "judge",
+          "score": 0.75,
+          "comment": "4/5 (prompt v1): The answer correctly reports the outcome as escalated and the rate-lock-status topic, which matches the reference, and it identifies the call. It leaves out the date, duration, member and agent IDs. The transcript details about placeholder values and the hedged guess at why the call was escalated are not in the reference but do not contradict it."
+        }
+      },
+      "outputs": {
+        "answer": "**Call Summary \u2014 CALL-00079**\n\n- **Member's issue:** The member called to check the status of their rate lock on a loan application.\n- **Agent handling:** The agent retrieved the application but provided data that appears to be placeholder or erroneous values \u2014 a 0.000% rate, an \"n/a\" expiration date, and a $0.00 loan amount \u2014 rather than actual loan details.\n- **Outcome:** The call was escalated, presumably because the agent could not provide valid rate lock information due to the bad data.\n\nSources: CALL-00079",
+        "route": "summarize_call",
+        "metric_names": [],
+        "sql": null,
+        "citations": [
+          "CALL-00079"
+        ],
+        "grounded": true
+      }
+    },
+    {
+      "id": "g41",
+      "kind": "open",
+      "error": null,
+      "results": {
+        "route": {
+          "key": "route",
+          "score": true,
+          "comment": "expected retrieve, got retrieve"
+        },
+        "interrupt": {
+          "key": "interrupt",
+          "score": true,
+          "comment": "no interrupt"
+        },
+        "metric": {
+          "key": "metric",
+          "score": null,
+          "comment": ""
+        },
+        "sql": {
+          "key": "sql",
+          "score": null,
+          "comment": ""
+        },
+        "citations": {
+          "key": "citations",
+          "score": false,
+          "comment": "no citation"
+        },
+        "call_id": {
+          "key": "call_id",
+          "score": null,
+          "comment": ""
+        },
+        "judge": {
+          "key": "judge",
+          "score": 0.0,
+          "comment": "1/5 (prompt v1): The answer is a raw database error message with no content about fee dispute calls. It cites no call ids and describes no reasons. It is honest that it is unverified, but it does not answer the question, while the reference shows 37 relevant calls exist."
+        }
+      },
+      "outputs": {
+        "answer": "Not grounded: treat this answer as unverified.\n\nTable 'langchain_pg_collection' is already defined for this MetaData instance.  Specify 'extend_existing=True' to redefine options and columns on an existing Table object.",
+        "route": "retrieve",
+        "metric_names": [],
+        "sql": null,
+        "citations": [],
+        "grounded": false
+      }
+    },
+    {
+      "id": "g05",
+      "kind": "ambiguous",
+      "error": null,
+      "results": {
+        "route": {
+          "key": "route",
+          "score": true,
+          "comment": "expected resolve_metric, got resolve_metric"
+        },
+        "interrupt": {
+          "key": "interrupt",
+          "score": true,
+          "comment": "\"balance\""
+        },
+        "metric": {
+          "key": "metric",
+          "score": true,
+          "comment": "expected ['savings_balance'], got ['savings_balance']"
+        },
+        "sql": {
+          "key": "sql",
+          "score": true,
+          "comment": ""
+        },
+        "citations": {
+          "key": "citations",
+          "score": null,
+          "comment": ""
+        },
+        "call_id": {
+          "key": "call_id",
+          "score": null,
+          "comment": ""
+        },
+        "judge": {
+          "key": "judge",
+          "score": 1.0,
+          "comment": "5/5 (prompt v1): The answer reports only the clarified metric, savings_balance, as a single figure with its MetricFlow-generated SQL, and blends or invents nothing. The banking line-of-business filter in the SQL appears to come from the declared metric's definition, so it is consistent with the reference. The answer does not explain that filter, but this is a small presentational gap rather than an error."
+        }
+      },
+      "outputs": {
+        "answer": "MetricFlow result (1 metric(s)):\nsavings_balance: 16056942.24\n\nSQL:\nSELECT\n  SUM(savings_balance) AS savings_balance\nFROM (\n  SELECT\n    products_src_10000.lob AS product__lob\n    , account_snapshot_src_10000.savings_balance AS savings_balance\n  FROM \"contactcenter\".\"marts\".\"f_account_snapshot\" account_snapshot_src_10000\n  LEFT OUTER JOIN\n    \"contactcenter\".\"marts\".\"d_product\" products_src_10000\n  ON\n    account_snapshot_src_10000.product_id = products_src_10000.product_id\n) subq_5\nWHERE product__lob = 'banking'",
+        "route": "resolve_metric",
+        "metric_names": [
+          "savings_balance"
+        ],
+        "sql": "SELECT\n  SUM(savings_balance) AS savings_balance\nFROM (\n  SELECT\n    products_src_10000.lob AS product__lob\n    , account_snapshot_src_10000.savings_balance AS savings_balance\n  FROM \"contactcenter\".\"marts\".\"f_account_snapshot\" account_snapshot_src_10000\n  LEFT OUTER JOIN\n    \"contactcenter\".\"marts\".\"d_product\" products_src_10000\n  ON\n    account_snapshot_src_10000.product_id = products_src_10000.product_id\n) subq_5\nWHERE product__lob = 'banking'",
+        "citations": [],
+        "grounded": true
+      }
+    },
+    {
+      "id": "g51",
+      "kind": "open",
+      "error": null,
+      "results": {
+        "route": {
+          "key": "route",
+          "score": true,
+          "comment": "expected retrieve, got retrieve"
+        },
+        "interrupt": {
+          "key": "interrupt",
+          "score": true,
+          "comment": "no interrupt"
+        },
+        "metric": {
+          "key": "metric",
+          "score": null,
+          "comment": ""
+        },
+        "sql": {
+          "key": "sql",
+          "score": null,
+          "comment": ""
+        },
+        "citations": {
+          "key": "citations",
+          "score": true,
+          "comment": "CALL-00299, CALL-00886, CALL-00081, CALL-00327, CALL-00741"
+        },
+        "call_id": {
+          "key": "call_id",
+          "score": null,
+          "comment": ""
+        },
+        "judge": {
+          "key": "judge",
+          "score": 0.25,
+          "comment": "2/5 (prompt v1): The answer cites plausible call ids and describes their contents in detail. However, it says 'across all five card services calls' when the reference shows 114 such calls. On that basis it declares a single, consistent request type for the whole category, which overgeneralizes from a small sample and misstates the scope."
+        }
+      },
+      "outputs": {
+        "answer": "## Summary\n\nAcross all five card services calls, members make a **single, consistent type of request: an available credit inquiry on a specific credit card.** Every call follows the same pattern \u2014 the member opens with a general \"I have a question about my credit card,\" identifies the card by its last four digits, hears the card's key details (credit limit, outstanding balance, and purchase APR), and then asks, *\"And what's my available credit?\"*\n\n## Request Breakdown by Call\n\n| Call ID | Date | Card (last 4) | Request | Outcome |\n|---|---|---|---|---|\n| CALL-00299 | 2026-06-26 | 1225 | Available credit ($9,554.65 available; $8,786.10 outstanding on an $18,340.75 limit) | Escalated |\n| CALL-00886 | 2026-06-29 | 0962 | Available credit ($384.12 available; $533.93 outstanding on a $918.05 limit) | Resolved |\n| CALL-00081 | 2026-07-28 | 1066 | Available credit ($18,295.03 available; $5,008.23 outstanding on a $23,303.26 limit) | Resolved |\n| CALL-00327 | 2026-05-29 | 1232 | Available credit ($24,041.63 available; $2,514.53 outstanding on a $26,556.16 limit) | Transferred |\n| CALL-00741 | 2026-06-25 | 1194 | Available credit ($17,560.35 available; $9,623.43 outstanding on a $27,183.78 limit) | Resolved |\n\n## Observations for Supervisors\n\n- **No disputes, fraud reports, or transaction issues appear** in any transcript \u2014 these are purely informational/account-status inquiries.\n- **Balance-to-limit ratios vary widely**: CALL-00886 shows a member using ~58% of a very low $918 limit, while CALL-00327 shows only ~9% utilization on a $26.5K limit.\n- **Rate information matters**: CALL-00741 stands out with a 0.000% purchase APR (likely a promotional rate), while others range from 16.3% to 24.0%.\n- **Notable discrepancy**: Despite the simplicity of these inquiries, two calls did not resolve at first contact \u2014 CALL-00299 was escalated and CALL-00327 was transferred. The transcripts don't capture the reason, so this may warrant a listen to those recordings to see what triggered the handoff on what appears to be a routine available-credit question.\n\nSources: CALL-00299, CALL-00886, CALL-00081, CALL-00327, CALL-00741",
+        "route": "retrieve",
+        "metric_names": [],
+        "sql": null,
+        "citations": [
+          "CALL-00299",
+          "CALL-00886",
+          "CALL-00081",
+          "CALL-00327",
+          "CALL-00741"
+        ],
+        "grounded": true
+      }
+    },
+    {
+      "id": "g37",
+      "kind": "call_lookup",
+      "error": null,
+      "results": {
+        "route": {
+          "key": "route",
+          "score": true,
+          "comment": "expected summarize_call, got summarize_call"
+        },
+        "interrupt": {
+          "key": "interrupt",
+          "score": true,
+          "comment": "no interrupt"
+        },
+        "metric": {
+          "key": "metric",
+          "score": null,
+          "comment": ""
+        },
+        "sql": {
+          "key": "sql",
+          "score": null,
+          "comment": ""
+        },
+        "citations": {
+          "key": "citations",
+          "score": true,
+          "comment": "CALL-00019"
+        },
+        "call_id": {
+          "key": "call_id",
+          "score": true,
+          "comment": "expected CALL-00019, cited ['CALL-00019']"
+        },
+        "judge": {
+          "key": "judge",
+          "score": 0.25,
+          "comment": "2/5 (prompt v1): The question asks which agent handled the call, and the answer never names AGT-007. It is therefore not responsive. It also gives specific dollar figures and a return percentage that do not appear in the reference, which may be invented. The date and resolved outcome are consistent with the reference."
+        }
+      },
+      "outputs": {
+        "answer": "**Call Summary (CALL-00019, Apr 17, 2026)**\n\n- **Member's issue:** Requested a review of their investment account.\n- **Agent's handling:** Provided the account snapshot \u2014 market value of $58,193.51, $2,224.54 in settled cash, and a year-to-date return of -11.16% with cost basis roughly matching contributions.\n- **Outcome:** Member was satisfied and thanked the agent. Call resolved; no further action needed.\n\nSources: CALL-00019",
+        "route": "summarize_call",
+        "metric_names": [],
+        "sql": null,
+        "citations": [
+          "CALL-00019"
+        ],
+        "grounded": true
+      }
+    },
+    {
+      "id": "g29",
+      "kind": "metric",
+      "error": null,
+      "results": {
+        "route": {
+          "key": "route",
+          "score": true,
+          "comment": "expected resolve_metric, got resolve_metric"
+        },
+        "interrupt": {
+          "key": "interrupt",
+          "score": true,
+          "comment": "no interrupt"
+        },
+        "metric": {
+          "key": "metric",
+          "score": true,
+          "comment": "expected ['heloc_drawn_balance', 'average_heloc_current_rate'], got ['average_heloc_current_rate', 'heloc_drawn_balance']"
+        },
+        "sql": {
+          "key": "sql",
+          "score": true,
+          "comment": ""
+        },
+        "citations": {
+          "key": "citations",
+          "score": null,
+          "comment": ""
+        },
+        "call_id": {
+          "key": "call_id",
+          "score": null,
+          "comment": ""
+        },
+        "judge": {
+          "key": "judge",
+          "score": 1.0,
+          "comment": "5/5 (prompt v1): The answer reports both declared metrics, average_heloc_current_rate and heloc_drawn_balance, as separate figures with the generated SQL. Nothing is blended or invented. It fully matches the reference and a supervisor can act on it."
+        }
+      },
+      "outputs": {
+        "answer": "MetricFlow result (2 metric(s)):\n  average_heloc_current_rate: 10.110072727272728\n  heloc_drawn_balance: 5526423.89\n\nSQL:\nSELECT\n  AVG(average_heloc_current_rate) AS average_heloc_current_rate\n  , SUM(heloc_drawn_balance) AS heloc_drawn_balance\nFROM (\n  SELECT\n    products_src_10000.lob AS product__lob\n    , account_snapshot_src_10000.heloc_current_rate AS average_heloc_current_rate\n    , account_snapshot_src_10000.heloc_drawn_balance AS heloc_drawn_balance\n  FROM \"contactcenter\".\"marts\".\"f_account_snapshot\" account_snapshot_src_10000\n  LEFT OUTER JOIN\n    \"contactcenter\".\"marts\".\"d_product\" products_src_10000\n  ON\n    account_snapshot_src_10000.product_id = products_src_10000.product_id\n) subq_5\nWHERE product__lob = 'home'",
+        "route": "resolve_metric",
+        "metric_names": [
+          "average_heloc_current_rate",
+          "heloc_drawn_balance"
+        ],
+        "sql": "SELECT\n  AVG(average_heloc_current_rate) AS average_heloc_current_rate\n  , SUM(heloc_drawn_balance) AS heloc_drawn_balance\nFROM (\n  SELECT\n    products_src_10000.lob AS product__lob\n    , account_snapshot_src_10000.heloc_current_rate AS average_heloc_current_rate\n    , account_snapshot_src_10000.heloc_drawn_balance AS heloc_drawn_balance\n  FROM \"contactcenter\".\"marts\".\"f_account_snapshot\" account_snapshot_src_10000\n  LEFT OUTER JOIN\n    \"contactcenter\".\"marts\".\"d_product\" products_src_10000\n  ON\n    account_snapshot_src_10000.product_id = products_src_10000.product_id\n) subq_5\nWHERE product__lob = 'home'",
+        "citations": [],
+        "grounded": true
+      }
+    },
+    {
+      "id": "g07",
+      "kind": "ambiguous",
+      "error": null,
+      "results": {
+        "route": {
+          "key": "route",
+          "score": true,
+          "comment": "expected resolve_metric, got resolve_metric"
+        },
+        "interrupt": {
+          "key": "interrupt",
+          "score": true,
+          "comment": "\"balance\""
+        },
+        "metric": {
+          "key": "metric",
+          "score": true,
+          "comment": "expected ['mortgage_principal_balance'], got ['mortgage_principal_balance']"
+        },
+        "sql": {
+          "key": "sql",
+          "score": true,
+          "comment": ""
+        },
+        "citations": {
+          "key": "citations",
+          "score": null,
+          "comment": ""
+        },
+        "call_id": {
+          "key": "call_id",
+          "score": null,
+          "comment": ""
+        },
+        "judge": {
+          "key": "judge",
+          "score": 0.75,
+          "comment": "4/5 (prompt v1): The answer faithfully reports the clarified metric, mortgage_principal_balance, as its own figure with the MetricFlow SQL, which matches the reference, and it invents nothing. The question asked about a trend, however, and the answer gives a single aggregate with no time dimension. It also does not acknowledge that it cannot show a trend, which is a minor responsiveness gap."
+        }
+      },
+      "outputs": {
+        "answer": "MetricFlow result (1 metric(s)):\nmortgage_principal_balance: 62977671.64\n\nSQL:\nSELECT\n  SUM(mortgage_principal_balance) AS mortgage_principal_balance\nFROM (\n  SELECT\n    products_src_10000.lob AS product__lob\n    , account_snapshot_src_10000.mortgage_principal_balance AS mortgage_principal_balance\n  FROM \"contactcenter\".\"marts\".\"f_account_snapshot\" account_snapshot_src_10000\n  LEFT OUTER JOIN\n    \"contactcenter\".\"marts\".\"d_product\" products_src_10000\n  ON\n    account_snapshot_src_10000.product_id = products_src_10000.product_id\n) subq_5\nWHERE product__lob = 'mortgage'",
+        "route": "resolve_metric",
+        "metric_names": [
+          "mortgage_principal_balance"
+        ],
+        "sql": "SELECT\n  SUM(mortgage_principal_balance) AS mortgage_principal_balance\nFROM (\n  SELECT\n    products_src_10000.lob AS product__lob\n    , account_snapshot_src_10000.mortgage_principal_balance AS mortgage_principal_balance\n  FROM \"contactcenter\".\"marts\".\"f_account_snapshot\" account_snapshot_src_10000\n  LEFT OUTER JOIN\n    \"contactcenter\".\"marts\".\"d_product\" products_src_10000\n  ON\n    account_snapshot_src_10000.product_id = products_src_10000.product_id\n) subq_5\nWHERE product__lob = 'mortgage'",
+        "citations": [],
+        "grounded": true
+      }
+    },
+    {
+      "id": "g36",
+      "kind": "call_lookup",
+      "error": null,
+      "results": {
+        "route": {
+          "key": "route",
+          "score": true,
+          "comment": "expected summarize_call, got summarize_call"
+        },
+        "interrupt": {
+          "key": "interrupt",
+          "score": true,
+          "comment": "no interrupt"
+        },
+        "metric": {
+          "key": "metric",
+          "score": null,
+          "comment": ""
+        },
+        "sql": {
+          "key": "sql",
+          "score": null,
+          "comment": ""
+        },
+        "citations": {
+          "key": "citations",
+          "score": true,
+          "comment": "CALL-00109"
+        },
+        "call_id": {
+          "key": "call_id",
+          "score": true,
+          "comment": "expected CALL-00109, cited ['CALL-00109']"
+        },
+        "judge": {
+          "key": "judge",
+          "score": 0.75,
+          "comment": "4/5 (prompt v1): The answer identifies CALL-00109 and matches the reference on date, account_balance category, member MBR-000318 and transferred outcome. It also notes honestly that the transcript does not show the reason for the transfer. The specific balance figures ($4,706.49 outstanding, $1,902.59 available credit) presumably come from the transcript but cannot be checked against the metadata-only reference, so this falls a step short of full confidence."
+        }
+      },
+      "outputs": {
+        "answer": "**Call Summary \u2014 CALL-00109 (2026-03-13)**\n\n- **Member's issue:** Called to check their account balance.\n- **Agent's handling:** Verified the member (Cory Hogan, MBR-000318) and provided the balance details: outstanding balance of $4,706.49 and available credit of $1,902.59 on the account ending in 1268. When asked whether this matched online banking, the agent confirmed it should.\n- **Outcome:** The call was transferred per the call record, though the transcript doesn't indicate the reason for the transfer or show the transfer itself.\n\nSources: CALL-00109",
+        "route": "summarize_call",
+        "metric_names": [],
+        "sql": null,
+        "citations": [
+          "CALL-00109"
+        ],
+        "grounded": true
+      }
+    },
+    {
+      "id": "g48",
+      "kind": "open",
+      "error": null,
+      "results": {
+        "route": {
+          "key": "route",
+          "score": true,
+          "comment": "expected retrieve, got retrieve"
+        },
+        "interrupt": {
+          "key": "interrupt",
+          "score": true,
+          "comment": "no interrupt"
+        },
+        "metric": {
+          "key": "metric",
+          "score": null,
+          "comment": ""
+        },
+        "sql": {
+          "key": "sql",
+          "score": null,
+          "comment": ""
+        },
+        "citations": {
+          "key": "citations",
+          "score": true,
+          "comment": "CALL-00820, CALL-00822, CALL-00187, CALL-00610, CALL-00860"
+        },
+        "call_id": {
+          "key": "call_id",
+          "score": null,
+          "comment": ""
+        },
+        "judge": {
+          "key": "judge",
+          "score": 0.5,
+          "comment": "3/5 (prompt v1): The answer cites concrete call ids and describes the content plausibly: notice confusion, shortage questions, property-tax causes and vague agent scripting. However, it covers only 5 of the 15 escrow_analysis calls without saying it sampled, yet generalizes '1 of 5 resolved' as if it were the category's resolution rate. The surplus-versus-shortage balance analysis is speculation the transcripts may not support."
+        }
+      },
+      "outputs": {
+        "answer": "## Issues on Escrow Analysis Calls\n\n**1. Escrow notice confusion (primary call trigger)**\nEvery member in this set opened with \"I got a notice about my escrow account\" \u2014 the calls are driven by members receiving escrow statements/analysis notices they don't understand and want explained (CALL-00820, CALL-00822, CALL-00187, CALL-00610, CALL-00860).\n\n**2. Shortage concerns**\nMembers' immediate follow-up question on every call was \"Is there a shortage?\" Shortage anxiety is the core emotional driver, even when the actual adjustment turns out to be minor.\n\n**3. Property tax changes as the root cause**\nIn all five calls, the agent attributed the adjustment to property taxes changing. Members appear to be caught off guard by tax-driven payment changes reflected in their escrow analysis.\n\n**4. Vague agent responses may be driving poor outcomes**\nThe agent on these calls gave a nearly identical, non-committal answer (\"a small adjustment... not much, but worth reviewing\") without directly answering the yes/no shortage question or explaining the dollar impact. This may explain why only **1 of 5 calls was resolved**:\n- Escalated: CALL-00822, CALL-00187\n- Unresolved: CALL-00610\n- Transferred: CALL-00860\n- Resolved: CALL-00820\n\n**5. Balance-vs.-narrative mismatch worth investigating**\nOn CALL-00610, the member had an escrow balance of **$5,233.76** against a $3,806.91 monthly payment \u2014 a relatively high balance that could suggest a *surplus* rather than a shortage. The generic \"small adjustment\" script doesn't address surplus scenarios, which may be why that call ended unresolved. Similarly, CALL-00187 ($1,001.07 balance on a $4,420.53 payment) suggests potential shortage pressure that the canned response glossed over, and it was escalated.\n\n**Supervisory takeaway:** The recurring issue isn't the escrow adjustments themselves \u2014 it's that members get notices they can't interpret, and the current response script doesn't clearly confirm whether a shortage exists or quantify the change. Targeted coaching on directly answering the shortage question and walking through the specific dollar adjustment could improve the resolution rate on this call type.\n\nSources: CALL-00820, CALL-00822, CALL-00187, CALL-00610, CALL-00860",
+        "route": "retrieve",
+        "metric_names": [],
+        "sql": null,
+        "citations": [
+          "CALL-00820",
+          "CALL-00822",
+          "CALL-00187",
+          "CALL-00610",
+          "CALL-00860"
+        ],
+        "grounded": true
+      }
+    },
+    {
+      "id": "g18",
+      "kind": "metric",
+      "error": null,
+      "results": {
+        "route": {
+          "key": "route",
+          "score": true,
+          "comment": "expected resolve_metric, got resolve_metric"
+        },
+        "interrupt": {
+          "key": "interrupt",
+          "score": true,
+          "comment": "no interrupt"
+        },
+        "metric": {
+          "key": "metric",
+          "score": true,
+          "comment": "expected ['rate_lock_fallout_pct'], got ['rate_lock_fallout_pct']"
+        },
+        "sql": {
+          "key": "sql",
+          "score": true,
+          "comment": ""
+        },
+        "citations": {
+          "key": "citations",
+          "score": null,
+          "comment": ""
+        },
+        "call_id": {
+          "key": "call_id",
+          "score": null,
+          "comment": ""
+        },
+        "judge": {
+          "key": "judge",
+          "score": 1.0,
+          "comment": "5/5 (prompt v1): The answer resolves to the declared metric rate_lock_fallout_pct and reports it as its own figure (0.366) with the MetricFlow SQL, which matches the reference. It invents nothing and blends nothing. Minor presentation issues remain: the ratio is not converted to a percentage, and the boilerplate wording ('each word maps to N distinct') is a little awkward, but neither materially weakens usability."
+        }
+      },
+      "outputs": {
+        "answer": "Question: \"What is the rate lock fallout percentage?\"\nResolved to 1 declared metric(s) \u2014 there is no single blended number; each word maps to N distinct, auditable metrics:\n\n- rate_lock_fallout_pct \u2014 Share of rate locks that expired without exercising (fall-out) \u2014 a derived ratio.\n\nMetricFlow result (1 metric(s)):\nrate_lock_fallout_pct: 0.366\n\nSQL:\nSELECT\n  CAST(SUM(is_expired) AS DOUBLE PRECISION) / CAST(NULLIF(SUM(1), 0) AS DOUBLE PRECISION) AS rate_lock_fallout_pct\nFROM \"contactcenter\".\"marts\".\"f_rate_lock\" rate_locks_src_10000",
+        "route": "resolve_metric",
+        "metric_names": [
+          "rate_lock_fallout_pct"
+        ],
+        "sql": "SELECT\n  CAST(SUM(is_expired) AS DOUBLE PRECISION) / CAST(NULLIF(SUM(1), 0) AS DOUBLE PRECISION) AS rate_lock_fallout_pct\nFROM \"contactcenter\".\"marts\".\"f_rate_lock\" rate_locks_src_10000",
+        "citations": [],
+        "grounded": true
+      }
+    },
+    {
+      "id": "g32",
+      "kind": "call_lookup",
+      "error": null,
+      "results": {
+        "route": {
+          "key": "route",
+          "score": true,
+          "comment": "expected summarize_call, got summarize_call"
+        },
+        "interrupt": {
+          "key": "interrupt",
+          "score": true,
+          "comment": "no interrupt"
+        },
+        "metric": {
+          "key": "metric",
+          "score": null,
+          "comment": ""
+        },
+        "sql": {
+          "key": "sql",
+          "score": null,
+          "comment": ""
+        },
+        "citations": {
+          "key": "citations",
+          "score": true,
+          "comment": "CALL-00003"
+        },
+        "call_id": {
+          "key": "call_id",
+          "score": true,
+          "comment": "expected CALL-00003, cited ['CALL-00003']"
+        },
+        "judge": {
+          "key": "judge",
+          "score": 1.0,
+          "comment": "5/5 (prompt v1): The answer correctly states that CALL-00003 was resolved, matching the reference, and its account-balance category and member ID MBR-000401 are also consistent. The member name and balance figures are not in the reference, but they plausibly come from the transcript and contradict nothing. The call is clearly identified and the question is directly answered."
+        }
+      },
+      "outputs": {
+        "answer": "**Call Summary \u2014 CALL-00003 (Account Balance Inquiry)**\n\n- **Member's issue:** Member (Timothy White) called to check his account balance.\n- **Agent's handling:** After verifying member number MBR-000401, the agent provided the ledger balance ($12,730.49). When the member asked if that matched online banking, the agent clarified that his available balance for today was $12,596.52 \u2014 distinguishing it from the ledger balance.\n- **Outcome:** Resolved. The member received both balance figures and the call ended without further issues.\n\nSources: CALL-00003",
+        "route": "summarize_call",
+        "metric_names": [],
+        "sql": null,
+        "citations": [
+          "CALL-00003"
+        ],
+        "grounded": true
+      }
+    },
+    {
+      "id": "g02",
+      "kind": "ambiguous",
+      "error": null,
+      "results": {
+        "route": {
+          "key": "route",
+          "score": true,
+          "comment": "expected resolve_metric, got resolve_metric"
+        },
+        "interrupt": {
+          "key": "interrupt",
+          "score": true,
+          "comment": "\"rate\""
+        },
+        "metric": {
+          "key": "metric",
+          "score": true,
+          "comment": "expected ['average_deposit_apy'], got ['average_deposit_apy']"
+        },
+        "sql": {
+          "key": "sql",
+          "score": true,
+          "comment": ""
+        },
+        "citations": {
+          "key": "citations",
+          "score": null,
+          "comment": ""
+        },
+        "call_id": {
+          "key": "call_id",
+          "score": null,
+          "comment": ""
+        },
+        "judge": {
+          "key": "judge",
+          "score": 1.0,
+          "comment": "5/5 (prompt v1): The agent clarified the ambiguous term, then reported average_deposit_apy as a single figure with the MetricFlow-generated SQL, with no blended or invented numbers. The banking filter appears to be part of the metric definition. The answer is faithful, responsive and usable, though terse."
+        }
+      },
+      "outputs": {
+        "answer": "MetricFlow result (1 metric(s)):\naverage_deposit_apy: 1.9372905660377358\n\nSQL:\nSELECT\n  AVG(average_deposit_apy) AS average_deposit_apy\nFROM (\n  SELECT\n    products_src_10000.lob AS product__lob\n    , account_snapshot_src_10000.deposit_apy AS average_deposit_apy\n  FROM \"contactcenter\".\"marts\".\"f_account_snapshot\" account_snapshot_src_10000\n  LEFT OUTER JOIN\n    \"contactcenter\".\"marts\".\"d_product\" products_src_10000\n  ON\n    account_snapshot_src_10000.product_id = products_src_10000.product_id\n) subq_5\nWHERE product__lob = 'banking'",
+        "route": "resolve_metric",
+        "metric_names": [
+          "average_deposit_apy"
+        ],
+        "sql": "SELECT\n  AVG(average_deposit_apy) AS average_deposit_apy\nFROM (\n  SELECT\n    products_src_10000.lob AS product__lob\n    , account_snapshot_src_10000.deposit_apy AS average_deposit_apy\n  FROM \"contactcenter\".\"marts\".\"f_account_snapshot\" account_snapshot_src_10000\n  LEFT OUTER JOIN\n    \"contactcenter\".\"marts\".\"d_product\" products_src_10000\n  ON\n    account_snapshot_src_10000.product_id = products_src_10000.product_id\n) subq_5\nWHERE product__lob = 'banking'",
+        "citations": [],
+        "grounded": true
+      }
+    },
+    {
+      "id": "g08",
+      "kind": "ambiguous",
+      "error": null,
+      "results": {
+        "route": {
+          "key": "route",
+          "score": true,
+          "comment": "expected resolve_metric, got resolve_metric"
+        },
+        "interrupt": {
+          "key": "interrupt",
+          "score": true,
+          "comment": "\"lcv\""
+        },
+        "metric": {
+          "key": "metric",
+          "score": true,
+          "comment": "expected ['member_lifetime_value'], got ['member_lifetime_value']"
+        },
+        "sql": {
+          "key": "sql",
+          "score": true,
+          "comment": ""
+        },
+        "citations": {
+          "key": "citations",
+          "score": null,
+          "comment": ""
+        },
+        "call_id": {
+          "key": "call_id",
+          "score": null,
+          "comment": ""
+        },
+        "judge": {
+          "key": "judge",
+          "score": 1.0,
+          "comment": "5/5 (prompt v1): The answer reports the chosen member_lifetime_value metric as its own figure, together with the MetricFlow-generated SQL, which matches the reference. Nothing is blended or invented. The only gap is that the raw number is unformatted and unlabeled, with no units or interpretation for the supervisor."
+        }
+      },
+      "outputs": {
+        "answer": "MetricFlow result (1 metric(s)):\nmember_lifetime_value: 760635.2454339623\n\nSQL:\nWITH sma_10005_cte AS (\n  SELECT\n    fee_revenue_amount AS __total_fee_revenue\n    , interest_earned_amount AS __total_interest_income\n    , member_id AS __active_members\n  FROM \"contactcenter\".\"marts\".\"f_transaction\" transactions_src_10000\n)\n\nSELECT\n  relationship_revenue * 24 / active_members AS member_lifetime_value\nFROM (\n  SELECT\n    MAX(subq_6.relationship_revenue) AS relationship_revenue\n    , MAX(subq_11.active_members) AS active_members\n  FROM (\n    SELECT\n      total_fee_revenue + total_interest_income AS relationship_revenue\n    FROM (\n      SELECT\n        SUM(__total_fee_revenue) AS total_fee_revenue\n        , SUM(__total_interest_income) AS total_interest_income\n      FROM sma_10005_cte\n    ) subq_5\n  ) subq_6\n  CROSS JOIN (\n    SELECT\n      COUNT(DISTINCT __active_members) AS active_members\n    FROM sma_10005_cte\n  ) subq_11\n) subq_12",
+        "route": "resolve_metric",
+        "metric_names": [
+          "member_lifetime_value"
+        ],
+        "sql": "WITH sma_10005_cte AS (\n  SELECT\n    fee_revenue_amount AS __total_fee_revenue\n    , interest_earned_amount AS __total_interest_income\n    , member_id AS __active_members\n  FROM \"contactcenter\".\"marts\".\"f_transaction\" transactions_src_10000\n)\n\nSELECT\n  relationship_revenue * 24 / active_members AS member_lifetime_value\nFROM (\n  SELECT\n    MAX(subq_6.relationship_revenue) AS relationship_revenue\n    , MAX(subq_11.active_members) AS active_members\n  FROM (\n    SELECT\n      total_fee_revenue + total_interest_income AS relationship_revenue\n    FROM (\n      SELECT\n        SUM(__total_fee_revenue) AS total_fee_revenue\n        , SUM(__total_interest_income) AS total_interest_income\n      FROM sma_10005_cte\n    ) subq_5\n  ) subq_6\n  CROSS JOIN (\n    SELECT\n      COUNT(DISTINCT __active_members) AS active_members\n    FROM sma_10005_cte\n  ) subq_11\n) subq_12",
+        "citations": [],
+        "grounded": true
+      }
+    },
+    {
+      "id": "g12",
+      "kind": "metric",
+      "error": null,
+      "results": {
+        "route": {
+          "key": "route",
+          "score": true,
+          "comment": "expected resolve_metric, got resolve_metric"
+        },
+        "interrupt": {
+          "key": "interrupt",
+          "score": true,
+          "comment": "no interrupt"
+        },
+        "metric": {
+          "key": "metric",
+          "score": true,
+          "comment": "expected ['call_volume'], got ['call_volume']"
+        },
+        "sql": {
+          "key": "sql",
+          "score": true,
+          "comment": ""
+        },
+        "citations": {
+          "key": "citations",
+          "score": null,
+          "comment": ""
+        },
+        "call_id": {
+          "key": "call_id",
+          "score": null,
+          "comment": ""
+        },
+        "judge": {
+          "key": "judge",
+          "score": 1.0,
+          "comment": "5/5 (prompt v1): The answer resolves to the declared call_volume metric and reports a single figure (1250) with its MetricFlow SQL, matching the reference without blending or inventing numbers. The boilerplate wording is slightly awkward ('each word maps to N distinct', 'meaning 1 of 4'), but nothing is unfaithful and the answer is usable."
+        }
+      },
+      "outputs": {
+        "answer": "Question: \"What was our call volume?\"\nResolved to 1 declared metric(s) \u2014 there is no single blended number; each word maps to N distinct, auditable metrics:\n\n- call_volume \u2014 Number of interactions (call volume \u2014 \"volume\" meaning 1 of 4).\n\nMetricFlow result (1 metric(s)):\ncall_volume: 1250\n\nSQL:\nSELECT\n  SUM(1) AS call_volume\nFROM \"contactcenter\".\"marts\".\"f_interaction\" interactions_src_10000",
+        "route": "resolve_metric",
+        "metric_names": [
+          "call_volume"
+        ],
+        "sql": "SELECT\n  SUM(1) AS call_volume\nFROM \"contactcenter\".\"marts\".\"f_interaction\" interactions_src_10000",
+        "citations": [],
+        "grounded": true
+      }
+    }
+  ]
+}
