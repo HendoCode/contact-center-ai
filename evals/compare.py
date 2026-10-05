@@ -1,7 +1,11 @@
 """Before/after comparison of two `make evals-live` result files.
 
-    make evals-compare A=results/evals/<before>.json B=results/evals/<after>.json
-    python -m evals.compare <before.json> <after.json>     # B may be omitted: LATEST
+    make evals-compare A=open-pgvector-vector B=open-lance-hybrid   # run names
+    make evals-compare A=latest~1 B=latest                          # the two newest runs
+    make evals-compare A=results/evals/baseline-2026-10-05-pre-fix.json   # a path; B: latest
+
+A and B are each a run name (the newest results file of that `--run`), `latest` or
+`latest~N` (N runs before the newest), or a path. It prints which file each resolved to.
 
 Prints what each side ran (question set, groups, agent model, judge model, judge prompt,
 golden set hash, item count); it refuses two runs over different question sets (golden vs
@@ -16,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -168,23 +173,64 @@ def compare(a: dict, b: dict, name_a: str = "A", name_b: str = "B", allow_datase
     return "\n\n".join(parts)
 
 
+RESULTS_DIR = LATEST_PATH.parent
+# <UTC date-time>_<run>_<short sha>[-n].json, as evals.run.result_path writes them
+_RUN_FILE = re.compile(r"^(\d{4}-\d{2}-\d{2}T\d{6}Z)_(.+)_([0-9a-f]{7})(?:-\d+)?\.json$")
+
+
+def run_files(results_dir: Path | None = None) -> list[tuple[str, str, Path]]:
+    """(timestamp, run name, path) of every timestamped results file, newest first."""
+    out = []
+    for p in (results_dir or RESULTS_DIR).glob("*.json"):
+        m = _RUN_FILE.match(p.name)
+        if m:
+            out.append((m.group(1), m.group(2), p))
+    return sorted(out, key=lambda t: (t[0], t[2].name), reverse=True)
+
+
 def latest(results_dir: Path | None = None) -> Path:
-    pointer = (results_dir / LATEST_PATH.name) if results_dir else LATEST_PATH
-    if not pointer.exists():
-        raise SystemExit(f"no {pointer.relative_to(REPO_ROOT) if pointer.is_relative_to(REPO_ROOT) else pointer}:"
-                         " pass B=<file>, or run make evals-live first")
-    return pointer.parent / pointer.read_text().strip()
+    return resolve("latest", results_dir)
+
+
+def resolve(spec: str, results_dir: Path | None = None) -> Path:
+    """A run name, `latest`, `latest~N` or a path -> one results file; one clear line if not."""
+    results_dir = results_dir or RESULTS_DIR
+    path = Path(spec)
+    if path.suffix == ".json" and path.exists():
+        return path
+    if (results_dir / spec).is_file():
+        return results_dir / spec
+    files = run_files(results_dir)
+    m = re.fullmatch(r"latest(?:~(\d+))?", spec)
+    if m:
+        n = int(m.group(1) or 0)
+        if n >= len(files):
+            raise SystemExit(f"evals-compare: {spec}: only {len(files)} run(s) in {results_dir.name}/")
+        return files[n][2]
+    named = [f for f in files if f[1] == spec]
+    if not named:
+        names = sorted({f[1] for f in files})
+        raise SystemExit(f"evals-compare: no run named {spec!r}; runs: {', '.join(names) or 'none'}")
+    if len(named) > 1 and named[0][0][:-3] == named[1][0][:-3]:  # same minute: ambiguous
+        same = ", ".join(f[2].name for f in named if f[0][:-3] == named[0][0][:-3])
+        raise SystemExit(f"evals-compare: {spec!r} has more than one run in the same minute ({same}); "
+                         "pass one of these file names")
+    return named[0][2]
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Compare two evals-live result files.")
-    parser.add_argument("before", type=Path)
-    parser.add_argument("after", type=Path, nargs="?", help="default: the file results/evals/LATEST names")
+    parser.add_argument("before", help="run name, latest, latest~N, or a results file path")
+    parser.add_argument("after", nargs="?", default="latest", help="same forms; default latest")
     parser.add_argument("--allow-different-datasets", action="store_true",
                         help="print a golden run beside a holdout run (no score is a before/after)")
     args = parser.parse_args(argv)
-    after = args.after or latest()
-    print(compare(load(args.before), load(after), str(args.before), str(after), args.allow_different_datasets))
+    before, after = resolve(args.before), resolve(args.after)
+    for label, spec, path in (("A", args.before, before), ("B", args.after, after)):
+        shown = path.relative_to(REPO_ROOT) if path.is_relative_to(REPO_ROOT) else path
+        print(f"{label}: {spec} -> {shown}")
+    print()
+    print(compare(load(before), load(after), before.name, after.name, args.allow_different_datasets))
     return 0
 
 

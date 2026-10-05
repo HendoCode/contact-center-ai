@@ -8,7 +8,7 @@ python -m evals.datasets.build_golden --check       # exit 1 if the golden set i
 make evals-live ARGS="--limit 5"                    # live smoke run: 5 questions (costs money)
 make evals-live                                     # live: all 51, real models and tools, to LangSmith
 make evals-live DRY=1                               # the live plan and cost estimate; resolves and runs nothing
-make evals-compare A=results/evals/<before>.json    # before/after table against the latest run
+make evals-compare A=<run name>                     # before/after table: that run against the latest
 make evals-export EXP=<LangSmith experiment>       # per-item results of an older run, read-only
 make evals-live ARGS="--dataset holdout"            # the held-out set (16 questions)
 LLM_MODEL=<openrouter id> make evals-live ARGS="--group open --run open-<model>"   # one group, another agent model
@@ -103,7 +103,7 @@ make evals-live ARGS="--dataset holdout --run holdout-glm-5.3-flash"
 LLM_MODEL=deepseek/deepseek-v4-pro    make evals-live ARGS="--group open --run open-deepseek-v4-pro"
 LLM_MODEL=moonshotai/kimi-k2.7-code   make evals-live ARGS="--group open --run open-kimi-k2.7-code"
 LLM_MODEL=anthropic/claude-sonnet-5.5 make evals-live ARGS="--group open --run open-claude-sonnet-5.5"
-make evals-compare A=results/evals/<post-env-fix full run>.json B=results/evals/<open-... run>.json
+make evals-compare A=post-env-fix B=open-deepseek-v4-pro    # run names; each resolves to its newest file
 ```
 
 ## How the agent searches, and trying another search
@@ -117,25 +117,25 @@ Two settings now control it, with today's behavior as the default:
 
 Every results file records `retriever_backend`, `retrieval_mode` and `retrieval_k`, and `make evals-compare` shows them and flags a change. Runs recorded before this count as pgvector, vector, 5.
 
-The experiment, with the same agent (`z-ai/glm-5.3-flash`), the same judge and only the open group:
+The experiment, with the same agent (`z-ai/glm-5.3-flash`), the same judge and only the open group, is one command:
 
 ```bash
-make evals-live ARGS="--group open --run open-pgvector-vector"                     # pgvector, vector, k=5
-RETRIEVER_BACKEND=lancedb make ingest                                              # LanceDB store; reuses .cache/embeddings/
-RETRIEVER_BACKEND=lancedb AGENT_RETRIEVAL_MODE=hybrid make evals-live ARGS="--group open --run open-lance-hybrid"
-make evals-compare A=results/evals/<open-pgvector-vector>.json B=results/evals/<open-lance-hybrid>.json
+make evals-retrieval-experiment DRY=1       # the plan and every run's estimate; runs nothing
+make evals-retrieval-experiment             # run it
+make evals-retrieval-experiment K10=1       # also LanceDB hybrid with k=10
 ```
 
-Each run is estimated at $0.11 to $0.27 (12 questions; the judge is most of it). `make` adds the `lance` dependency group whenever `RETRIEVER_BACKEND=lancedb`. A third run with `AGENT_RETRIEVAL_K=10` tests coverage; it puts more transcript text in front of the agent, so allow up to about $0.35.
+It prints the total estimate first, then in order: the open group on pgvector with vector search (`--run open-pgvector-vector`), the LanceDB ingest (`RETRIEVER_BACKEND=lancedb make ingest`, reusing `.cache/embeddings/`), the open group on LanceDB with hybrid search (`--run open-lance-hybrid`), and `make evals-compare A=open-pgvector-vector B=open-lance-hybrid`. Each run prints its own estimate ($0.11 to $0.27 each; the judge is most of it) and the first failing step stops it with the fix. `K10=1` adds `open-lance-hybrid-k10` and a k=5 against k=10 comparison; it reads twice the transcripts, so allow up to about $0.35 for it. `make` adds the `lance` dependency group whenever `RETRIEVER_BACKEND=lancedb`. Before reading the deltas, check that each table's `tool err` row reads 0.
 
 ## Comparing runs: `make evals-compare`
 
 ```bash
-make evals-compare A=results/evals/<before>.json B=results/evals/<after>.json
-make evals-compare A=results/evals/<before>.json            # B: the file LATEST names
+make evals-compare A=open-pgvector-vector B=open-lance-hybrid    # run names: the newest file of each --run
+make evals-compare A=latest~1 B=latest                            # the two newest runs
+make evals-compare A=results/evals/baseline-2026-10-05-pre-fix.json   # a file path also works; B: latest
 ```
 
-It prints what each side ran (agent model, judge model, judge prompt, golden set hash, `--limit`), then one table per group (`all`, then each kind) with every check's score before, after, and the delta. It warns when any of those differ. A different judge model or prompt makes the judge column incomparable; a different golden set or limit makes every column incomparable; a different agent model is what the delta then measures.
+It prints which file each side resolved to (a run name means the newest file of that `--run`; two of the same name within one minute are refused as ambiguous), then what each side ran (agent model, judge model, judge prompt, golden set hash, `--limit`), then one table per group (`all`, then each kind) with every check's score before, after, and the delta. It warns when any of those differ. A different judge model or prompt makes the judge column incomparable; a different golden set or limit makes every column incomparable; a different agent model is what the delta then measures.
 
 For a run made before results files kept `items`, `make evals-export EXP=<experiment>` reads that LangSmith experiment (read-only) and writes the same per-item detail to `results/evals/items/<experiment>.json`: golden id and kind, inputs, the agent's outputs, the run error, and every evaluator's score and comment, including the judge's reasoning. It needs `LANGSMITH_API_KEY`, taken from 1Password when `LANGSMITH_KEY_REF` is set and otherwise from the shell or `.env`, and it never overwrites a file (`OUT=<file>` picks another).
 
