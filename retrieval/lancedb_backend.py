@@ -307,6 +307,6 @@ class LanceDBRetriever:
         r = rows[0]
         return Hit(call_id=r["call_id"], text=r["text"], score=1.0, metadata=json.loads(r["metadata"]))
 
-    def count(self) -> int:
+    def count(self, where: dict | None = None) -> int:
         table = self._table()
-        return 0 if table is None else table.count_rows()
+        return 0 if table is None else table.count_rows(translate_where(where))

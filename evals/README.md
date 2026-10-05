@@ -189,3 +189,16 @@ Classified:
 
 The golden and held-out sets, the judge prompt and the answer text are unchanged.
 
+### 2026-10-05 open answers now state their sample
+
+Neither a stronger agent model nor LanceDB hybrid search lifted the open group (pgvector vector 0.62, LanceDB hybrid 0.48, with 0 tool errors), which left the framing finding above: answers drawn from 5 retrieved calls described them as the whole category. The search tool (`rag_query`) now counts each retrieved category in the same store the search used (`Retriever.count(where)`, pgvector and LanceDB) and opens every answer with a plain statement of what it read, for example `Based on a sample of 5 retrieved calls: 5 of 143 calls in fraud_dispute.` The prompt also tells the model the transcripts are a sample and not to say "all calls". The sizes come from the store, never from the evals' references; a size that cannot be counted is reported as unavailable. The golden and held-out sets, the judge prompt and the references are unchanged.
+
+To measure it, rerun the open group on both sets and compare by run name ($0.11 to $0.27 and $0.04 to $0.09):
+
+```bash
+make evals-live ARGS="--group open --run open-framing"
+make evals-live ARGS="--dataset holdout --group open --run holdout-open-framing"
+make evals-compare A=open-pgvector-vector B=open-framing
+make evals-compare A=holdout-glm-5.3-flash B=holdout-open-framing     # read the open table
+```
+
