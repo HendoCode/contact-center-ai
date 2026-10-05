@@ -67,21 +67,25 @@ render() {
   while read -r name ref; do printf '%s=%s\n' "$name" "${!ref}"; done < <(template_pairs "$TEMPLATE")
 }
 
-# The --limit N the command passes to evals.run, if any.
-limit_arg() {
-  local i
-  for ((i = 0; i < ${#CMD[@]}; i++)); do
+# The value of option $1 (e.g. --limit) the command passes to evals.run, if any. Only the
+# words after `evals.run` count, so uv's own `--group agent` is never read as an eval group.
+cmd_opt() {
+  local i start=0
+  for ((i = 0; i < ${#CMD[@]}; i++)); do [[ "${CMD[i]}" == evals.run ]] && start=$((i + 1)); done
+  for ((i = start; i < ${#CMD[@]}; i++)); do
     case "${CMD[i]}" in
-      --limit) printf '%s\n' "${CMD[i + 1]:-}"; return ;;
-      --limit=*) printf '%s\n' "${CMD[i]#--limit=}"; return ;;
+      "$1") printf '%s\n' "${CMD[i + 1]:-}"; return ;;
+      "$1"=*) printf '%s\n' "${CMD[i]#"$1"=}"; return ;;
     esac
   done
 }
 
 preflight() {
-  local limit args=()
-  limit="$(limit_arg)"
-  [[ -n "$limit" ]] && args+=(--limit "$limit")
+  local opt value args=()
+  for opt in --limit --dataset --group; do
+    value="$(cmd_opt "$opt")"
+    [[ -n "$value" ]] && args+=("$opt" "$value")
+  done
   (cd "$ROOT" && "$UV" run -q --group agent python -m evals.preflight "${args[@]}" "$@")
 }
 
