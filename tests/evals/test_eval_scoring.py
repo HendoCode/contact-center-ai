@@ -144,5 +144,5 @@ def test_summarize_counts_applicable_items_only():
         {"kind": "metric", "results": {"sql": {"score": False}, "citations": {"score": None}}},
     ]
     table = summarize(rows, ["sql", "citations"])
-    assert table["all"] == {"n": 2, "sql": 0.5, "citations": None}
+    assert table["all"] == {"n": 2, "tool_errors": 0, "sql": 0.5, "citations": None}
     assert set(table) == {"all", "metric"}

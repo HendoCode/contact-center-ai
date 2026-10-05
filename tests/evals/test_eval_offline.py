@@ -141,6 +141,7 @@ def test_live_rows_are_read_from_langsmith_results():
     assert eval_run._row(result) == {
         "id": "g01", "kind": "ambiguous", "error": None,
         "results": {"route": {"key": "route", "score": True, "comment": ""}},
+        "tool_error": None,
         "outputs": {"answer": "Rate is 4.1%.", "route": "ask_the_analyst", "metric_names": None,
                     "sql": "SELECT 1", "citations": None, "grounded": None},
     }

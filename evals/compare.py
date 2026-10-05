@@ -44,6 +44,25 @@ class DifferentDatasets(SystemExit):
     """Two runs over different question sets (golden vs holdout) have no before/after."""
 
 
+TOOL_ERROR_MARKERS = ("TOOL ERROR (", "query_metric error:", "is already defined for this MetaData instance")
+
+
+def tool_errors(record: dict) -> dict[str, int] | None:
+    """Items whose answer is a tool failure, per group (and "all"). Counted from `items`
+    when the file has them, so runs recorded before the count existed are covered too."""
+    items = record.get("items")
+    if items is not None:
+        counts: dict[str, int] = {"all": 0}
+        for it in items:
+            answer = (it.get("outputs") or {}).get("answer") or ""
+            hit = bool(it.get("tool_error")) or any(m in answer for m in TOOL_ERROR_MARKERS)
+            counts["all"] += hit
+            counts[it.get("kind")] = counts.get(it.get("kind"), 0) + hit
+        return counts
+    rows = {g: r.get("tool_errors") for g, r in record["metrics"].items() if isinstance(r, dict)}
+    return rows if any(v is not None for v in rows.values()) else None
+
+
 def load(path: Path) -> dict:
     record = json.loads(Path(path).read_text())
     if record.get("area") != "evals":
@@ -102,12 +121,17 @@ def checks(a: dict, b: dict) -> list[str]:
     return keys
 
 
-def group_table(group: str, a: dict, b: dict, keys: list[str]) -> str:
+def group_table(group: str, a: dict, b: dict, keys: list[str],
+                te: tuple[dict | None, dict | None] = (None, None)) -> str:
     ra, rb = a["metrics"].get(group) or {}, b["metrics"].get(group) or {}
     lines = [f"{group}  (n {ra.get('n', 0)} -> {rb.get('n', 0)})",
              f"  {'check':<10} {'before':>7} {'after':>7} {'delta':>7}"]
     for k in keys:
         lines.append(f"  {k:<10} {_fmt(ra.get(k)):>7} {_fmt(rb.get(k)):>7} {_delta(ra.get(k), rb.get(k)):>7}")
+    ta, tb = (t.get(group) if t else None for t in te)
+    if ta or tb:
+        show = lambda v: "?" if v is None else str(v)  # noqa: E731
+        lines.append(f"  {'tool err':<10} {show(ta):>7} {show(tb):>7}   items whose answer is a tool failure")
     return "\n".join(lines)
 
 
@@ -129,10 +153,15 @@ def compare(a: dict, b: dict, name_a: str = "A", name_b: str = "B", allow_datase
     warn = warnings(a, b)
     if warn:
         parts.append("\n".join(warn))
-    keys = checks(a, b)
+    keys = [k for k in checks(a, b) if k != "tool_errors"]
+    te = (tool_errors(a), tool_errors(b))
+    for name, counts in ((name_a, te[0]), (name_b, te[1])):
+        if counts and counts.get("all"):
+            parts.append(f"WARNING: {name} has {counts['all']} item(s) whose answer is a tool failure; "
+                         "their scores measure the failure, not the agent")
     groups = [g for g in dict.fromkeys([*a["metrics"], *b["metrics"]])
               if isinstance(a["metrics"].get(g, b["metrics"].get(g)), dict)]
-    parts += [group_table(g, a, b, keys) for g in groups]
+    parts += [group_table(g, a, b, keys, te) for g in groups]
     ea, eb = a["metrics"].get("errors"), b["metrics"].get("errors")
     if ea is not None or eb is not None:
         parts.append(f"errors: {ea} -> {eb}")
