@@ -7,6 +7,8 @@ check prints one clear message and the run stops at the first failure:
 
 - the agent's model differs from the judge's (the run itself refuses too, but only after
   loading the corpus);
+- olap/dbt/target/semantic_manifest.json was built for the local Postgres target, not by
+  a Snowflake or Databricks build (which made every metric answer a SQL error);
 - Postgres is reachable and the transcripts are embedded in it (the agent searches them),
   when RETRIEVER_BACKEND is pgvector;
 - Ollama answers and has the embedding model (pulled once if missing), when
@@ -175,9 +177,20 @@ def check_ollama(base_url: str, model: str, client=None) -> str:
     return f"Ollama reachable at {base_url}, {model} present"
 
 
+def check_manifest() -> str:
+    """The semantic manifest `mf` reads is built for the local Postgres the metric tool queries."""
+    from ccai_mcp.metrics import LOCAL_ADAPTER, manifest_problem
+
+    problem = manifest_problem()
+    if problem:
+        raise PreflightError(problem)
+    return f"semantic manifest built for {LOCAL_ADAPTER}"
+
+
 def run_checks(env: os._Environ | dict = os.environ) -> Iterator[str]:
     """Each check in turn, yielding its result line; the first failure raises."""
     yield check_models_differ()
+    yield check_manifest()
     if env.get("RETRIEVER_BACKEND", "pgvector").lower() == "pgvector":
         yield check_postgres(env.get("DATABASE_URL", DEFAULT_DATABASE_URL),
                              env.get("COLLECTION_NAME", "call_transcripts"))

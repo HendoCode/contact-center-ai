@@ -103,9 +103,11 @@ load-databricks:
 	$(call WAREHOUSE_RUN,databricks) uv run --group dbt --group databricks python -m olap.dbt.loaders databricks
 
 # dbt build on a warehouse target, settings from 1Password: make dbt-build WAREHOUSE=snowflake
+# Artifacts go to olap/dbt/target/<warehouse>/, so the dev target/semantic_manifest.json that
+# the metric tools (mf) read on local Postgres is never overwritten with warehouse SQL.
 dbt-build:
 	@case "$(WAREHOUSE)" in snowflake|databricks) ;; *) echo "usage: make dbt-build WAREHOUSE=snowflake|databricks" >&2; exit 2 ;; esac
-	$(call WAREHOUSE_RUN,$(WAREHOUSE)) uv run --group dbt --group $(WAREHOUSE) dbt build --project-dir olap/dbt --profiles-dir olap/dbt --target $(WAREHOUSE)
+	$(call WAREHOUSE_RUN,$(WAREHOUSE)) uv run --group dbt --group $(WAREHOUSE) dbt build --project-dir olap/dbt --profiles-dir olap/dbt --target $(WAREHOUSE) --target-path target/$(WAREHOUSE)
 
 load-dry-run:
 	$(PYTHON) -m olap.dbt.loaders snowflake --dry-run

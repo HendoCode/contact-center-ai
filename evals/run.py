@@ -252,6 +252,21 @@ def sync_dataset(client, items: list[dict], name: str) -> None:
         client.create_examples(dataset_name=name, examples=examples)
 
 
+_HOME_RE = re.compile(r"/(?:home|Users)/[^/\s'\"`]+/")
+
+
+def redact_home(value):
+    """Replace /home/<user>/ and /Users/<user>/ with ~/ in every string of `value`: results
+    files are committed to a public repo, and tool errors quote absolute paths."""
+    if isinstance(value, str):
+        return _HOME_RE.sub("~/", value)
+    if isinstance(value, list):
+        return [redact_home(v) for v in value]
+    if isinstance(value, dict):
+        return {k: redact_home(v) for k, v in value.items()}
+    return value
+
+
 def _row(result_row: dict) -> dict:
     example = result_row["example"]
     results = {
@@ -259,9 +274,9 @@ def _row(result_row: dict) -> dict:
         for r in result_row["evaluation_results"]["results"]
     }
     outputs = getattr(result_row["run"], "outputs", None) or {}
-    return {"id": example.metadata["golden_id"], "kind": example.metadata["kind"],
-            "error": result_row["run"].error, "results": results,
-            "outputs": {k: outputs.get(k) for k in OUTPUT_KEYS}}
+    return redact_home({"id": example.metadata["golden_id"], "kind": example.metadata["kind"],
+                        "error": result_row["run"].error, "results": results,
+                        "outputs": {k: outputs.get(k) for k in OUTPUT_KEYS}})
 
 
 def result_path(run: str, sha: str, now: datetime | None = None, out_dir: Path | None = None) -> Path:

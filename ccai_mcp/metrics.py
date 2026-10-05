@@ -50,6 +50,34 @@ def _mf_binary() -> str:
     return "mf"
 
 
+# `mf` reads target/semantic_manifest.json and queries the profile's default target, dev
+# (Postgres). A warehouse build that wrote target/ would leave Snowflake or Databricks SQL
+# there (Databricks quotes with backticks) and every metric query would fail on Postgres.
+LOCAL_ADAPTER = "postgres"
+PARSE_HINT = "run 'cd olap/dbt && uv run --group dbt dbt parse' to rebuild it for the local Postgres target"
+
+
+def manifest_problem(dbt_dir: Path | None = None) -> str | None:
+    """Why `mf` cannot query local Postgres with the current target/ artifacts, or None."""
+    target = (dbt_dir or DBT_DIR) / "target"
+    semantic = target / "semantic_manifest.json"
+    if not semantic.exists():
+        return f"no {semantic.relative_to(REPO_ROOT)}: {PARSE_HINT}"
+    adapter = None
+    manifest = target / "manifest.json"
+    if manifest.exists():
+        try:
+            adapter = json.loads(manifest.read_text()).get("metadata", {}).get("adapter_type")
+        except (OSError, ValueError):
+            adapter = None
+    if adapter is None and "`" in semantic.read_text():
+        adapter = "databricks"  # backtick-quoted relation names; Postgres and Snowflake use "
+    if adapter and adapter != LOCAL_ADAPTER:
+        return (f"{semantic.relative_to(REPO_ROOT)} was built for {adapter}, but metric queries "
+                f"run on the local {LOCAL_ADAPTER}: {PARSE_HINT}")
+    return None
+
+
 def run_metricflow(args: list[str]) -> str:
     """Run `mf` from the dbt project dir and return cleaned stdout."""
     completed = subprocess.run(
@@ -144,6 +172,10 @@ def query_metric_raw(
         base += ["--group-by", ",".join(_as_list(group_by))]
     if limit is not None:
         base += ["--limit", str(int(limit))]
+
+    problem = manifest_problem()
+    if problem:
+        raise RuntimeError(problem)
 
     with tempfile.TemporaryDirectory() as td:
         csv_path = os.path.join(td, "metricflow_result.csv")

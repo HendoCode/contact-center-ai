@@ -36,6 +36,7 @@ def fake():
     feedback = [
         NS(run_id="r2", key="sql", score=False, comment="answer text lacks the SQL"),
         NS(run_id="r2", key="judge", score=0.25, comment="Terse: gives a number with no explanation."),
+        NS(run_id="r1", key="judge", score=0.0, comment="Error text from /home/someone/repo/olap/dbt."),
         NS(run_id="r1", key="route", score=True, comment=None),
     ]
     examples = {"e1": NS(metadata={"golden_id": "g01", "kind": "ambiguous"}),
@@ -52,7 +53,8 @@ def test_export_has_every_item_with_outputs_scores_and_judge_reasoning():
     assert first == {"id": "g01", "kind": "ambiguous", "inputs": {"question": "rate?"},
                      "error": "TimeoutError: x",
                      "outputs": dict.fromkeys(("answer", "route", "metric_names", "sql", "citations", "grounded")),
-                     "results": {"route": {"key": "route", "score": True, "comment": ""}}}
+                     "results": {"judge": {"key": "judge", "score": 0.0, "comment": "Error text from ~/repo/olap/dbt."},
+                                 "route": {"key": "route", "score": True, "comment": ""}}}
     assert second["id"] == "g12"
     assert second["outputs"]["sql"] == "SELECT count(*) FROM calls"
     assert "messages" not in second["outputs"]

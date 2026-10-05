@@ -75,9 +75,15 @@ loaders below. On Postgres the sources are read from `public`; on Snowflake and 
 `SNOWFLAKE_RAW_SCHEMA` / `DATABRICKS_RAW_SCHEMA` (default `raw`) in the target's database or catalog.
 
 ```bash
-dbt parse --target snowflake      # offline: renders the profile, connects to nothing
-dbt build --target snowflake      # needs the loaded data and a running warehouse
+dbt parse --target snowflake --target-path target/snowflake   # offline: renders the profile, connects to nothing
+dbt build --target snowflake --target-path target/snowflake   # needs the loaded data and a running warehouse
 ```
+
+Keep `--target-path target/<warehouse>` on every warehouse command (`make dbt-build` adds it).
+`mf` and the metric tools read `target/semantic_manifest.json` and query the local Postgres, so a
+warehouse build that writes `target/` leaves Snowflake or Databricks SQL there and every metric
+query fails. The tools and `make evals-live` refuse with one line when that happens; `dbt parse`
+(dev) rebuilds it.
 
 ### Running against Snowflake or Databricks (settings from 1Password)
 
