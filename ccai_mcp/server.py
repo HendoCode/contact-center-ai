@@ -174,6 +174,11 @@ async def list_tools(
     return ListToolsResult(tools=TOOLS)
 
 
+# Every failure a tool reports starts with this, so a client, the agent's answer and the
+# evals can tell a tool failure from an answer (evals.run counts them per group).
+TOOL_ERROR_PREFIX = "TOOL ERROR"
+
+
 def _error(message: str) -> CallToolResult:
     return CallToolResult(content=[TextContent(type="text", text=message)], isError=True)
 
@@ -190,11 +195,11 @@ async def call_tool(ctx: ServerRequestContext, params: CallToolRequestParams) ->
         try:
             jsonschema.validate(arguments, tool.input_schema)
         except jsonschema.ValidationError as e:
-            return _error(f"Input validation error: {e.message}")
+            return _error(f"{TOOL_ERROR_PREFIX} ({name}): Input validation error: {e.message}")
     try:
         result = await _run_tool(name, arguments)
     except Exception as e:
-        return _error(str(e))
+        return _error(f"{TOOL_ERROR_PREFIX} ({name}): {type(e).__name__}: {e}")
     return CallToolResult(content=[TextContent(type="text", text=result)])
 
 

@@ -255,7 +255,7 @@ def query_metric(
     try:
         result = query_metric_raw(metrics, group_by=group_by, limit=limit)
     except (ValueError, RuntimeError) as exc:
-        return f"query_metric error: {exc}"
+        return f"TOOL ERROR (query_metric): {exc}"
     return _render_result(result, decimals=decimals)
 
 
