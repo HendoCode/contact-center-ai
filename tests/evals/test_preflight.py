@@ -94,7 +94,7 @@ def test_checks_skip_postgres_and_ollama_when_not_used(monkeypatch):
     monkeypatch.setattr(preflight, "check_postgres", lambda *a: pytest.fail("pgvector not in use"))
     monkeypatch.setattr(preflight, "check_ollama", lambda *a: pytest.fail("ollama not in use"))
     env = {"RETRIEVER_BACKEND": "lancedb", "EMBEDDING_PROVIDER": "openai"}
-    assert list(preflight.run_checks(env)) == ["models ok", "manifest ok", "marts ok"]
+    assert list(preflight.run_checks(env)) == ["search: lancedb, vector, k=5", "models ok", "manifest ok", "marts ok"]
 
 
 def test_mart_relations_come_from_the_semantic_manifest(tmp_path):

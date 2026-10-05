@@ -27,6 +27,9 @@ SETUP = {
     "dataset": ("params", "eval_dataset"),
     "groups": ("params", "groups"),
     "agent model": ("versions", "agent_model"),
+    "retriever": ("params", "retriever_backend"),
+    "search mode": ("params", "retrieval_mode"),
+    "search k": ("params", "retrieval_k"),
     "judge model": ("versions", "judge_model"),
     "judge prompt": ("params", "judge_prompt"),
     "golden set": ("params", "golden_sha256"),
@@ -52,6 +55,10 @@ def setup(record: dict) -> dict[str, object]:
     out = {label: record.get(section, {}).get(key) for label, (section, key) in SETUP.items()}
     out["dataset"] = out["dataset"] or "golden"  # runs before --dataset existed were golden
     out["groups"] = ",".join(out["groups"]) if out["groups"] else "all"
+    # Runs before these were recorded searched pgvector, vector mode, k=5.
+    out["retriever"] = out["retriever"] or "pgvector"
+    out["search mode"] = out["search mode"] or "vector"
+    out["search k"] = out["search k"] or 5
     return out
 
 

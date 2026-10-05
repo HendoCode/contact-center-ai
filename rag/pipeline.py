@@ -210,20 +210,20 @@ def ingest(source: str = "synthetic", use_cache: bool = True):
 
 # ── Retrieve ──────────────────────────────────────────────────────────────────
 
-def retrieve(query: str, k: int = 5, where: dict | None = None) -> list[Hit]:
+def retrieve(query: str, k: int = 5, where: dict | None = None, mode: str = "vector") -> list[Hit]:
     """Retrieve the top-k most relevant call transcripts for a query."""
-    return get_retriever().search(query, k=k, where=where)
+    return get_retriever().search(query, k=k, where=where, mode=mode)
 
 
 # ── RAG query ─────────────────────────────────────────────────────────────────
 
-def rag_query(query: str, k: int = 5) -> str:
+def rag_query(query: str, k: int = 5, mode: str = "vector") -> str:
     """
     Run a full RAG query: retrieve relevant transcripts, then generate a response.
 
     This is the core function exposed by the MCP tools.
     """
-    hits = retrieve(query, k=k)
+    hits = retrieve(query, k=k, mode=mode)
 
     context = "\n\n---\n\n".join(
         f"Call ID: {hit.call_id}\n"

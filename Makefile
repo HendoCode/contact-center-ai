@@ -9,6 +9,8 @@
 .PHONY: up down seed ingest test lint check-public demo bench evals evals-live evals-compare evals-export finetune-data finetune-label load-snowflake load-databricks load-dry-run dbt-build dbt-build-dev dev-data lance-azure-check
 
 PYTHON := uv run python
+# RETRIEVER_BACKEND=lancedb needs the lance dependency group wherever the store is read or written.
+LANCE_GROUP = $(if $(filter lancedb,$(RETRIEVER_BACKEND)),--group lance)
 
 # The L3 stack lives in the `app` Compose profile, so a bare `docker compose up -d`
 # still starts only db and ollama.
@@ -49,7 +51,7 @@ seed:
 # .cache/embeddings/ (shared with make bench), so a rerun embeds only new text;
 # ARGS="--no-cache" embeds everything afresh.
 ingest:
-	$(PYTHON) -m rag.pipeline --ingest $(ARGS)
+	uv run $(LANCE_GROUP) python -m rag.pipeline --ingest $(ARGS)
 
 # ── CI gates ─────────────────────────────────────────────────────────────────
 
@@ -143,7 +145,7 @@ evals:
 EVALS_RUN = $(if $(DIRECT),,tools/evals-live-run.sh $(if $(DRY),--dry-run) --)
 
 evals-live:
-	$(EVALS_RUN) uv run --group agent python -m evals.run --live $(ARGS)
+	$(EVALS_RUN) uv run --group agent $(LANCE_GROUP) python -m evals.run --live $(ARGS)
 
 # Before/after table of two evals-live result files, per group and check, with deltas and a
 # warning when the agent, judge, judge prompt, golden set or limit differ. B defaults to the

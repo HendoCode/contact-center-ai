@@ -106,6 +106,28 @@ LLM_MODEL=anthropic/claude-sonnet-5.5 make evals-live ARGS="--group open --run o
 make evals-compare A=results/evals/<post-env-fix full run>.json B=results/evals/<open-... run>.json
 ```
 
+## How the agent searches, and trying another search
+
+An open question routes to `retrieve`, which calls the MCP tool `search_transcripts` with the question. The tool (`ccai_mcp/tools.py`) runs `rag.pipeline.rag_query`: `get_retriever()` picks the store from `RETRIEVER_BACKEND` (`pgvector` by default, or `lancedb`), searches the top `k` transcripts with no filter, and the agent's model writes an answer from those transcripts that cites their call ids. Until this change, `k` was always 5 and the mode always `vector`.
+
+Two settings now control it, with today's behavior as the default:
+
+- `AGENT_RETRIEVAL_MODE` = `vector` (default), `fts` or `hybrid`. It is read by the search tool, which inherits the agent's environment. pgvector serves `vector` only, so `fts` and `hybrid` need `RETRIEVER_BACKEND=lancedb`; the preflight refuses the mismatch with one line.
+- `AGENT_RETRIEVAL_K` = how many transcripts the agent asks for (default 5).
+
+Every results file records `retriever_backend`, `retrieval_mode` and `retrieval_k`, and `make evals-compare` shows them and flags a change. Runs recorded before this count as pgvector, vector, 5.
+
+The experiment, with the same agent (`z-ai/glm-5.3-flash`), the same judge and only the open group:
+
+```bash
+make evals-live ARGS="--group open --run open-pgvector-vector"                     # pgvector, vector, k=5
+RETRIEVER_BACKEND=lancedb make ingest                                              # LanceDB store; reuses .cache/embeddings/
+RETRIEVER_BACKEND=lancedb AGENT_RETRIEVAL_MODE=hybrid make evals-live ARGS="--group open --run open-lance-hybrid"
+make evals-compare A=results/evals/<open-pgvector-vector>.json B=results/evals/<open-lance-hybrid>.json
+```
+
+Each run is estimated at $0.11 to $0.27 (12 questions; the judge is most of it). `make` adds the `lance` dependency group whenever `RETRIEVER_BACKEND=lancedb`. A third run with `AGENT_RETRIEVAL_K=10` tests coverage; it puts more transcript text in front of the agent, so allow up to about $0.35.
+
 ## Comparing runs: `make evals-compare`
 
 ```bash
@@ -144,4 +166,26 @@ What changed: `make dbt-build-dev` builds the dev target as a first-class step, 
 `make dbt-build-dev` then failed 16 of 111 nodes with `relation "public.account" does not exist`. On the host, `make seed` only generates the JSON and `make ingest` only embeds; the OLTP schema (`olap/oltp/apply.sh`) and the raw load (`olap/seed.py`) ran only inside the Compose `seed` container, so after the database was reset nothing on the host recreated the raw tables. This is the third environment cause.
 
 What changed: `make dev-data` runs every step on the host in order (generate, schema, load, ingest, dbt build), prints one line per step, and stops at the first failure with its fix. The preflight now tells the two cases apart: raw tables absent says to run `make dev-data` (or `olap/oltp/apply.sh` then `uv run python olap/seed.py`), and raw tables present but marts absent says `make dbt-build-dev`.
+
+### 2026-10-05 open questions: what the judge marks down
+
+After the environment fixes, the open group scored 0.58 on the golden set and 0.62 on the held-out set, and swapping the agent model did not lift it (deepseek-v4-pro 0.50, kimi-k2.7-code 0.54, claude-sonnet-5.5 0.48, glm-5.3-flash 0.58; single runs of 12). The judge's reasoning on the 12 golden open items in `2026-10-05T045841Z_post-env-fix_657fe1e.json`:
+
+| item | judge | what the judge marks down |
+|---|---|---|
+| g41 fees | 0.00 | the search tool returned an error, not transcripts (below) |
+| g51 card services | 0.25 | five calls described as "all five", one request type claimed for 114 calls |
+| g40 fraud | 0.50 | generalizes from five of 143 calls; speculates about a shared cause |
+| g43 balance | 0.50 | "all five calls" of 179, no sample caveat; automation advice beyond the data |
+| g48 escrow | 0.50 | "1 of 5 resolved" read as the category's rate; some speculation |
+| g42, g44, g45, g46, g47, g49, g50 | 0.75 | grounded and responsive; each marked down only for generalizing from 5 calls without saying it is a sample, sometimes with mild speculation |
+
+Classified:
+
+- **Retrieval found the right calls.** All 55 cited calls in that run are in the item's expected category, and the judge never says a relevant call was missed. The one exception is g41: in the kimi and sonnet runs, "Why do members call to dispute fees?" retrieved five `fraud_dispute` calls (0 of 5 on category), a real retrieval miss that hybrid search with its keyword match is the natural test for.
+- **The answer is a thin sample presented as the whole (11 of 11 scored items).** With `k=5`, every answer rests on five transcripts and most say "all five" or "every call". The reference states each category's size (15 to 179 calls), so the judge marks the coverage gap every time. That is the dominant cause, and it points at `k` and at the answer not saying it read a sample, more than at the store or the model.
+- **A search-tool error (`Table 'langchain_pg_collection' is already defined for this MetaData instance`)** replaced the answer on g41 here and on 7 of the 36 items in the three model runs (deepseek 3, kimi 2, sonnet 2), each scored 0 or near it. That alone moves a 12-item group mean by up to 0.25 and explains more of the model-to-model spread than the models do. The cause (most likely a second `PGVector` set up in one process) is not yet confirmed; it is a defect to fix separately, before reading small deltas.
+- **No case reads as a harsh judge or a wrong reference.** The judge is consistent: grounded but over-generalized answers get 4 of 5, and stronger generalization gets less.
+
+The golden and held-out sets, the judge prompt and the answer text are unchanged.
 
