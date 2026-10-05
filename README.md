@@ -76,11 +76,9 @@ docker compose up -d
 uv venv --python 3.12
 uv sync --extra dev
 
-# Generate synthetic call data
-python data/synthetic/generate_data.py
-
-# Ingest data into vector store
-python -m rag.pipeline --ingest
+# Build all local data: synthetic JSON, OLTP schema and load, vector-store ingest,
+# and the dbt marts (idempotent; one line per step, stops with the fix on failure)
+make dev-data
 
 # Start the MCP server
 python -m ccai_mcp.server
