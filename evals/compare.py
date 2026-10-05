@@ -3,7 +3,9 @@
     make evals-compare A=results/evals/<before>.json B=results/evals/<after>.json
     python -m evals.compare <before.json> <after.json>     # B may be omitted: LATEST
 
-Prints what each side ran (agent model, judge model, judge prompt, golden set, item count),
+Prints what each side ran (question set, groups, agent model, judge model, judge prompt,
+golden set hash, item count); it refuses two runs over different question sets (golden vs
+holdout) unless --allow-different-datasets,
 a warning for every one of those that differs, then one table per group (all, then each
 golden kind) with each check's pass rate on both sides and the delta. A changed judge
 model or prompt makes the judge column incomparable; a changed golden set or --limit makes
@@ -22,6 +24,8 @@ LATEST_PATH = REPO_ROOT / "results" / "evals" / "LATEST"  # written by evals.run
 
 # What a side ran: label -> (section, key) in the run record.
 SETUP = {
+    "dataset": ("params", "eval_dataset"),
+    "groups": ("params", "groups"),
     "agent model": ("versions", "agent_model"),
     "judge model": ("versions", "judge_model"),
     "judge prompt": ("params", "judge_prompt"),
@@ -29,7 +33,12 @@ SETUP = {
     "limit": ("params", "limit"),
 }
 # A difference in these makes the named checks incomparable (None: every check).
-AFFECTS = {"judge model": ["judge"], "judge prompt": ["judge"], "golden set": None, "limit": None}
+AFFECTS = {"judge model": ["judge"], "judge prompt": ["judge"], "golden set": None, "limit": None,
+           "groups": "groups"}
+
+
+class DifferentDatasets(SystemExit):
+    """Two runs over different question sets (golden vs holdout) have no before/after."""
 
 
 def load(path: Path) -> dict:
@@ -40,7 +49,10 @@ def load(path: Path) -> dict:
 
 
 def setup(record: dict) -> dict[str, object]:
-    return {label: record.get(section, {}).get(key) for label, (section, key) in SETUP.items()}
+    out = {label: record.get(section, {}).get(key) for label, (section, key) in SETUP.items()}
+    out["dataset"] = out["dataset"] or "golden"  # runs before --dataset existed were golden
+    out["groups"] = ",".join(out["groups"]) if out["groups"] else "all"
+    return out
 
 
 def warnings(a: dict, b: dict) -> list[str]:
@@ -49,7 +61,9 @@ def warnings(a: dict, b: dict) -> list[str]:
     for label in SETUP:
         if sa[label] != sb[label]:
             what = AFFECTS.get(label, [])
-            consequence = ("every score is incomparable" if what is None
+            consequence = ("compare only the tables of groups both runs scored; 'all' is not comparable"
+                           if what == "groups"
+                           else "every score is incomparable" if what is None
                            else f"{', '.join(what)} scores are not comparable" if what
                            else "the delta measures this change")
             out.append(f"WARNING: {label} differs ({_short(sa[label])} -> {_short(sb[label])}): {consequence}")
@@ -90,8 +104,16 @@ def group_table(group: str, a: dict, b: dict, keys: list[str]) -> str:
     return "\n".join(lines)
 
 
-def compare(a: dict, b: dict, name_a: str = "A", name_b: str = "B") -> str:
+def compare(a: dict, b: dict, name_a: str = "A", name_b: str = "B", allow_datasets: bool = False) -> str:
+    da, db = setup(a)["dataset"], setup(b)["dataset"]
+    if da != db and not allow_datasets:
+        raise DifferentDatasets(
+            f"evals-compare: refusing: {name_a} ran the {da} set and {name_b} the {db} set, so no "
+            "score has a before/after; compare runs of the same set (or pass --allow-different-datasets "
+            "to print them side by side anyway)")
     parts = []
+    if da != db:
+        parts.append(f"!!! DIFFERENT QUESTION SETS ({da} vs {db}): NO SCORE BELOW IS A BEFORE/AFTER !!!")
     width = max(len(label) for label in SETUP)
     for name, record in ((name_a, a), (name_b, b)):
         s = setup(record)
@@ -122,9 +144,11 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Compare two evals-live result files.")
     parser.add_argument("before", type=Path)
     parser.add_argument("after", type=Path, nargs="?", help="default: the file results/evals/LATEST names")
+    parser.add_argument("--allow-different-datasets", action="store_true",
+                        help="print a golden run beside a holdout run (no score is a before/after)")
     args = parser.parse_args(argv)
     after = args.after or latest()
-    print(compare(load(args.before), load(after), str(args.before), str(after)))
+    print(compare(load(args.before), load(after), str(args.before), str(after), args.allow_different_datasets))
     return 0
 
 

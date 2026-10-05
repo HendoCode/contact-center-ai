@@ -58,8 +58,9 @@ ASSUMPTIONS = {
 }
 
 
-def golden_count(path: Path = GOLDEN_PATH) -> int:
-    return sum(1 for line in path.read_text().splitlines() if line.strip())
+def golden_count(path: Path = GOLDEN_PATH, groups: list[str] | None = None) -> int:
+    rows = [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
+    return sum(1 for r in rows if not groups or r["kind"] in groups)
 
 
 def fetch_prices(url: str = OPENROUTER_MODELS_URL, timeout: float = 15) -> dict[str, tuple[float, float]]:
@@ -268,8 +269,9 @@ def run_checks(env: os._Environ | dict = os.environ) -> Iterator[str]:
                            env.get("OLLAMA_EMBEDDING_MODEL", "nomic-embed-text"))
 
 
-def print_estimate(limit: int | None) -> None:
-    total = golden_count()
+def print_estimate(limit: int | None, dataset: str = "golden", groups: list[str] | None = None) -> None:
+    path = GOLDEN_PATH.parent / f"agent_{dataset}.jsonl"
+    total = golden_count(path, groups)
     n = min(limit, total) if limit else total
     models = priced_models()
     try:
@@ -288,6 +290,8 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Checks and a cost estimate before make evals-live.")
     parser.add_argument("--limit", type=int, help="questions the run will score (default all)")
     parser.add_argument("--estimate-only", action="store_true", help="print the estimate, skip the checks")
+    parser.add_argument("--dataset", choices=("golden", "holdout"), default="golden", help="question set to count")
+    parser.add_argument("--group", help="comma-separated groups the run scores (default all)")
     args = parser.parse_args(argv)
     if not args.estimate_only:
         from dotenv import load_dotenv
@@ -299,7 +303,8 @@ def main(argv: list[str] | None = None) -> int:
         except PreflightError as exc:
             print(f"evals-live: {exc}", file=sys.stderr)
             return 1
-    print_estimate(args.limit)
+    groups = [g.strip() for g in args.group.split(",") if g.strip()] if args.group else None
+    print_estimate(args.limit, args.dataset, groups)
     return 0
 
 

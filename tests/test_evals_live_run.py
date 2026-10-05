@@ -158,3 +158,18 @@ def test_dry_run_prints_names_and_plan_never_values(tmp_path):
         assert secret not in res.stdout + res.stderr
     assert not (tmp_path / "envfile").exists(), "dry run must not call op run"
     assert "--estimate-only" in (tmp_path / "uv.log").read_text()
+
+
+def test_dataset_and_group_reach_the_preflight_estimate(tmp_path):
+    res = run(["--", "true", "--live", "--dataset", "holdout", "--group=open,call_lookup"], tmp_path)
+    assert res.returncode == 0, res.stderr
+    assert "-m evals.preflight --dataset holdout --group open,call_lookup" in (tmp_path / "uv.log").read_text()
+
+
+def test_uv_group_flag_is_not_read_as_an_eval_group(tmp_path):
+    cmd = ["uv", "run", "--group", "agent", "python", "-m", "evals.run", "--live", "--group", "open"]
+    res = run(["--dry-run", "--", *cmd], tmp_path)
+    assert res.returncode == 0, res.stderr
+    log = (tmp_path / "uv.log").read_text()
+    assert "-m evals.preflight --group open --estimate-only" in log
+    assert "--group agent --estimate-only" not in log

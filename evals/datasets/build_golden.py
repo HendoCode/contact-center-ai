@@ -37,6 +37,7 @@ DATA_DIR = REPO_ROOT / "data" / "synthetic"
 METRICS_PATH = REPO_ROOT / "olap" / "dbt" / "models" / "marts" / "semantic" / "metrics.yml"
 TERMS_PATH = REPO_ROOT / "agent" / "data" / "ambiguous_terms.yml"
 GOLDEN_PATH = Path(__file__).resolve().parent / "agent_golden.jsonl"
+HOLDOUT_PATH = Path(__file__).resolve().parent / "agent_holdout.jsonl"
 
 KINDS = ("ambiguous", "metric", "call_lookup", "open")
 ROUTE_BY_KIND = {
@@ -330,11 +331,12 @@ def _open_record(spec: dict, calls: list[dict], metrics) -> dict:
     }
 
 
-def build(calls: list[dict] | None = None) -> list[dict]:
+def build(calls: list[dict] | None = None, specs: list[dict] | None = None,
+          prefix: str = "g") -> list[dict]:
     calls = calls if calls is not None else load_calls()
     metrics, terms = load_metrics(), load_terms()
     records = []
-    for n, spec in enumerate(SPECS, start=1):
+    for n, spec in enumerate(SPECS if specs is None else specs, start=1):
         kind = spec["kind"]
         if kind in ("ambiguous", "metric"):
             body = _metric_record(spec, metrics, terms)
@@ -343,7 +345,7 @@ def build(calls: list[dict] | None = None) -> list[dict]:
         else:
             body = _open_record(spec, calls, metrics)
         records.append({
-            "id": f"g{n:02d}", "kind": kind, "question": body["question"],
+            "id": f"{prefix}{n:02d}", "kind": kind, "question": body["question"],
             "clarify_with": body["clarify_with"],
             "route": ROUTE_BY_KIND[kind],
             "expect_interrupt": bool(body["interrupts"]),
@@ -365,22 +367,34 @@ def dumps(records: list[dict]) -> str:
     return "".join(json.dumps(r) + "\n" for r in records)
 
 
+def build_dataset(name: str, calls: list[dict] | None = None) -> tuple[list[dict], Path]:
+    """The records and file for a named dataset: golden (g01..) or holdout (h01..)."""
+    if name == "holdout":
+        from evals.datasets.holdout_specs import HOLDOUT_SPECS
+
+        return build(calls, HOLDOUT_SPECS, prefix="h"), HOLDOUT_PATH
+    return build(calls), GOLDEN_PATH
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[1].strip())
     parser.add_argument("--check", action="store_true",
-                        help="fail if agent_golden.jsonl differs from a fresh derivation")
+                        help="fail if the dataset file differs from a fresh derivation")
+    parser.add_argument("--dataset", choices=("golden", "holdout"), default="golden",
+                        help="golden (agent_golden.jsonl, default) or holdout (agent_holdout.jsonl)")
     args = parser.parse_args(argv)
 
-    text = dumps(build())
+    records, path = build_dataset(args.dataset)
+    text = dumps(records)
     if args.check:
-        if not GOLDEN_PATH.exists() or GOLDEN_PATH.read_text() != text:
-            print(f"{GOLDEN_PATH} is stale; run python -m evals.datasets.build_golden")
+        if not path.exists() or path.read_text() != text:
+            print(f"{path} is stale; run python -m evals.datasets.build_golden --dataset {args.dataset}")
             return 1
-        print(f"{GOLDEN_PATH} is up to date")
+        print(f"{path} is up to date")
         return 0
-    GOLDEN_PATH.write_text(text)
+    path.write_text(text)
     counts = Counter(json.loads(line)["kind"] for line in text.splitlines())
-    print(f"wrote {sum(counts.values())} items to {GOLDEN_PATH}: {dict(counts)}")
+    print(f"wrote {sum(counts.values())} items to {path}: {dict(counts)}")
     return 0
 
 
