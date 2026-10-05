@@ -217,13 +217,39 @@ def retrieve(query: str, k: int = 5, where: dict | None = None, mode: str = "vec
 
 # ── RAG query ─────────────────────────────────────────────────────────────────
 
+def sample_statement(hits: list[Hit], count) -> str:
+    """What the answer rests on: N retrieved calls out of M in their category, from
+    `count(where)` over the same store, e.g. "Based on 5 of 143 calls in fraud_dispute"."""
+    n = len(hits)
+    if not n:
+        return "No matching calls were retrieved."
+    by_cat: dict[str, int] = {}
+    for hit in hits:
+        cat = hit.metadata.get("category")
+        by_cat[cat] = by_cat.get(cat, 0) + 1
+    parts = []
+    for cat, got in sorted(by_cat.items(), key=lambda kv: (-kv[1], str(kv[0]))):
+        try:
+            total = count({"category": cat}) if cat is not None else None
+        except Exception:  # noqa: BLE001 - a size we cannot count is said so, never guessed
+            total = None
+        where = f"calls in {cat}" if cat is not None else "calls with no category"
+        parts.append(f"{got} of {total} {where}" if total is not None else f"{got} {where} (category size unavailable)")
+    return f"Based on a sample of {n} retrieved call{'s' if n != 1 else ''}: " + "; ".join(parts) + "."
+
+
 def rag_query(query: str, k: int = 5, mode: str = "vector") -> str:
     """
     Run a full RAG query: retrieve relevant transcripts, then generate a response.
 
+    The response opens with the sample statement (how many calls it read, out of how many
+    in each category), so a few retrieved calls are never presented as a whole category.
+
     This is the core function exposed by the MCP tools.
     """
-    hits = retrieve(query, k=k, mode=mode)
+    retriever = get_retriever()
+    hits = retriever.search(query, k=k, mode=mode)
+    sample = sample_statement(hits, retriever.count)
 
     context = "\n\n---\n\n".join(
         f"Call ID: {hit.call_id}\n"
@@ -239,6 +265,7 @@ def rag_query(query: str, k: int = 5, mode: str = "vector") -> str:
     prompt = f"""You are an assistant helping contact center supervisors understand call patterns and member issues.
 
 Based on the following call transcripts, answer the question below. Be specific and reference call IDs where relevant.
+These transcripts are a retrieved sample, not every call: {sample} Describe what this sample shows; do not say "all calls" or "every call" about the whole category.
 
 TRANSCRIPTS:
 {context}
@@ -248,7 +275,7 @@ QUESTION: {query}
 ANSWER:"""
 
     response = llm.invoke(prompt)
-    return response.content
+    return f"{sample}\n\n{response.content}"
 
 
 # ── CLI ───────────────────────────────────────────────────────────────────────

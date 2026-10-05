@@ -65,7 +65,9 @@ class Retriever(Protocol):
         """Metadata lookup, never semantic."""
         ...
 
-    def count(self) -> int: ...
+    def count(self, where: dict | None = None) -> int:
+        """Rows in the store, or only those matching the portable `where`."""
+        ...
 
 
 def _normalize_bound(op: str, value: object) -> tuple[str, object]:
