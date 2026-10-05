@@ -52,6 +52,7 @@ def test_export_has_every_item_with_outputs_scores_and_judge_reasoning():
     first, second = data["items"]
     assert first == {"id": "g01", "kind": "ambiguous", "inputs": {"question": "rate?"},
                      "error": "TimeoutError: x",
+                     "tool_error": None,
                      "outputs": dict.fromkeys(("answer", "route", "metric_names", "sql", "citations", "grounded")),
                      "results": {"judge": {"key": "judge", "score": 0.0, "comment": "Error text from ~/repo/olap/dbt."},
                                  "route": {"key": "route", "score": True, "comment": ""}}}

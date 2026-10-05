@@ -18,7 +18,7 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
-from evals.run import OUTPUT_KEYS, REPO_ROOT, redact_home
+from evals.run import OUTPUT_KEYS, REPO_ROOT, redact_home, tool_error
 
 # Outside results/evals/*.json, which holds only aggregate run records (tools.results renders them).
 ITEMS_DIR = REPO_ROOT / "results" / "evals" / "items"
@@ -41,6 +41,7 @@ def export(client, experiment: str) -> dict:
         items.append({
             "id": meta.get("golden_id"), "kind": meta.get("kind"),
             "inputs": run.inputs or {}, "error": run.error,
+            "tool_error": tool_error(outputs.get("answer")),
             "outputs": {k: outputs.get(k) for k in OUTPUT_KEYS},
             "results": {fb.key: {"key": fb.key, "score": fb.score, "comment": fb.comment or ""}
                         for fb in sorted(feedback[str(run.id)], key=lambda f: f.key)},

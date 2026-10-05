@@ -101,7 +101,7 @@ def summarize(rows: list[dict], keys: list[str]) -> dict[str, dict]:
         members = groups.get(group, [])
         if not members:
             continue
-        line: dict = {"n": len(members)}
+        line: dict = {"n": len(members), "tool_errors": sum(1 for r in members if r.get("tool_error"))}
         for key in keys:
             scores = [r["results"][key]["score"] for r in members
                       if key in r["results"] and r["results"][key]["score"] is not None]
@@ -254,6 +254,22 @@ def sync_dataset(client, items: list[dict], name: str, path: Path = GOLDEN_PATH)
         client.create_examples(dataset_name=name, examples=examples)
 
 
+# A tool failure inside an answer. "TOOL ERROR (" is what the MCP server and query_metric
+# write now; the other two are how failures read in runs recorded before that.
+TOOL_ERROR_RE = re.compile(r"TOOL ERROR \(|query_metric error:|is already defined for this MetaData instance")
+
+
+def tool_error(answer: str | None) -> str | None:
+    """The first line of a tool failure in `answer`, or None when there is none."""
+    if not answer:
+        return None
+    m = TOOL_ERROR_RE.search(answer)
+    if not m:
+        return None
+    start = answer.rfind("\n", 0, m.start()) + 1
+    return answer[start:].split("\n", 1)[0].strip()[:300]
+
+
 _HOME_RE = re.compile(r"/(?:home|Users)/[^/\s'\"`]+/")
 
 
@@ -278,6 +294,7 @@ def _row(result_row: dict) -> dict:
     outputs = getattr(result_row["run"], "outputs", None) or {}
     return redact_home({"id": example.metadata["golden_id"], "kind": example.metadata["kind"],
                         "error": result_row["run"].error, "results": results,
+                        "tool_error": tool_error(outputs.get("answer")),
                         "outputs": {k: outputs.get(k) for k in OUTPUT_KEYS}})
 
 
