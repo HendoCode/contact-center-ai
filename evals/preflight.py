@@ -251,8 +251,24 @@ def check_marts(relations: list[tuple[str, str]], conninfo: str,
     return f"marts built: {len(relations)} tables the metric tool queries exist"
 
 
+def check_retrieval(env: os._Environ | dict = os.environ) -> str:
+    """The search mode and k are valid, and the backend serves the mode."""
+    backend = env.get("RETRIEVER_BACKEND", "pgvector").lower()
+    mode = (env.get("AGENT_RETRIEVAL_MODE") or "vector").strip().lower()
+    k = (env.get("AGENT_RETRIEVAL_K") or "5").strip()
+    if mode not in ("vector", "fts", "hybrid"):
+        raise PreflightError(f"AGENT_RETRIEVAL_MODE={mode!r}: use vector, fts or hybrid")
+    if mode != "vector" and backend != "lancedb":
+        raise PreflightError(f"AGENT_RETRIEVAL_MODE={mode} needs RETRIEVER_BACKEND=lancedb "
+                             f"({backend} serves vector search only)")
+    if not k.isdigit() or int(k) < 1:
+        raise PreflightError(f"AGENT_RETRIEVAL_K={k!r}: a positive whole number")
+    return f"search: {backend}, {mode}, k={k}"
+
+
 def run_checks(env: os._Environ | dict = os.environ) -> Iterator[str]:
     """Each check in turn, yielding its result line; the first failure raises."""
+    yield check_retrieval(env)
     yield check_models_differ()
     yield check_manifest()
     from ccai_mcp.metrics import DBT_DIR
