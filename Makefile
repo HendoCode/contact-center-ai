@@ -45,9 +45,11 @@ down:
 seed:
 	$(PYTHON) data/synthetic/generate_data.py
 
-# Embed and store the transcripts in the vector store.
+# Embed and store the transcripts in the vector store. Vectors are cached per model in
+# .cache/embeddings/ (shared with make bench), so a rerun embeds only new text;
+# ARGS="--no-cache" embeds everything afresh.
 ingest:
-	$(PYTHON) -m rag.pipeline --ingest
+	$(PYTHON) -m rag.pipeline --ingest $(ARGS)
 
 # ── CI gates ─────────────────────────────────────────────────────────────────
 

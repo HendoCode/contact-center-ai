@@ -40,10 +40,14 @@ def get_embeddings():
 
     if provider == "ollama":
         from langchain_ollama import OllamaEmbeddings
-        return OllamaEmbeddings(
+
+        from rag.ollama_models import ensure_ready
+        embeddings = OllamaEmbeddings(
             model=os.getenv("OLLAMA_EMBEDDING_MODEL", "nomic-embed-text"),
             base_url=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"),
         )
+        ensure_ready(embeddings)  # pulls the model if the server lacks it
+        return embeddings
 
     from langchain_openai import OpenAIEmbeddings
     return OpenAIEmbeddings(

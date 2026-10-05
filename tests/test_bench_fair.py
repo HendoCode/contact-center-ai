@@ -73,7 +73,8 @@ def _fake_main(monkeypatch, tmp_path, argv):
 
     monkeypatch.setattr(rag.embeddings, "get_embeddings", lambda: Emb())
     monkeypatch.setattr(bench, "RESULTS_ROOT", tmp_path)
-    monkeypatch.setattr(bench, "CACHE_DIR", tmp_path / "cache")
+    monkeypatch.setattr("rag.embedding_cache.CACHE_DIR", tmp_path / "cache")
+    monkeypatch.setattr("rag.embedding_cache.LEGACY_CACHE_DIR", tmp_path / "legacy")
     monkeypatch.setattr(bench, "open_lancedb", spy)
     monkeypatch.setattr(bench, "OPENERS", {"lancedb": spy})
     assert bench.main(["--backends", "lancedb", "--repeats", "1", *argv]) == 0

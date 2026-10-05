@@ -101,7 +101,8 @@ def test_main_writes_results_even_when_a_backend_fails(tmp_path, monkeypatch, ca
 
     monkeypatch.setattr(rag.embeddings, "get_embeddings", lambda: Echo())
     monkeypatch.setattr(bench, "RESULTS_ROOT", tmp_path)
-    monkeypatch.setattr(bench, "CACHE_DIR", tmp_path / "cache")
+    monkeypatch.setattr("rag.embedding_cache.CACHE_DIR", tmp_path / "cache")
+    monkeypatch.setattr("rag.embedding_cache.LEGACY_CACHE_DIR", tmp_path / "legacy")
     monkeypatch.setattr(bench, "OPENERS", {"pgvector": opener(FakeRetriever("pgvector", fail_ingest=True)),
                                            "lancedb": opener(FakeRetriever("lancedb"))})
     monkeypatch.setattr(bench, "postgres_versions", lambda: (_ for _ in ()).throw(OSError(HUGE)))

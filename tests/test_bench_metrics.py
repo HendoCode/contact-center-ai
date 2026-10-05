@@ -7,7 +7,6 @@ import pytest
 from retrieval.bench import (
     CachedEmbeddings,
     embed_progress,
-    ensure_ollama_model,
     percentile,
     reciprocal_rank,
     recall_at_k,
@@ -114,43 +113,6 @@ def test_warm_documents_reports_progress_from_zero_to_total(capsys):
     assert out[0].startswith("bench: embedding 250 unique docs")
     assert out[1:] == ["  embedded 64/250", "  embedded 128/250", "  embedded 192/250",
                        "  embedded 250/250"]
-
-
-class _Model:
-    def __init__(self, model):
-        self.model = model
-
-
-class _FakeOllama:
-    def __init__(self, have):
-        self.have, self.pulled = have, []
-
-    def list(self):
-        return type("ListResponse", (), {"models": [_Model(m) for m in self.have]})()
-
-    def pull(self, model):
-        self.pulled.append(model)
-
-
-class OllamaEmbeddings:  # matched by class name, like langchain_ollama's
-    model, base_url = "nomic-embed-text", "http://localhost:11434"
-
-
-def test_ensure_ollama_model_pulls_only_when_missing(capsys):
-    client = _FakeOllama(have=["llama3.2:latest"])
-    ensure_ollama_model(OllamaEmbeddings(), client=client)
-    assert client.pulled == ["nomic-embed-text"]
-    assert "pulling Ollama model nomic-embed-text" in capsys.readouterr().out
-
-    client = _FakeOllama(have=["nomic-embed-text:latest"])
-    ensure_ollama_model(OllamaEmbeddings(), client=client)
-    assert client.pulled == []
-
-
-def test_ensure_ollama_model_skips_other_providers():
-    client = _FakeOllama(have=[])
-    ensure_ollama_model(object(), client=client)
-    assert client.pulled == []
 
 
 # ── §4.3 results contract and renderer ────────────────────────────────────────
