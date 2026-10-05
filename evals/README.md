@@ -5,7 +5,9 @@ A golden set of 51 questions for the LangGraph agent (`agent/`), the evaluators 
 ```bash
 make evals                                          # offline: no keys, no DB, no network
 python -m evals.datasets.build_golden --check       # exit 1 if the golden set is stale
-make evals-live                                     # real models and tools, to LangSmith (costs money)
+make evals-live ARGS="--limit 5"                    # live smoke run: 5 questions (costs money)
+make evals-live                                     # live: all 51, real models and tools, to LangSmith
+make evals-live DRY=1                               # the live plan and cost estimate; resolves and runs nothing
 ```
 
 ## The golden set
@@ -57,8 +59,15 @@ LangSmith tracing is forced off for the offline run.
 This needs:
 
 - the stack: `make up`, `make seed`, `make ingest`, and `dbt build` in `olap/dbt`;
-- the agent's provider keys;
-- `LANGSMITH_API_KEY`;
-- a judge that differs from the agent's model: `EVAL_JUDGE_PROVIDER` (`anthropic` or `openai`) and `EVAL_JUDGE_MODEL` (default `claude-opus-5-5`). The run refuses to start when the two models match.
+- the 1Password CLI, signed in (`eval $(op signin)`), and two references to items in your vault:
 
-It syncs the golden set to the LangSmith dataset `ccai-agent-golden-<sha8>`, named after a hash of the file's content and keyed by golden id, so a rerun adds nothing twice. It then runs one experiment with every evaluator plus the judge, writes `results/evals/<date>_agent-golden-<provider>.json`, and renders `results/evals/README.md`. Pass `ARGS="--limit 5"` for a cheap smoke run.
+  ```bash
+  export LANGSMITH_KEY_REF='op://<your vault>/<LangSmith item>/<field>'        # becomes LANGSMITH_API_KEY
+  export EVALS_OPENAI_KEY_REF='op://<your vault>/<OpenRouter item>/<field>'    # becomes OPENAI_API_KEY
+  ```
+
+  `OPENAI_API_KEY` is an OpenRouter key: it pays for the agent (`LLM_PROVIDER=openai`, `LLM_MODEL`) and the judge. The repo names no vault; `tools/op/evals.env` only says which variable holds each reference.
+
+`make evals-live` runs `tools/evals-live-run.sh`, which resolves both keys with `op run` into the run's processes only. The judge goes through OpenRouter: `EVAL_JUDGE_PROVIDER=openai`, `EVAL_JUDGE_MODEL=anthropic/claude-opus-5.5` (OpenRouter's spelling) and `LLM_BASE_URL=https://openrouter.ai/api/v1` are the defaults, and any of them set in the shell wins. Before anything is paid for, it checks, with one message each: both references set and readable, the agent's model unlike the judge's, Postgres reachable with the transcripts embedded (pgvector), and Ollama reachable when it does the embeddings. Then it prints an estimated cost range from OpenRouter's live per-token prices for the two models, under a stated assumption of tokens per question (`ASSUMPTIONS` in `preflight.py`); a model not served through OpenRouter is listed as not priced. `DIRECT=1` skips 1Password and the checks and reads everything from the shell or `.env`, as before.
+
+The run itself still refuses to start when the agent and judge models match. It syncs the golden set to the LangSmith dataset `ccai-agent-golden-<sha8>`, named after a hash of the file's content and keyed by golden id, so a rerun adds nothing twice. It then runs one experiment with every evaluator plus the judge, writes `results/evals/<date>_agent-golden-<provider>.json`, and renders `results/evals/README.md`. `ARGS="--limit 5"` scores the first five questions.
