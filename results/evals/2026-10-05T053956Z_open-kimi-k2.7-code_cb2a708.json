@@ -1,0 +1,716 @@
+{
+  "date": "2026-10-05",
+  "git_sha": "cb2a7089110f1a025f4dbc8d75455ea3aa41449b-dirty",
+  "area": "evals",
+  "run": "open-kimi-k2.7-code",
+  "hardware": "Intel(R) Core(TM) i5-1038NG7 CPU @ 2.00GHz, 8 cores, 15 GB RAM, Linux",
+  "versions": {
+    "python": "3.14.7",
+    "agent_model": "moonshotai/kimi-k2.7-code",
+    "judge_model": "anthropic/claude-opus-5.5",
+    "langgraph": "1.2.12",
+    "langsmith": "0.8.9",
+    "langchain-core": "1.6.6"
+  },
+  "params": {
+    "dataset": "ccai-agent-golden-35328593",
+    "eval_dataset": "golden",
+    "groups": [
+      "open"
+    ],
+    "golden_sha256": "353285937ec0a4ecf583a1965a25047b24601be47859e546b13054344419c68b",
+    "limit": null,
+    "llm_provider": "openai",
+    "agent_model": "moonshotai/kimi-k2.7-code",
+    "judge_provider": "openai",
+    "judge_model": "anthropic/claude-opus-5.5",
+    "judge_prompt": "v1",
+    "retriever_backend": "pgvector",
+    "embedding_provider": "ollama",
+    "experiment": "agent-golden-openai-9243a261"
+  },
+  "metrics": {
+    "all": {
+      "n": 12,
+      "route": 1.0,
+      "interrupt": 1.0,
+      "metric": null,
+      "sql": null,
+      "citations": 0.833,
+      "call_id": null,
+      "judge": 0.542
+    },
+    "open": {
+      "n": 12,
+      "route": 1.0,
+      "interrupt": 1.0,
+      "metric": null,
+      "sql": null,
+      "citations": 0.833,
+      "call_id": null,
+      "judge": 0.542
+    },
+    "errors": 0
+  },
+  "notes": "make evals-live: every golden item through the real graph, MCP tools and models; LLM-as-judge prompt v1, judge score scaled (score - 1) / 4. Pass rates count applicable items only.",
+  "items": [
+    {
+      "id": "g40",
+      "kind": "open",
+      "error": null,
+      "results": {
+        "route": {
+          "key": "route",
+          "score": true,
+          "comment": "expected retrieve, got retrieve"
+        },
+        "interrupt": {
+          "key": "interrupt",
+          "score": true,
+          "comment": "no interrupt"
+        },
+        "metric": {
+          "key": "metric",
+          "score": null,
+          "comment": ""
+        },
+        "sql": {
+          "key": "sql",
+          "score": null,
+          "comment": ""
+        },
+        "citations": {
+          "key": "citations",
+          "score": false,
+          "comment": "no citation"
+        },
+        "call_id": {
+          "key": "call_id",
+          "score": null,
+          "comment": ""
+        },
+        "judge": {
+          "key": "judge",
+          "score": 0.0,
+          "comment": "1/5 (prompt v1): The answer is a raw SQLAlchemy error message with a 'not grounded' disclaimer. It does not describe the fraud_dispute calls, cites no call ids, and does not answer the question. Flagging it as unverified is honest, but it gives the supervisor nothing usable."
+        }
+      },
+      "outputs": {
+        "answer": "Not grounded: treat this answer as unverified.\n\nTable 'langchain_pg_collection' is already defined for this MetaData instance.  Specify 'extend_existing=True' to redefine options and columns on an existing Table object.",
+        "route": "retrieve",
+        "metric_names": [],
+        "sql": null,
+        "citations": [],
+        "grounded": false
+      }
+    },
+    {
+      "id": "g41",
+      "kind": "open",
+      "error": null,
+      "results": {
+        "route": {
+          "key": "route",
+          "score": true,
+          "comment": "expected retrieve, got retrieve"
+        },
+        "interrupt": {
+          "key": "interrupt",
+          "score": true,
+          "comment": "no interrupt"
+        },
+        "metric": {
+          "key": "metric",
+          "score": null,
+          "comment": ""
+        },
+        "sql": {
+          "key": "sql",
+          "score": null,
+          "comment": ""
+        },
+        "citations": {
+          "key": "citations",
+          "score": true,
+          "comment": "CALL-00494, CALL-01248, CALL-00458, CALL-00102, CALL-00533"
+        },
+        "call_id": {
+          "key": "call_id",
+          "score": null,
+          "comment": ""
+        },
+        "judge": {
+          "key": "judge",
+          "score": 0.25,
+          "comment": "2/5 (prompt v1): The question asks about fee disputes, which the reference grounds in the fee_dispute category (37 calls). The answer instead describes unrecognized online-retailer purchases handled as fraud disputes, which reads like a different category, and it quietly reframes 'fees' as 'charges'. The cited calls may be real, but the substance likely misrepresents why members dispute fees, a material error in responsiveness and faithfulness."
+        }
+      },
+      "outputs": {
+        "answer": " Members call to dispute charges because they see an **unrecognized transaction\u2014specifically from an online retailer\u2014and say they did not make the purchase**.\n\nThis pattern is consistent across the transcripts:\n\n- **CALL-00494**: Member reports a charge they don\u2019t recognize from an online retailer and states, \u201cI definitely didn\u2019t make that purchase.\u201d\n- **CALL-01248**: Same issue\u2014unrecognized online retailer charge that the member denies making.\n- **CALL-00458**: Member disputes an unrecognized charge from an online retailer.\n- **CALL-00102**: Again, an unrecognized online retailer charge the member did not authorize.\n- **CALL-00533**: Same reason, though the outcome was a callback scheduled rather than resolved.\n\nIn each case, the agent opens a fraud dispute and issues a provisional credit while the investigation is pending.\n\nSources: CALL-00494, CALL-01248, CALL-00458, CALL-00102, CALL-00533",
+        "route": "retrieve",
+        "metric_names": [],
+        "sql": null,
+        "citations": [
+          "CALL-00494",
+          "CALL-01248",
+          "CALL-00458",
+          "CALL-00102",
+          "CALL-00533"
+        ],
+        "grounded": true
+      }
+    },
+    {
+      "id": "g43",
+      "kind": "open",
+      "error": null,
+      "results": {
+        "route": {
+          "key": "route",
+          "score": true,
+          "comment": "expected retrieve, got retrieve"
+        },
+        "interrupt": {
+          "key": "interrupt",
+          "score": true,
+          "comment": "no interrupt"
+        },
+        "metric": {
+          "key": "metric",
+          "score": null,
+          "comment": ""
+        },
+        "sql": {
+          "key": "sql",
+          "score": null,
+          "comment": ""
+        },
+        "citations": {
+          "key": "citations",
+          "score": true,
+          "comment": "CALL-00626, CALL-00326, CALL-00014, CALL-00388, CALL-00127"
+        },
+        "call_id": {
+          "key": "call_id",
+          "score": null,
+          "comment": ""
+        },
+        "judge": {
+          "key": "judge",
+          "score": 0.75,
+          "comment": "4/5 (prompt v1): The answer addresses the question directly: members ask to check their balance, then whether it matches online banking. It cites real-looking call ids and invents no figures that contradict the reference. A minor gap is that it generalizes ('consistently') from five sampled calls without noting the category's size of 179 calls or any variation among them."
+        }
+      },
+      "outputs": {
+        "answer": "Members call in and first ask to check their account balance: **\u201cHi, I\u2019d like to check my account balance.\u201d** (seen in CALL-00626, CALL-00326, CALL-00014, CALL-00388, and CALL-00127).\n\nAfter the agent provides the ledger balance, members consistently ask: **\u201cIs that the same number I\u2019d see in online banking?\u201d** (also seen in CALL-00626, CALL-00326, CALL-00014, CALL-00388, and CALL-00127).\n\nSources: CALL-00626, CALL-00326, CALL-00014, CALL-00388, CALL-00127",
+        "route": "retrieve",
+        "metric_names": [],
+        "sql": null,
+        "citations": [
+          "CALL-00626",
+          "CALL-00326",
+          "CALL-00014",
+          "CALL-00388",
+          "CALL-00127"
+        ],
+        "grounded": true
+      }
+    },
+    {
+      "id": "g42",
+      "kind": "open",
+      "error": null,
+      "results": {
+        "route": {
+          "key": "route",
+          "score": true,
+          "comment": "expected retrieve, got retrieve"
+        },
+        "interrupt": {
+          "key": "interrupt",
+          "score": true,
+          "comment": "no interrupt"
+        },
+        "metric": {
+          "key": "metric",
+          "score": null,
+          "comment": ""
+        },
+        "sql": {
+          "key": "sql",
+          "score": null,
+          "comment": ""
+        },
+        "citations": {
+          "key": "citations",
+          "score": true,
+          "comment": "CALL-00932, CALL-01184, CALL-01094, CALL-00746, CALL-01093"
+        },
+        "call_id": {
+          "key": "call_id",
+          "score": null,
+          "comment": ""
+        },
+        "judge": {
+          "key": "judge",
+          "score": 0.75,
+          "comment": "4/5 (prompt v1): The answer is responsive and cites specific call ids with outcomes. Its description of the password-rejection and reset-link pattern is plausible and adds no invented facts beyond clearly hedged suggestions. Minor gap: it draws a 'dominant issue' conclusion from only 5 calls without noting that the category holds 147, which slightly overstates how representative the sample is."
+        }
+      },
+      "outputs": {
+        "answer": "Members are reporting the same core login problem across the online banking support calls: they cannot sign in because the system repeatedly says their password is wrong.\n\nSpecifically:\n- **CALL-00932**: Member cannot sign in; \u201cpassword is wrong.\u201d Agent verifies identity and sends a secure reset link; marked **resolved**.\n- **CALL-01184**: Same incorrect-password login failure; reset link sent, but outcome is **unresolved**.\n- **CALL-01094**: Same issue; reset link sent, but case is **escalated**.\n- **CALL-00746**: Same issue; reset link sent, but case is **escalated**.\n- **CALL-01093**: Same issue; reset link sent and a **callback is scheduled**.\n\nPattern: the dominant issue is **password rejection / failed online banking authentication**, not username problems, MFA issues, lockouts, browser errors, or site outages based on these transcripts. The standard handling is identity verification using member number plus account last four, followed by an emailed secure password reset link that agents say should work within 1\u20132 minutes.\n\nHowever, the mixed outcomes \u2014 only **CALL-00932 resolved**, while **CALL-01184 is unresolved**, **CALL-01094 and CALL-00746 escalated**, and **CALL-01093 requires callback** \u2014 suggest the reset-link process does not reliably confirm resolution during the initial contact. Supervisors may want to check whether reset emails are delayed, links expire, members cannot access the email on file, or the reset does not actually clear the login failure.\n\nSources: CALL-00932, CALL-01184, CALL-01094, CALL-00746, CALL-01093",
+        "route": "retrieve",
+        "metric_names": [],
+        "sql": null,
+        "citations": [
+          "CALL-00932",
+          "CALL-01184",
+          "CALL-01094",
+          "CALL-00746",
+          "CALL-01093"
+        ],
+        "grounded": true
+      }
+    },
+    {
+      "id": "g44",
+      "kind": "open",
+      "error": null,
+      "results": {
+        "route": {
+          "key": "route",
+          "score": true,
+          "comment": "expected retrieve, got retrieve"
+        },
+        "interrupt": {
+          "key": "interrupt",
+          "score": true,
+          "comment": "no interrupt"
+        },
+        "metric": {
+          "key": "metric",
+          "score": null,
+          "comment": ""
+        },
+        "sql": {
+          "key": "sql",
+          "score": null,
+          "comment": ""
+        },
+        "citations": {
+          "key": "citations",
+          "score": true,
+          "comment": "CALL-00247, CALL-00079, CALL-00192, CALL-00117, CALL-00330"
+        },
+        "call_id": {
+          "key": "call_id",
+          "score": null,
+          "comment": ""
+        },
+        "judge": {
+          "key": "judge",
+          "score": 0.75,
+          "comment": "4/5 (prompt v1): The answer is responsive: it names specific questions members ask (expiration date, loan amount confirmation) and cites call ids, with no evident fabrication against the reference. However, it frames the finding as 'all five calls' when the category holds 17. It never notes that it reviewed only a sample, a minor completeness and framing gap."
+        }
+      },
+      "outputs": {
+        "answer": " Based on the transcripts, when members call to check on a mortgage rate lock, they consistently ask two follow-up questions after stating they want to check on the rate lock:\n\n1. **\"When does it expire?\"** \u2014 Members ask about the rate lock expiration date. This appears in all five calls, including **CALL-00247**, **CALL-00079**, **CALL-00192**, **CALL-00117**, and **CALL-00330**.\n\n2. **\"What was the loan amount again?\"** \u2014 Members ask for confirmation of the loan amount. This also appears in all five calls, including **CALL-00247**, **CALL-00079**, **CALL-00192**, **CALL-00117**, and **CALL-00330**.\n\nIn every transcript, the agent confirms the active lock and rate first, then responds to these two member questions.\n\nSources: CALL-00247, CALL-00079, CALL-00192, CALL-00117, CALL-00330",
+        "route": "retrieve",
+        "metric_names": [],
+        "sql": null,
+        "citations": [
+          "CALL-00247",
+          "CALL-00079",
+          "CALL-00192",
+          "CALL-00117",
+          "CALL-00330"
+        ],
+        "grounded": true
+      }
+    },
+    {
+      "id": "g45",
+      "kind": "open",
+      "error": null,
+      "results": {
+        "route": {
+          "key": "route",
+          "score": true,
+          "comment": "expected retrieve, got retrieve"
+        },
+        "interrupt": {
+          "key": "interrupt",
+          "score": true,
+          "comment": "no interrupt"
+        },
+        "metric": {
+          "key": "metric",
+          "score": null,
+          "comment": ""
+        },
+        "sql": {
+          "key": "sql",
+          "score": null,
+          "comment": ""
+        },
+        "citations": {
+          "key": "citations",
+          "score": false,
+          "comment": "no citation"
+        },
+        "call_id": {
+          "key": "call_id",
+          "score": null,
+          "comment": ""
+        },
+        "judge": {
+          "key": "judge",
+          "score": 0.0,
+          "comment": "1/5 (prompt v1): The answer is a raw database error message with no content about member questions on loan interest rates. It cites no calls and gives no description, even though the reference says relevant data exists in rate_inquiry and loan_inquiry. It does flag itself as unverified, but it does not answer the question."
+        }
+      },
+      "outputs": {
+        "answer": "Not grounded: treat this answer as unverified.\n\nTable 'langchain_pg_collection' is already defined for this MetaData instance.  Specify 'extend_existing=True' to redefine options and columns on an existing Table object.",
+        "route": "retrieve",
+        "metric_names": [],
+        "sql": null,
+        "citations": [],
+        "grounded": false
+      }
+    },
+    {
+      "id": "g47",
+      "kind": "open",
+      "error": null,
+      "results": {
+        "route": {
+          "key": "route",
+          "score": true,
+          "comment": "expected retrieve, got retrieve"
+        },
+        "interrupt": {
+          "key": "interrupt",
+          "score": true,
+          "comment": "no interrupt"
+        },
+        "metric": {
+          "key": "metric",
+          "score": null,
+          "comment": ""
+        },
+        "sql": {
+          "key": "sql",
+          "score": null,
+          "comment": ""
+        },
+        "citations": {
+          "key": "citations",
+          "score": true,
+          "comment": "CALL-00957, CALL-00445, CALL-01116"
+        },
+        "call_id": {
+          "key": "call_id",
+          "score": null,
+          "comment": ""
+        },
+        "judge": {
+          "key": "judge",
+          "score": 0.5,
+          "comment": "3/5 (prompt v1): The answer stays on the account-opening topic and cites real-looking call ids with a specific rate quote, but it does not mention the 53-call scope. It makes sweeping claims, that every call follows this pattern and that no member asks about fees or minimums, from only three cited calls, which risks unsupported generalization. It also reads the agent volunteering the rate as members wanting to know it, so it only partly answers what members actually ask."
+        }
+      },
+      "outputs": {
+        "answer": "Based on the transcripts, members opening new accounts want to know the **interest rate on the savings account**.\n\nIn each account-opening call, after the member selects a savings account, the agent states: *\u201cOur high-yield savings earns 4.816% right now.\u201d* The member then responds positively and proceeds to open the account (e.g., **CALL-00957**, **CALL-00445**, **CALL-01116**).\n\nNo members in these transcripts ask about fees, minimum balances, or other account terms \u2014 the key piece of information that drives their decision is the **4.816% rate**.\n\nSources: CALL-00957, CALL-00445, CALL-01116",
+        "route": "retrieve",
+        "metric_names": [],
+        "sql": null,
+        "citations": [
+          "CALL-00957",
+          "CALL-00445",
+          "CALL-01116"
+        ],
+        "grounded": true
+      }
+    },
+    {
+      "id": "g46",
+      "kind": "open",
+      "error": null,
+      "results": {
+        "route": {
+          "key": "route",
+          "score": true,
+          "comment": "expected retrieve, got retrieve"
+        },
+        "interrupt": {
+          "key": "interrupt",
+          "score": true,
+          "comment": "no interrupt"
+        },
+        "metric": {
+          "key": "metric",
+          "score": null,
+          "comment": ""
+        },
+        "sql": {
+          "key": "sql",
+          "score": null,
+          "comment": ""
+        },
+        "citations": {
+          "key": "citations",
+          "score": true,
+          "comment": "CALL-00268, CALL-00420, CALL-00785, CALL-01236, CALL-01046"
+        },
+        "call_id": {
+          "key": "call_id",
+          "score": null,
+          "comment": ""
+        },
+        "judge": {
+          "key": "judge",
+          "score": 0.75,
+          "comment": "4/5 (prompt v1): The answer is responsive. It describes a concrete handling pattern (acknowledge, give the minimum payment, offer hardship deferral, submit and confirm by email) and cites five specific call ids with plausible, transcript-style details. Nothing contradicts the reference. Its gap is that it never says these five calls are a sample of 113 payment_assistance calls, so 'consistent across all five calls' could overstate how general the pattern is."
+        }
+      },
+      "outputs": {
+        "answer": " Agents handle members who can\u2019t make a payment by offering a hardship program that can defer the current month\u2019s payment to the end of the term.\n\nIn each call, the agent:\n\n1. **Acknowledges the member\u2019s difficulty** \u2014 e.g., \u201cI\u2019m sorry to hear that.\u201d\n2. **Provides account-specific minimum payment information**:\n   - CALL-00268: account ending in 1031, minimum payment **$342.26**\n   - CALL-00420: account ending in 1026, minimum payment **$35.00**\n   - CALL-00785: account ending in 1023, minimum payment **$35.00**\n   - CALL-01236: account ending in 1087, minimum payment **$35.00**\n   - CALL-01046: account ending in 1234, minimum payment **$301.68**\n3. **Offers the hardship deferral option** after the member says the amount is unaffordable.\n4. **Submits the request** once the member agrees and tells them a confirmation email will be sent shortly.\n\nThis pattern is consistent across all five calls, regardless of the final outcome (resolved, transferred, escalated, or callback_scheduled).\n\nSources: CALL-00268, CALL-00420, CALL-00785, CALL-01236, CALL-01046",
+        "route": "retrieve",
+        "metric_names": [],
+        "sql": null,
+        "citations": [
+          "CALL-00268",
+          "CALL-00420",
+          "CALL-00785",
+          "CALL-01236",
+          "CALL-01046"
+        ],
+        "grounded": true
+      }
+    },
+    {
+      "id": "g49",
+      "kind": "open",
+      "error": null,
+      "results": {
+        "route": {
+          "key": "route",
+          "score": true,
+          "comment": "expected retrieve, got retrieve"
+        },
+        "interrupt": {
+          "key": "interrupt",
+          "score": true,
+          "comment": "no interrupt"
+        },
+        "metric": {
+          "key": "metric",
+          "score": null,
+          "comment": ""
+        },
+        "sql": {
+          "key": "sql",
+          "score": null,
+          "comment": ""
+        },
+        "citations": {
+          "key": "citations",
+          "score": true,
+          "comment": "CALL-00650, CALL-01066, CALL-00690, CALL-00131, CALL-00711"
+        },
+        "call_id": {
+          "key": "call_id",
+          "score": null,
+          "comment": ""
+        },
+        "judge": {
+          "key": "judge",
+          "score": 0.75,
+          "comment": "4/5 (prompt v1): The answer describes a consistent pattern in insurance calls and cites specific call ids. Nothing contradicts the reference, and it addresses the question. However, it draws on only 5 of the 72 insurance_service calls, and claims like \"every call\" and \"every member\" overgeneralize from that small sample without stating the limitation, so this is a minor gap."
+        }
+      },
+      "outputs": {
+        "answer": "Members ask three main questions about their auto insurance policies across the transcripts:\n\n1. **To review their auto insurance policy** \u2014 This request opens every call (CALL-00650, CALL-01066, CALL-00690, CALL-00131, CALL-00711).\n\n2. **To walk through the coverage details** \u2014 After hearing their premium and deductible, every member asks, \"Can you walk through the coverage?\" (CALL-00650, CALL-01066, CALL-00690, CALL-00131, CALL-00711).\n\n3. **About adding full coverage** \u2014 Each member follows up by asking, \"And what would full coverage add?\" (CALL-00650, CALL-01066, CALL-00690, CALL-00131, CALL-00711).\n\nIn summary, the consistent pattern is that members request a policy review, ask for an explanation of their current coverage, and then inquire about upgrading to full coverage.\n\nSources: CALL-00650, CALL-01066, CALL-00690, CALL-00131, CALL-00711",
+        "route": "retrieve",
+        "metric_names": [],
+        "sql": null,
+        "citations": [
+          "CALL-00650",
+          "CALL-01066",
+          "CALL-00690",
+          "CALL-00131",
+          "CALL-00711"
+        ],
+        "grounded": true
+      }
+    },
+    {
+      "id": "g50",
+      "kind": "open",
+      "error": null,
+      "results": {
+        "route": {
+          "key": "route",
+          "score": true,
+          "comment": "expected retrieve, got retrieve"
+        },
+        "interrupt": {
+          "key": "interrupt",
+          "score": true,
+          "comment": "no interrupt"
+        },
+        "metric": {
+          "key": "metric",
+          "score": null,
+          "comment": ""
+        },
+        "sql": {
+          "key": "sql",
+          "score": null,
+          "comment": ""
+        },
+        "citations": {
+          "key": "citations",
+          "score": true,
+          "comment": "CALL-01107, CALL-01151, CALL-00019, CALL-01128, CALL-00732"
+        },
+        "call_id": {
+          "key": "call_id",
+          "score": null,
+          "comment": ""
+        },
+        "judge": {
+          "key": "judge",
+          "score": 0.75,
+          "comment": "4/5 (prompt v1): The answer is responsive, cites real-looking call ids, and describes what members ask without obvious invention. It covers only five of the 59 investment_review calls, and it phrases the pattern as 'all members' and 'every member', which overstates what a five-call sample can show. That is a minor gap in scope and caveating, not a factual error."
+        }
+      },
+      "outputs": {
+        "answer": " Based on the transcripts, members consistently ask two things during investment review calls:\n\n1. **They request the review itself:** All members open with, *\"I'd like to review my investment account.\"* (CALL-01107, CALL-01151, CALL-00019, CALL-01128, CALL-00732)\n\n2. **They ask about year-to-date performance:** After the agent shares the account market value and settled cash, every member follows up with, *\"How has it performed this year?\"* (CALL-01107, CALL-01151, CALL-00019, CALL-01128, CALL-00732)\n\nThis pattern is consistent across all five calls, regardless of whether the account had positive returns (e.g., 23.14% in CALL-01107), negative returns (e.g., -11.16% in CALL-00019), or modest returns (e.g., 3.51% in CALL-01128 and CALL-00732).\n\nSources: CALL-01107, CALL-01151, CALL-00019, CALL-01128, CALL-00732",
+        "route": "retrieve",
+        "metric_names": [],
+        "sql": null,
+        "citations": [
+          "CALL-01107",
+          "CALL-01151",
+          "CALL-00019",
+          "CALL-01128",
+          "CALL-00732"
+        ],
+        "grounded": true
+      }
+    },
+    {
+      "id": "g48",
+      "kind": "open",
+      "error": null,
+      "results": {
+        "route": {
+          "key": "route",
+          "score": true,
+          "comment": "expected retrieve, got retrieve"
+        },
+        "interrupt": {
+          "key": "interrupt",
+          "score": true,
+          "comment": "no interrupt"
+        },
+        "metric": {
+          "key": "metric",
+          "score": null,
+          "comment": ""
+        },
+        "sql": {
+          "key": "sql",
+          "score": null,
+          "comment": ""
+        },
+        "citations": {
+          "key": "citations",
+          "score": true,
+          "comment": "CALL-00820, CALL-00822, CALL-00187, CALL-00610, CALL-00860"
+        },
+        "call_id": {
+          "key": "call_id",
+          "score": null,
+          "comment": ""
+        },
+        "judge": {
+          "key": "judge",
+          "score": 0.75,
+          "comment": "4/5 (prompt v1): The answer cites real call ids, describes the content (shortage concerns, property tax adjustments) and lists the outcomes, all of which look consistent with an escrow_analysis set. It samples only 5 of the 15 calls, yet asserts the cause holds \"in every call,\" which overgeneralizes slightly. The $3,158.95 detail can't be verified, but it is plausible. Overall it is faithful and usable, with a minor gap in coverage."
+        }
+      },
+      "outputs": {
+        "answer": " The main issue on these escrow-analysis calls is that **members receive a notice about their escrow account and are concerned there may be a shortage.**\n\nAcross the transcripts, the member\u2019s first question is consistently, \u201cIs there a shortage?\u201d (e.g., **CALL-00820**, **CALL-00822**, **CALL-00187**, **CALL-00610**, **CALL-00860**). In each case, the agent explains that the change is **not a significant shortage but a small adjustment due to slightly changed property taxes**.\n\nKey takeaways:\n\n- **Notice-driven anxiety:** Members call because they got an escrow notice and want to know if they owe money or if their payment will spike.\n- **Property tax adjustments:** The underlying cause cited in every call is a minor change in property taxes, resulting in a small escrow adjustment.\n- **Payment confusion:** Members may not realize their escrow payment is already included in their monthly payment; agents clarify this (e.g., escrow payment included in the $3,158.95 monthly payment in **CALL-00820**).\n- **Resolution variability:** Some calls are resolved (**CALL-00820**), while others are escalated (**CALL-00822**, **CALL-00187**), left unresolved (**CALL-00610**), or transferred (**CALL-00860**), suggesting that not all members accept the explanation or need further review.\n\nSo, supervisors should watch for patterns of members misinterpreting routine escrow notices as shortages and ensure agents clearly explain property tax\u2013driven adjustments and how the escrow payment is folded into the monthly mortgage payment.\n\nSources: CALL-00820, CALL-00822, CALL-00187, CALL-00610, CALL-00860",
+        "route": "retrieve",
+        "metric_names": [],
+        "sql": null,
+        "citations": [
+          "CALL-00820",
+          "CALL-00822",
+          "CALL-00187",
+          "CALL-00610",
+          "CALL-00860"
+        ],
+        "grounded": true
+      }
+    },
+    {
+      "id": "g51",
+      "kind": "open",
+      "error": null,
+      "results": {
+        "route": {
+          "key": "route",
+          "score": true,
+          "comment": "expected retrieve, got retrieve"
+        },
+        "interrupt": {
+          "key": "interrupt",
+          "score": true,
+          "comment": "no interrupt"
+        },
+        "metric": {
+          "key": "metric",
+          "score": null,
+          "comment": ""
+        },
+        "sql": {
+          "key": "sql",
+          "score": null,
+          "comment": ""
+        },
+        "citations": {
+          "key": "citations",
+          "score": true,
+          "comment": "CALL-00299, CALL-00886, CALL-00081, CALL-00327, CALL-00741"
+        },
+        "call_id": {
+          "key": "call_id",
+          "score": null,
+          "comment": ""
+        },
+        "judge": {
+          "key": "judge",
+          "score": 0.5,
+          "comment": "3/5 (prompt v1): The answer cites specific call ids and details that look grounded, and nothing contradicts the reference. However, it generalizes from 5 calls out of 114 and presents available-credit inquiries as \"the consistent member request\" without saying the sample is small. That overreaches and leaves the description of card services requests incomplete."
+        }
+      },
+      "outputs": {
+        "answer": "Based on the transcripts, members contacting **card_services** request account information about their credit cards, specifically asking:\n\n**\u201cWhat\u2019s my available credit?\u201d**\n\nIn each call, the member first asks about their credit card in general. After the agent verifies their identity and provides the card\u2019s limit, outstanding balance, and purchase APR, the member follows up by asking for the available credit. This pattern appears in all five calls:\n\n- **CALL-00299**: Member asks about card ending in 1225; available credit is **$9,554.65**.\n- **CALL-00886**: Member asks about card ending in 0962; available credit is **$384.12**.\n- **CALL-00081**: Member asks about card ending in 1066; available credit is **$18,295.03**.\n- **CALL-00327**: Member asks about card ending in 1232; available credit is **$24,041.63**.\n- **CALL-00741**: Member asks about card ending in 1194; available credit is **$17,560.35**.\n\nSo the consistent member request across these card services calls is to confirm their **available credit balance** after receiving basic credit card account details.\n\nSources: CALL-00299, CALL-00886, CALL-00081, CALL-00327, CALL-00741",
+        "route": "retrieve",
+        "metric_names": [],
+        "sql": null,
+        "citations": [
+          "CALL-00299",
+          "CALL-00886",
+          "CALL-00081",
+          "CALL-00327",
+          "CALL-00741"
+        ],
+        "grounded": true
+      }
+    }
+  ]
+}
