@@ -60,7 +60,7 @@ LangSmith tracing is forced off for the offline run.
 
 This needs:
 
-- the stack: `make up`, `make seed`, `make ingest`, and `dbt build` in `olap/dbt`;
+- the stack, in this order: `make up`, `make seed`, `make ingest`, then `make dbt-build-dev` (builds the marts the metric tool queries and the semantic manifest `mf` reads; rerun it after any re-seed);
 - the 1Password CLI, signed in (`eval $(op signin)`), and two references to items in your vault:
 
   ```bash
@@ -70,7 +70,7 @@ This needs:
 
   `OPENAI_API_KEY` is an OpenRouter key: it pays for the agent (`LLM_PROVIDER=openai`, `LLM_MODEL`) and the judge. The repo names no vault; `tools/op/evals.env` only says which variable holds each reference.
 
-`make evals-live` runs `tools/evals-live-run.sh`, which resolves both keys with `op run` into the run's processes only. The judge goes through OpenRouter: `EVAL_JUDGE_PROVIDER=openai`, `EVAL_JUDGE_MODEL=anthropic/claude-opus-5.5` (OpenRouter's spelling) and `LLM_BASE_URL=https://openrouter.ai/api/v1` are the defaults, and any of them set in the shell wins. Before anything is paid for, it checks, with one message each: both references set and readable, the agent's model unlike the judge's, Postgres reachable with the transcripts embedded (pgvector), and Ollama reachable when it does the embeddings. Then it prints an estimated cost range from OpenRouter's live per-token prices for the two models, under a stated assumption of tokens per question (`ASSUMPTIONS` in `preflight.py`); a model not served through OpenRouter is listed as not priced. `DIRECT=1` skips 1Password and the checks and reads everything from the shell or `.env`, as before.
+`make evals-live` runs `tools/evals-live-run.sh`, which resolves both keys with `op run` into the run's processes only. The judge goes through OpenRouter: `EVAL_JUDGE_PROVIDER=openai`, `EVAL_JUDGE_MODEL=anthropic/claude-opus-5.5` (OpenRouter's spelling) and `LLM_BASE_URL=https://openrouter.ai/api/v1` are the defaults, and any of them set in the shell wins. Before anything is paid for, it checks, with one message each: both references set and readable, the agent's model unlike the judge's, the semantic manifest built for the local Postgres, every marts table the metric tool queries present, Postgres reachable with the transcripts embedded (pgvector), and Ollama reachable when it does the embeddings. Then it prints an estimated cost range from OpenRouter's live per-token prices for the two models, under a stated assumption of tokens per question (`ASSUMPTIONS` in `preflight.py`); a model not served through OpenRouter is listed as not priced. `DIRECT=1` skips 1Password and the checks and reads everything from the shell or `.env`, as before.
 
 The run itself still refuses to start when the agent and judge models match. It syncs the golden set to the LangSmith dataset `ccai-agent-golden-<sha8>`, named after a hash of the file's content and keyed by golden id, so a rerun adds nothing twice. It then runs one experiment with every evaluator plus the judge, writes `results/evals/<UTC date-time>_<run>_<short git sha>.json`, points `results/evals/LATEST` at it, and renders `results/evals/README.md`. A results file is never overwritten: a second run in the same second gets a `-2` suffix. The run name defaults to `agent-golden-<LLM_PROVIDER>`; `ARGS="--run post-fix"` names it. Each file also keeps every item's outputs (answer, route, metrics, SQL, citations), its scores and the judge's comment under `items`, so a run can be diagnosed without LangSmith. `ARGS="--limit 5"` scores the first five questions.
 
@@ -100,4 +100,10 @@ What changed so it cannot recur (no change to the golden set, the judge prompt o
 - `make dbt-build WAREHOUSE=...` writes its artifacts to `olap/dbt/target/<warehouse>/` (`--target-path`), so a warehouse build no longer overwrites the dev `target/semantic_manifest.json`. The warehouse commands in `olap/dbt/README.md` show the same flag. Per-target directories were chosen over moving the dev manifest because `mf` has no flag for a manifest path and always reads `target/`.
 - `query_metric` checks the manifest before running `mf` and refuses with one line naming the adapter it was built for and the fix (`cd olap/dbt && uv run --group dbt dbt parse`). The adapter comes from `target/manifest.json` metadata, or from backtick-quoted relation names when that file is absent. The `make evals-live` preflight runs the same check, so a poisoned manifest stops the run before anything is paid for.
 - Results files and exports replace `/home/<user>/` and `/Users/<user>/` with `~/`, because tool errors quote absolute paths and these files are committed to a public repo.
+
+### 2026-10-05 first rerun: the marts were never built
+
+After `dbt parse` fixed the manifest, the rerun's 29 ambiguous and metric items failed again, now with `relation "marts.f_transaction" does not exist`. Local Postgres had been re-seeded (`make seed ingest`), which creates the OLTP tables, but `dbt build` had not run for the dev target, so the `marts` schema the metric tool queries did not exist. This is a second environment cause that invalidates a run for those two groups, independent of the first.
+
+What changed: `make dbt-build-dev` builds the dev target as a first-class step, and the run sequence above lists it after seed and ingest. The `make evals-live` preflight now confirms that every table named in the semantic manifest's relations exists in the dev Postgres, and stops with `marts not built (<tables> missing): run 'make dbt-build-dev' ...` before anything is paid for.
 
