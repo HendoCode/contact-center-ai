@@ -75,14 +75,54 @@ def test_group_on_one_side_only_shows_n_a():
     assert "  sql           0.00     n/a" in out
 
 
-def test_main_defaults_b_to_latest(tmp_path, monkeypatch, capsys):
-    a, b = tmp_path / "a.json", tmp_path / "b.json"
-    a.write_text(json.dumps(BEFORE))
-    b.write_text(json.dumps(AFTER))
-    (tmp_path / "LATEST").write_text("b.json\n")
-    monkeypatch.setattr(compare, "LATEST_PATH", tmp_path / "LATEST")
-    assert compare.main([str(a)]) == 0
-    assert "+0.90" in capsys.readouterr().out
+def write_runs(tmp_path, monkeypatch, names):
+    """Timestamped results files, one minute apart, in run order; RESULTS_DIR points at them."""
+    out = []
+    for n, (name, rec) in enumerate(names):
+        p = tmp_path / f"2026-10-05T15{n:02d}00Z_{name}_abc1234.json"
+        p.write_text(json.dumps(rec))
+        out.append(p)
+    monkeypatch.setattr(compare, "RESULTS_DIR", tmp_path)
+    return out
+
+
+def test_run_names_resolve_to_their_newest_file(tmp_path, monkeypatch):
+    files = write_runs(tmp_path, monkeypatch, [("open-pgvector-vector", BEFORE), ("open-lance-hybrid", AFTER),
+                                               ("open-pgvector-vector", BEFORE)])
+    assert compare.resolve("open-pgvector-vector") == files[2]
+    assert compare.resolve("open-lance-hybrid") == files[1]
+    assert compare.resolve("latest") == files[2]
+    assert compare.resolve("latest~2") == files[0]
+    assert compare.resolve(str(files[0])) == files[0]
+    assert compare.resolve(files[0].name) == files[0]
+
+
+def test_main_by_name_prints_what_it_resolved_and_defaults_b_to_latest(tmp_path, monkeypatch, capsys):
+    files = write_runs(tmp_path, monkeypatch, [("before-run", BEFORE), ("after-run", AFTER)])
+    assert compare.main(["before-run"]) == 0
+    out = capsys.readouterr().out
+    assert f"A: before-run -> {files[0]}" in out and f"B: latest -> {files[1]}" in out
+    assert "+0.90" in out
+
+
+def test_unknown_name_lists_the_runs(tmp_path, monkeypatch):
+    write_runs(tmp_path, monkeypatch, [("open-pgvector-vector", BEFORE), ("open-lance-hybrid", AFTER)])
+    with pytest.raises(SystemExit, match="no run named 'open-lance'; runs: open-lance-hybrid, open-pgvector-vector"):
+        compare.resolve("open-lance")
+
+
+def test_same_minute_runs_are_ambiguous(tmp_path, monkeypatch):
+    monkeypatch.setattr(compare, "RESULTS_DIR", tmp_path)
+    for name in ("2026-10-05T150001Z_x_abc1234.json", "2026-10-05T150059Z_x_def5678.json"):
+        (tmp_path / name).write_text(json.dumps(BEFORE))
+    with pytest.raises(SystemExit, match="more than one run in the same minute"):
+        compare.resolve("x")
+
+
+def test_latest_beyond_the_runs_is_one_line(tmp_path, monkeypatch):
+    write_runs(tmp_path, monkeypatch, [("only", BEFORE)])
+    with pytest.raises(SystemExit, match=r"latest~3: only 1 run\(s\)"):
+        compare.resolve("latest~3")
 
 
 def test_non_evals_file_is_refused(tmp_path):

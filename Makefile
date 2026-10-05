@@ -6,7 +6,7 @@
 # `evals` is the L2 agent golden set offline (a CI gate); `evals-live` is the same set
 # against real models, uploaded to LangSmith.
 
-.PHONY: up down seed ingest test lint check-public demo bench evals evals-live evals-compare evals-export finetune-data finetune-label load-snowflake load-databricks load-dry-run dbt-build dbt-build-dev dev-data lance-azure-check
+.PHONY: up down seed ingest test lint check-public demo bench evals evals-live evals-compare evals-export evals-retrieval-experiment finetune-data finetune-label load-snowflake load-databricks load-dry-run dbt-build dbt-build-dev dev-data lance-azure-check
 
 PYTHON := uv run python
 # RETRIEVER_BACKEND=lancedb needs the lance dependency group wherever the store is read or written.
@@ -147,11 +147,17 @@ EVALS_RUN = $(if $(DIRECT),,tools/evals-live-run.sh $(if $(DRY),--dry-run) --)
 evals-live:
 	$(EVALS_RUN) uv run --group agent $(LANCE_GROUP) python -m evals.run --live $(ARGS)
 
+# The open-question retrieval experiment in one command: pgvector vector run, LanceDB ingest,
+# LanceDB hybrid run, then the comparison by run name. Prints the total estimate first; stops
+# at the first failure with the fix. DRY=1: plan and estimates only. K10=1 adds a k=10 run.
+evals-retrieval-experiment:
+	tools/evals-retrieval-experiment.sh $(if $(DRY),--dry-run) $(if $(K10),--k10)
+
 # Before/after table of two evals-live result files, per group and check, with deltas and a
-# warning when the agent, judge, judge prompt, golden set or limit differ. B defaults to the
-# file results/evals/LATEST names. Name a run with ARGS="--run <name>" on evals-live.
+# warning when the agent, judge, judge prompt, golden set or limit differ. A and B are run
+# names (the newest file of that --run), latest, latest~N, or paths; B defaults to latest. Name a run with ARGS="--run <name>" on evals-live.
 evals-compare:
-	@test -n "$(A)" || { echo "usage: make evals-compare A=results/evals/<before>.json [B=<after>.json]" >&2; exit 2; }
+	@test -n "$(A)" || { echo "usage: make evals-compare A=<run name | latest~N | file> [B=<same; default latest>]" >&2; exit 2; }
 	$(PYTHON) -m evals.compare $(A) $(B)
 
 # Per-item results of one LangSmith experiment, read-only:
