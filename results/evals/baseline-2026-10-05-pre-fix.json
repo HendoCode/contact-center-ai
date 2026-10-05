@@ -1,0 +1,82 @@
+{
+  "date": "2026-10-04",
+  "git_sha": "dd9cbf0ad1fa75fda0794b69521930af31ac674c-dirty",
+  "area": "evals",
+  "run": "agent-golden-openai",
+  "hardware": "Intel(R) Core(TM) i5-1038NG7 CPU @ 2.00GHz, 8 cores, 15 GB RAM, Linux",
+  "versions": {
+    "python": "3.14.7",
+    "agent_model": "z-ai/glm-5.3-flash",
+    "judge_model": "anthropic/claude-opus-5.5",
+    "langgraph": "1.2.12",
+    "langsmith": "0.8.9",
+    "langchain-core": "1.6.6"
+  },
+  "params": {
+    "dataset": "ccai-agent-golden-35328593",
+    "golden_sha256": "353285937ec0a4ecf583a1965a25047b24601be47859e546b13054344419c68b",
+    "limit": null,
+    "llm_provider": "openai",
+    "agent_model": "z-ai/glm-5.3-flash",
+    "judge_provider": "openai",
+    "judge_model": "anthropic/claude-opus-5.5",
+    "judge_prompt": "v1",
+    "retriever_backend": "pgvector",
+    "embedding_provider": "ollama",
+    "experiment": "agent-golden-openai-74042631"
+  },
+  "metrics": {
+    "all": {
+      "n": 51,
+      "route": 1.0,
+      "interrupt": 1.0,
+      "metric": 1.0,
+      "sql": 0.0,
+      "citations": 0.909,
+      "call_id": 1.0,
+      "judge": 0.343
+    },
+    "ambiguous": {
+      "n": 11,
+      "route": 1.0,
+      "interrupt": 1.0,
+      "metric": 1.0,
+      "sql": 0.0,
+      "citations": null,
+      "call_id": null,
+      "judge": 0.159
+    },
+    "metric": {
+      "n": 18,
+      "route": 1.0,
+      "interrupt": 1.0,
+      "metric": 1.0,
+      "sql": 0.0,
+      "citations": null,
+      "call_id": null,
+      "judge": 0.194
+    },
+    "call_lookup": {
+      "n": 10,
+      "route": 1.0,
+      "interrupt": 1.0,
+      "metric": null,
+      "sql": null,
+      "citations": 1.0,
+      "call_id": 1.0,
+      "judge": 0.725
+    },
+    "open": {
+      "n": 12,
+      "route": 1.0,
+      "interrupt": 1.0,
+      "metric": null,
+      "sql": null,
+      "citations": 0.833,
+      "call_id": null,
+      "judge": 0.417
+    },
+    "errors": 0
+  },
+  "notes": "make evals-live: every golden item through the real graph, MCP tools and models; LLM-as-judge prompt v1, judge score scaled (score - 1) / 4. Pass rates count applicable items only."
+}
