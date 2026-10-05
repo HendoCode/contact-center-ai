@@ -12,7 +12,8 @@ Live needs the full stack (`make up seed ingest`, `dbt build`), the agent's prov
 LANGSMITH_API_KEY, and a judge model that differs from the agent's (EVAL_JUDGE_PROVIDER,
 EVAL_JUDGE_MODEL). It syncs the golden set to a LangSmith dataset named after its content
 hash, runs a LangSmith experiment with every evaluator plus the LLM-as-judge, and writes
-results/evals/<date>_agent-golden-<provider>.json (§4.3). It costs API money.
+results/evals/<UTC date-time>_<run>_<short sha>.json (§4.3; never overwritten, LATEST names the
+newest) with every item's outputs, scores and judge comments. It costs API money.
 """
 
 import argparse
@@ -20,11 +21,12 @@ import asyncio
 import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 import uuid
 from collections import defaultdict
-from datetime import date
+from datetime import UTC, datetime
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -41,6 +43,8 @@ INPUT_KEYS = ("question", "clarify_with")
 MAX_INTERRUPTS = 4  # more than any golden question can raise; stops a runaway re-ask loop
 DATASET_PREFIX = "ccai-agent-golden"
 DEFAULT_JUDGE_MODEL = "claude-opus-5-5"
+RESULTS_DIR = REPO_ROOT / "results" / "evals"
+LATEST_PATH = RESULTS_DIR / "LATEST"
 
 
 # ── golden set ────────────────────────────────────────────────────────────────
@@ -254,11 +258,34 @@ def _row(result_row: dict) -> dict:
         r.key: {"key": r.key, "score": r.score, "comment": r.comment or ""}
         for r in result_row["evaluation_results"]["results"]
     }
+    outputs = getattr(result_row["run"], "outputs", None) or {}
     return {"id": example.metadata["golden_id"], "kind": example.metadata["kind"],
-            "error": result_row["run"].error, "results": results}
+            "error": result_row["run"].error, "results": results,
+            "outputs": {k: outputs.get(k) for k in OUTPUT_KEYS}}
 
 
-async def run_live(limit: int | None, max_concurrency: int) -> int:
+def result_path(run: str, sha: str, now: datetime | None = None, out_dir: Path | None = None) -> Path:
+    """`<UTC date-time>_<run>_<short sha>.json`, never an existing file: a second run in the
+    same second gets a `-2`, `-3`, ... suffix instead of overwriting."""
+    now = now or datetime.now(UTC)
+    out_dir = out_dir or RESULTS_DIR
+    stem = f"{now:%Y-%m-%dT%H%M%SZ}_{run}_{sha[:7]}"
+    path, n = out_dir / f"{stem}.json", 1
+    while path.exists():
+        n += 1
+        path = out_dir / f"{stem}-{n}.json"
+    return path
+
+
+def write_record(record: dict, path: Path) -> None:
+    """Write a run record without ever replacing one, and point LATEST at it."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "x") as fh:  # "x": fail rather than overwrite
+        fh.write(json.dumps(record, indent=2) + "\n")
+    (path.parent / LATEST_PATH.name).write_text(path.name + "\n")
+
+
+async def run_live(limit: int | None, max_concurrency: int, run_name: str | None = None) -> int:
     load_dotenv()  # before the key check: the key normally lives in .env
     if not os.getenv("LANGSMITH_API_KEY"):
         raise SystemExit("make evals-live uploads to LangSmith: set LANGSMITH_API_KEY in .env")
@@ -313,9 +340,10 @@ async def run_live(limit: int | None, max_concurrency: int) -> int:
     from importlib import metadata as md
     from platform import python_version
 
+    now = datetime.now(UTC)
     record = {
-        "date": date.today().isoformat(), "git_sha": git_sha(), "area": "evals",
-        "run": f"agent-golden-{provider}", "hardware": detect_hardware(),
+        "date": now.date().isoformat(), "git_sha": git_sha(), "area": "evals",
+        "run": run_name or f"agent-golden-{provider}", "hardware": detect_hardware(),
         "versions": {"python": python_version(), "agent_model": agent_model,
                      "judge_model": judge_model,
                      **{p: md.version(p) for p in ("langgraph", "langsmith", "langchain-core")}},
@@ -325,12 +353,12 @@ async def run_live(limit: int | None, max_concurrency: int) -> int:
                  f"models; LLM-as-judge prompt {JUDGE_PROMPT_VERSION}, judge score scaled "
                  "(score - 1) / 4. Pass rates count applicable items only.",
     }
+    record["items"] = rows  # per-item outputs, scores and judge comments, for diagnosis
     errors = validate(record)
     if errors:
         raise ValueError("results record violates §4.3: " + "; ".join(errors))
-    out = REPO_ROOT / "results" / "evals" / f"{record['date']}_{record['run']}.json"
-    out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps(record, indent=2) + "\n")
+    out = result_path(record["run"], record["git_sha"], now)
+    write_record(record, out)
     render("evals")
     print(f"\nwrote {out.relative_to(REPO_ROOT)}; LangSmith experiment {results.experiment_name}")
     return 0
@@ -343,9 +371,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--limit", type=int, help="live only: the first N examples")
     parser.add_argument("--max-concurrency", type=int, default=2,
                         help="live only: examples in flight at once")
+    parser.add_argument("--run", help="live only: run name in the results file "
+                                      "(default agent-golden-<LLM_PROVIDER>)")
     args = parser.parse_args(argv)
+    if args.run is not None and not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", args.run):
+        parser.error("--run: letters, digits, '.', '_' and '-' only")
     if args.live:
-        return asyncio.run(run_live(args.limit, args.max_concurrency))
+        return asyncio.run(run_live(args.limit, args.max_concurrency, args.run))
     return offline_main()
 
 

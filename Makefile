@@ -6,7 +6,7 @@
 # `evals` is the L2 agent golden set offline (a CI gate); `evals-live` is the same set
 # against real models, uploaded to LangSmith.
 
-.PHONY: up down seed ingest test lint check-public demo bench evals evals-live finetune-data finetune-label load-snowflake load-databricks load-dry-run dbt-build lance-azure-check
+.PHONY: up down seed ingest test lint check-public demo bench evals evals-live evals-compare evals-export finetune-data finetune-label load-snowflake load-databricks load-dry-run dbt-build lance-azure-check
 
 PYTHON := uv run python
 
@@ -131,3 +131,18 @@ EVALS_RUN = $(if $(DIRECT),,tools/evals-live-run.sh $(if $(DRY),--dry-run) --)
 
 evals-live:
 	$(EVALS_RUN) uv run --group agent python -m evals.run --live $(ARGS)
+
+# Before/after table of two evals-live result files, per group and check, with deltas and a
+# warning when the agent, judge, judge prompt, golden set or limit differ. B defaults to the
+# file results/evals/LATEST names. Name a run with ARGS="--run <name>" on evals-live.
+evals-compare:
+	@test -n "$(A)" || { echo "usage: make evals-compare A=results/evals/<before>.json [B=<after>.json]" >&2; exit 2; }
+	$(PYTHON) -m evals.compare $(A) $(B)
+
+# Per-item results of one LangSmith experiment, read-only:
+#   make evals-export EXP=agent-golden-openai-74042631 [OUT=<file>]
+# LANGSMITH_API_KEY comes from 1Password when LANGSMITH_KEY_REF is set (as for evals-live),
+# otherwise from the shell or .env.
+evals-export:
+	@test -n "$(EXP)" || { echo "usage: make evals-export EXP=<LangSmith experiment> [OUT=<file>]" >&2; exit 2; }
+	$(if $(LANGSMITH_KEY_REF),LANGSMITH_API_KEY="$$(op read '$(LANGSMITH_KEY_REF)')") uv run --group agent python -m evals.export $(EXP) $(if $(OUT),--out $(OUT))
