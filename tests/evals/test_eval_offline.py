@@ -134,10 +134,13 @@ def test_live_run_refuses_without_a_langsmith_key(monkeypatch):
 def test_live_rows_are_read_from_langsmith_results():
     result = {
         "example": SimpleNamespace(metadata={"golden_id": "g01", "kind": "ambiguous"}),
-        "run": SimpleNamespace(error=None),
+        "run": SimpleNamespace(error=None, outputs={"answer": "Rate is 4.1%.", "route": "ask_the_analyst",
+                                                    "sql": "SELECT 1", "extra": "dropped"}),
         "evaluation_results": {"results": [SimpleNamespace(key="route", score=True, comment=None)]},
     }
     assert eval_run._row(result) == {
         "id": "g01", "kind": "ambiguous", "error": None,
         "results": {"route": {"key": "route", "score": True, "comment": ""}},
+        "outputs": {"answer": "Rate is 4.1%.", "route": "ask_the_analyst", "metric_names": None,
+                    "sql": "SELECT 1", "citations": None, "grounded": None},
     }
