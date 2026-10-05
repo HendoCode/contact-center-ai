@@ -10,6 +10,8 @@ make evals-live                                     # live: all 51, real models 
 make evals-live DRY=1                               # the live plan and cost estimate; resolves and runs nothing
 make evals-compare A=results/evals/<before>.json    # before/after table against the latest run
 make evals-export EXP=<LangSmith experiment>       # per-item results of an older run, read-only
+make evals-live ARGS="--dataset holdout"            # the held-out set (16 questions)
+LLM_MODEL=<openrouter id> make evals-live ARGS="--group open --run open-<model>"   # one group, another agent model
 ```
 
 ## The golden set
@@ -73,6 +75,36 @@ This needs:
 `make evals-live` runs `tools/evals-live-run.sh`, which resolves both keys with `op run` into the run's processes only. The judge goes through OpenRouter: `EVAL_JUDGE_PROVIDER=openai`, `EVAL_JUDGE_MODEL=anthropic/claude-opus-5.5` (OpenRouter's spelling) and `LLM_BASE_URL=https://openrouter.ai/api/v1` are the defaults, and any of them set in the shell wins. Before anything is paid for, it checks, with one message each: both references set and readable, the agent's model unlike the judge's, the semantic manifest built for the local Postgres, every marts table the metric tool queries present (or, when the raw tables are missing too, a separate line saying to load them), Postgres reachable with the transcripts embedded (pgvector), and Ollama reachable when it does the embeddings. Then it prints an estimated cost range from OpenRouter's live per-token prices for the two models, under a stated assumption of tokens per question (`ASSUMPTIONS` in `preflight.py`); a model not served through OpenRouter is listed as not priced. `DIRECT=1` skips 1Password and the checks and reads everything from the shell or `.env`, as before.
 
 The run itself still refuses to start when the agent and judge models match. It syncs the golden set to the LangSmith dataset `ccai-agent-golden-<sha8>`, named after a hash of the file's content and keyed by golden id, so a rerun adds nothing twice. It then runs one experiment with every evaluator plus the judge, writes `results/evals/<UTC date-time>_<run>_<short git sha>.json`, points `results/evals/LATEST` at it, and renders `results/evals/README.md`. A results file is never overwritten: a second run in the same second gets a `-2` suffix. The run name defaults to `agent-golden-<LLM_PROVIDER>`; `ARGS="--run post-fix"` names it. Each file also keeps every item's outputs (answer, route, metrics, SQL, citations), its scores and the judge's comment under `items`, so a run can be diagnosed without LangSmith. `ARGS="--limit 5"` scores the first five questions.
+
+## Held-out set
+
+`datasets/agent_holdout.jsonl` holds 16 questions the golden set does not have (ambiguous 4, metric 5, call_lookup 3, open 4), in the golden schema with ids `h01`..`h16`. They were written once, on 2026-10-05, from the synthetic data and the semantic layer only (metric labels, the ambiguous terms, the transcript categories and outcomes), before any score on them was seen; the questions are in `datasets/holdout_specs.py` and every expectation is derived by the same code as the golden set (`python -m evals.datasets.build_golden --dataset holdout [--check]`).
+
+**The file is held out.** Its questions are not edited after scores are seen. A factual error in a question may be fixed; each fix is recorded in `holdout_specs.py` with its date and reason. It has its own content hash and its own LangSmith dataset (`ccai-agent-holdout-<sha8>`). `make evals-live ARGS="--dataset holdout"` runs it; the default run is the golden set, unchanged. `make evals-compare` refuses to compare a golden run with a holdout run (no score there is a before/after) unless `--allow-different-datasets`.
+
+## Trying another agent model
+
+The agent model is configuration: `LLM_MODEL` (any OpenRouter model id, with `LLM_PROVIDER=openai`, the default). The judge stays fixed (`anthropic/claude-opus-5.5`, prompt `judge_answer_v1`), so judge scores stay comparable across agent models. `--group open` (comma-separated, any of `ambiguous`, `metric`, `call_lookup`, `open`) scores only those groups, which keeps a model trial cheap; the estimate counts only those questions. Compare a group-only run against a full run's table for the same group: `make evals-compare A=<full run> B=<group run>` warns that `all` is not comparable and the `open` table is.
+
+Candidates, checked against OpenRouter's public model list on 2026-10-05 (price per million input/output tokens; all three list tool calling and structured outputs, which the agent needs):
+
+| model | price in/out | estimate, open group (12 q, with judge) | why |
+|---|---|---|---|
+| `deepseek/deepseek-v4-pro` | $0.21 / $0.42 | $0.11 to $0.29 | about the current agent's price, a much larger model: the cheapest real step up |
+| `moonshotai/kimi-k2.7-code` | $0.67 / $3.35 | $0.15 to $0.51 | strong at tool use, mid price |
+| `anthropic/claude-sonnet-5.5` | $2.00 / $10.00 | $0.26 to $1.08 | the upper bound worth paying for; agent cost dominates |
+
+The current agent is `z-ai/glm-5.3-flash` at $0.15 / $0.50. Estimates use the preflight's stated token assumption per question; open questions carry retrieved transcripts, so their real input may sit near the top of the range. Not verified here: how well each model's tool calling works with this agent's MCP tools (only a live run shows that).
+
+**Planned runs and total estimate** (each prints its own estimate first): the holdout with the current agent, $0.14 to $0.36; the open group with each of the three candidates, $0.11 to $0.29, $0.15 to $0.51 and $0.26 to $1.08. **Total: $0.66 to $2.24**, under the $3 cap.
+
+```bash
+make evals-live ARGS="--dataset holdout --run holdout-glm-5.3-flash"
+LLM_MODEL=deepseek/deepseek-v4-pro    make evals-live ARGS="--group open --run open-deepseek-v4-pro"
+LLM_MODEL=moonshotai/kimi-k2.7-code   make evals-live ARGS="--group open --run open-kimi-k2.7-code"
+LLM_MODEL=anthropic/claude-sonnet-5.5 make evals-live ARGS="--group open --run open-claude-sonnet-5.5"
+make evals-compare A=results/evals/<post-env-fix full run>.json B=results/evals/<open-... run>.json
+```
 
 ## Comparing runs: `make evals-compare`
 

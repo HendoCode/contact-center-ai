@@ -34,7 +34,7 @@ from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.types import Command
 
 from evals.datasets import build_golden
-from evals.datasets.build_golden import DATA_DIR, GOLDEN_PATH, KINDS, REPO_ROOT
+from evals.datasets.build_golden import DATA_DIR, GOLDEN_PATH, HOLDOUT_PATH, KINDS, REPO_ROOT
 from evals.evaluators import DETERMINISTIC, DETERMINISTIC_KEYS, JUDGE_PROMPT_VERSION
 
 KNOWN_FAILURES_PATH = Path(__file__).resolve().parent / "known_failures.json"
@@ -42,6 +42,8 @@ OUTPUT_KEYS = ("answer", "route", "metric_names", "sql", "citations", "grounded"
 INPUT_KEYS = ("question", "clarify_with")
 MAX_INTERRUPTS = 4  # more than any golden question can raise; stops a runaway re-ask loop
 DATASET_PREFIX = "ccai-agent-golden"
+# --dataset NAME -> (file, LangSmith dataset prefix). The golden set is the default.
+DATASETS = {"golden": (GOLDEN_PATH, DATASET_PREFIX), "holdout": (HOLDOUT_PATH, "ccai-agent-holdout")}
 DEFAULT_JUDGE_MODEL = "claude-opus-5-5"
 RESULTS_DIR = REPO_ROOT / "results" / "evals"
 LATEST_PATH = RESULTS_DIR / "LATEST"
@@ -233,14 +235,14 @@ def golden_sha(path: Path = GOLDEN_PATH) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def sync_dataset(client, items: list[dict], name: str) -> None:
+def sync_dataset(client, items: list[dict], name: str, path: Path = GOLDEN_PATH) -> None:
     """Create the LangSmith dataset if missing and add any example it lacks, keyed by
     golden id, so a rerun (or a run after a partial upload) creates nothing twice."""
     if client.has_dataset(dataset_name=name):
         have = {(ex.metadata or {}).get("golden_id")
                 for ex in client.list_examples(dataset_name=name)}
     else:
-        client.create_dataset(name, description=f"agent golden set ({GOLDEN_PATH.name})")
+        client.create_dataset(name, description=f"agent eval set ({path.name})")
         have = set()
     missing = [item for item in items if item["id"] not in have]
     if missing:
@@ -300,7 +302,16 @@ def write_record(record: dict, path: Path) -> None:
     (path.parent / LATEST_PATH.name).write_text(path.name + "\n")
 
 
-async def run_live(limit: int | None, max_concurrency: int, run_name: str | None = None) -> int:
+def select_examples(examples, groups: list[str] | None, limit: int | None) -> list:
+    """The examples a run scores: only the named groups (golden kinds), in golden-id order,
+    then the first `limit`."""
+    chosen = [ex for ex in examples if not groups or (ex.metadata or {}).get("kind") in groups]
+    chosen.sort(key=lambda ex: (ex.metadata or {}).get("golden_id", ""))
+    return chosen[:limit] if limit else chosen
+
+
+async def run_live(limit: int | None, max_concurrency: int, run_name: str | None = None,
+                   dataset_name: str = "golden", groups: list[str] | None = None) -> int:
     load_dotenv()  # before the key check: the key normally lives in .env
     if not os.getenv("LANGSMITH_API_KEY"):
         raise SystemExit("make evals-live uploads to LangSmith: set LANGSMITH_API_KEY in .env")
@@ -322,19 +333,24 @@ async def run_live(limit: int | None, max_concurrency: int, run_name: str | None
     judge_model = model_name(judge_llm)
     check_judge_differs(agent_model, judge_model)
 
-    items = load_golden()
+    path, prefix = DATASETS[dataset_name]
+    items = load_golden(path)
     client = Client()
-    dataset = f"{DATASET_PREFIX}-{golden_sha()[:8]}"
-    sync_dataset(client, items, dataset)
+    dataset = f"{prefix}-{golden_sha(path)[:8]}"
+    sync_dataset(client, items, dataset, path)
 
     graph = build_graph(get_llm=get_llm, toolbox=MCPToolbox(), checkpointer=InMemorySaver())
 
     async def target(inputs: dict) -> dict:
         return await run_question(graph, inputs["question"], inputs.get("clarify_with"))
 
-    data = client.list_examples(dataset_name=dataset, limit=limit) if limit else dataset
+    if groups:
+        data = select_examples(client.list_examples(dataset_name=dataset), groups, limit)
+    else:
+        data = client.list_examples(dataset_name=dataset, limit=limit) if limit else dataset
     params = {
-        "dataset": dataset, "golden_sha256": golden_sha(), "limit": limit,
+        "dataset": dataset, "eval_dataset": dataset_name, "groups": groups,
+        "golden_sha256": golden_sha(path), "limit": limit,
         "llm_provider": provider, "agent_model": agent_model,
         "judge_provider": os.getenv("EVAL_JUDGE_PROVIDER", "anthropic"),
         "judge_model": judge_model, "judge_prompt": JUDGE_PROMPT_VERSION,
@@ -358,7 +374,7 @@ async def run_live(limit: int | None, max_concurrency: int, run_name: str | None
     now = datetime.now(UTC)
     record = {
         "date": now.date().isoformat(), "git_sha": git_sha(), "area": "evals",
-        "run": run_name or f"agent-golden-{provider}", "hardware": detect_hardware(),
+        "run": run_name or f"agent-{dataset_name}-{provider}", "hardware": detect_hardware(),
         "versions": {"python": python_version(), "agent_model": agent_model,
                      "judge_model": judge_model,
                      **{p: md.version(p) for p in ("langgraph", "langsmith", "langchain-core")}},
@@ -387,12 +403,18 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--max-concurrency", type=int, default=2,
                         help="live only: examples in flight at once")
     parser.add_argument("--run", help="live only: run name in the results file "
-                                      "(default agent-golden-<LLM_PROVIDER>)")
+                                      "(default agent-<dataset>-<LLM_PROVIDER>)")
+    parser.add_argument("--dataset", choices=sorted(DATASETS), default="golden",
+                        help="live only: golden (default, 51 questions) or holdout (agent_holdout.jsonl)")
+    parser.add_argument("--group", help=f"live only: score only these groups, comma-separated ({', '.join(KINDS)})")
     args = parser.parse_args(argv)
+    groups = [g.strip() for g in args.group.split(",") if g.strip()] if args.group else None
+    if groups and not set(groups) <= set(KINDS):
+        parser.error(f"--group: one or more of {', '.join(KINDS)}")
     if args.run is not None and not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", args.run):
         parser.error("--run: letters, digits, '.', '_' and '-' only")
     if args.live:
-        return asyncio.run(run_live(args.limit, args.max_concurrency, args.run))
+        return asyncio.run(run_live(args.limit, args.max_concurrency, args.run, args.dataset, groups))
     return offline_main()
 
 
