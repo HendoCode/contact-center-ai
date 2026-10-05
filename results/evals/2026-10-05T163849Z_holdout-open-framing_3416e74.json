@@ -1,0 +1,290 @@
+{
+  "date": "2026-10-05",
+  "git_sha": "3416e74b423433ab385a0dcbe5f4069f02748970-dirty",
+  "area": "evals",
+  "run": "holdout-open-framing",
+  "hardware": "Intel(R) Core(TM) i5-1038NG7 CPU @ 2.00GHz, 8 cores, 15 GB RAM, Linux",
+  "versions": {
+    "python": "3.14.7",
+    "agent_model": "z-ai/glm-5.3-flash",
+    "judge_model": "anthropic/claude-opus-5.5",
+    "langgraph": "1.2.12",
+    "langsmith": "0.8.9",
+    "langchain-core": "1.6.6"
+  },
+  "params": {
+    "dataset": "ccai-agent-holdout-27fe1343",
+    "eval_dataset": "holdout",
+    "groups": [
+      "open"
+    ],
+    "golden_sha256": "27fe1343d2a7ce215e5542893b9cd5f92388215234ffb09eff1db60c93eb1d80",
+    "limit": null,
+    "llm_provider": "openai",
+    "agent_model": "z-ai/glm-5.3-flash",
+    "judge_provider": "openai",
+    "judge_model": "anthropic/claude-opus-5.5",
+    "judge_prompt": "v1",
+    "retriever_backend": "pgvector",
+    "retrieval_mode": "vector",
+    "retrieval_k": 5,
+    "embedding_provider": "ollama",
+    "experiment": "agent-golden-openai-6424e03f"
+  },
+  "metrics": {
+    "all": {
+      "n": 4,
+      "tool_errors": 0,
+      "route": 1.0,
+      "interrupt": 1.0,
+      "metric": null,
+      "sql": null,
+      "citations": 1.0,
+      "call_id": null,
+      "judge": 0.812
+    },
+    "open": {
+      "n": 4,
+      "tool_errors": 0,
+      "route": 1.0,
+      "interrupt": 1.0,
+      "metric": null,
+      "sql": null,
+      "citations": 1.0,
+      "call_id": null,
+      "judge": 0.812
+    },
+    "errors": 0
+  },
+  "notes": "make evals-live: every golden item through the real graph, MCP tools and models; LLM-as-judge prompt v1, judge score scaled (score - 1) / 4. Pass rates count applicable items only.",
+  "items": [
+    {
+      "id": "h13",
+      "kind": "open",
+      "error": null,
+      "results": {
+        "route": {
+          "key": "route",
+          "score": true,
+          "comment": "expected retrieve, got retrieve"
+        },
+        "interrupt": {
+          "key": "interrupt",
+          "score": true,
+          "comment": "no interrupt"
+        },
+        "metric": {
+          "key": "metric",
+          "score": null,
+          "comment": ""
+        },
+        "sql": {
+          "key": "sql",
+          "score": null,
+          "comment": ""
+        },
+        "citations": {
+          "key": "citations",
+          "score": true,
+          "comment": "CALL-01022, CALL-01161, CALL-00038, CALL-00424, CALL-01163"
+        },
+        "call_id": {
+          "key": "call_id",
+          "score": null,
+          "comment": ""
+        },
+        "judge": {
+          "key": "judge",
+          "score": 1.0,
+          "comment": "5/5 (prompt v1): The answer correctly places the calls in mortgage_inquiry (89 calls), cites five specific call ids, and describes their content: status checks, LTV questions prompted by statements, repeat contacts and outcomes. It plainly flags that a 5-call sample may not represent all 89. The specific figures can't be checked against the reference, but nothing contradicts it and the details read as drawn from the transcripts."
+        }
+      },
+      "tool_error": null,
+      "outputs": {
+        "answer": "Based on a sample of 5 retrieved calls: 5 of 89 calls in mortgage_inquiry.\n\n## Why Members Call About Their Mortgages (Sample: 5 of 89 calls in mortgage_inquiry)\n\nBased on this retrieved sample, members are calling for **routine status checks and clarification of figures on their mortgage statements** \u2014 not to report problems. Two consistent drivers appear across all five calls:\n\n**1. General account check-ins.** Every call opens with the member asking to \"check on my mortgage,\" and the agent responds by reading out the note rate and current principal balance (e.g., CALL-01022: 6.540% rate, $532,680.88 principal on loan ending 0590; CALL-01161: 7.151% rate, $545,050.59 principal on loan ending 0629).\n\n**2. LTV confusion from statements.** In all five transcripts, the member specifically asks about loan-to-value, and each says they saw \"LTV mentioned on my statement\" \u2014 suggesting statement terminology is a trigger for these calls. Note that the agent reports *LTV at origination* (e.g., 89.83% in CALL-01022, 60.74% in CALL-01161), not current LTV, which may be worth watching as a potential clarification gap even though members in this sample said the numbers \"matched what I expected.\"\n\n**Other observations from the sample:**\n- **Repeat contacts:** Loan ending 0654 appears in both CALL-00038 (April) and CALL-00424 (August), and loan 0590 appears twice on the same day (CALL-01022 and CALL-01163, June 23) \u2014 indicating some members check repeatedly.\n- **Outcomes:** 4 of 5 resolved; CALL-00424 was escalated despite a transcript that looks like a routine confirmation, so the escalation cause isn't visible in the text.\n- Escrow balances are also routinely provided ($73.51 to $984.60 across the sample).\n\nKeep in mind this is a 5-call sample of an 89-call category, so these patterns describe what was retrieved, not the full population.\n\nSources: CALL-01022, CALL-01161, CALL-00038, CALL-00424, CALL-01163",
+        "route": "retrieve",
+        "metric_names": [],
+        "sql": null,
+        "citations": [
+          "CALL-01022",
+          "CALL-01161",
+          "CALL-00038",
+          "CALL-00424",
+          "CALL-01163"
+        ],
+        "grounded": true
+      }
+    },
+    {
+      "id": "h14",
+      "kind": "open",
+      "error": null,
+      "results": {
+        "route": {
+          "key": "route",
+          "score": true,
+          "comment": "expected retrieve, got retrieve"
+        },
+        "interrupt": {
+          "key": "interrupt",
+          "score": true,
+          "comment": "no interrupt"
+        },
+        "metric": {
+          "key": "metric",
+          "score": null,
+          "comment": ""
+        },
+        "sql": {
+          "key": "sql",
+          "score": null,
+          "comment": ""
+        },
+        "citations": {
+          "key": "citations",
+          "score": true,
+          "comment": "CALL-01104, CALL-01061, CALL-00974, CALL-00728, CALL-01063"
+        },
+        "call_id": {
+          "key": "call_id",
+          "score": null,
+          "comment": ""
+        },
+        "judge": {
+          "key": "judge",
+          "score": 0.75,
+          "comment": "4/5 (prompt v1): The answer uses the correct category (loan_inquiry, 101 calls), cites real call ids, and states plainly that it covers only a 5-call sample. It answers the question directly, noting that members ask about rates and that the application step comes from the agent. Specifics such as balances, rate ranges and outcomes cannot be checked against the reference but contradict nothing, so the small sample is the only gap."
+        }
+      },
+      "tool_error": null,
+      "outputs": {
+        "answer": "Based on a sample of 5 retrieved calls: 5 of 101 calls in loan_inquiry.\n\n## What Members Ask in This Sample\n\nIn this 5-call sample from the **loan_inquiry** category, members' questions are consistent and rate-focused rather than application-focused:\n\n**1. Primary question: current loan rates.** Every member in this sample opens with the same request: *\"I'd like to ask about your current loan rates\"* (CALL-01104, CALL-01061, CALL-00974, CALL-00728, CALL-01063).\n\n**2. They anchor the question to an existing account.** Rather than describing a new purchase, members ask for a product \"comparable to\" an account they already hold \u2014 e.g., account ending in **0755** (CALL-01104), **0800** (CALL-01061, CALL-00974, CALL-00728), and **0753** (CALL-01063).\n\n**3. They want specific numbers.** Agents responded with quoted rates (base plus margin) ranging from **10.020% to 10.528%** in this sample, along with existing drawn balances (e.g., $53,200.77 in CALL-01104; $28,414.97 in CALL-01061/00974/00728; $21,534.80 in CALL-01063).\n\n**4. The actual application step is agent-initiated, not member-initiated.** In all five calls, it's the *agent* who offers to \"start a pre-qualification\" \u2014 no member in this sample proactively asks to begin an application, and the transcripts end before any pre-qualification is started.\n\n## Takeaway for Supervisors\n\nIn this sample, \"loan inquiries\" are really **rate-shopping calls**: members check pricing against their existing accounts, get their answer, and hang up. Outcomes split **3 resolved / 2 callback_scheduled** (CALL-00728, CALL-01063), suggesting that when members don't convert on the spot, a follow-up callback is the fallback path.\n\nNote: This reflects only the 5 retrieved calls of 101 in this category, so broader patterns may differ.\n\nSources: CALL-01104, CALL-01061, CALL-00974, CALL-00728, CALL-01063",
+        "route": "retrieve",
+        "metric_names": [],
+        "sql": null,
+        "citations": [
+          "CALL-01104",
+          "CALL-01061",
+          "CALL-00974",
+          "CALL-00728",
+          "CALL-01063"
+        ],
+        "grounded": true
+      }
+    },
+    {
+      "id": "h16",
+      "kind": "open",
+      "error": null,
+      "results": {
+        "route": {
+          "key": "route",
+          "score": true,
+          "comment": "expected retrieve, got retrieve"
+        },
+        "interrupt": {
+          "key": "interrupt",
+          "score": true,
+          "comment": "no interrupt"
+        },
+        "metric": {
+          "key": "metric",
+          "score": null,
+          "comment": ""
+        },
+        "sql": {
+          "key": "sql",
+          "score": null,
+          "comment": ""
+        },
+        "citations": {
+          "key": "citations",
+          "score": true,
+          "comment": "CALL-00559, CALL-00978, CALL-01114, CALL-01079, CALL-00999"
+        },
+        "call_id": {
+          "key": "call_id",
+          "score": null,
+          "comment": ""
+        },
+        "judge": {
+          "key": "judge",
+          "score": 0.75,
+          "comment": "4/5 (prompt v1): The answer cites real-looking call ids in the payment_assistance category, describes the call content, and is honest that the transcripts show no distinct callback trigger. It flags the 5-of-113 sample limit plainly. A minor gap: it speculates a little about possible outside causes, though it labels these as speculation, and it covers only a small sample."
+        }
+      },
+      "tool_error": null,
+      "outputs": {
+        "answer": "Based on a sample of 5 retrieved calls: 5 of 113 calls in payment_assistance.\n\n**Short answer: In this sample, the transcripts don't reveal a distinct trigger \u2014 every call, including the callback one, follows the same pattern.**\n\nWhat the sample of 5 shows:\n\n- All 5 calls (CALL-00559, CALL-00978, CALL-01114, CALL-01079, CALL-00999) follow an identical flow: the member states they're having trouble making a payment, the agent quotes the minimum payment (ranging from $35.00 to $170.44), the member says they can't afford it, and the agent submits a hardship program deferral to the end of the loan term.\n- Only one call in this sample \u2014 **CALL-01114** (2026-03-13, account ending 0986, minimum payment $98.37) \u2014 ended with a **callback_scheduled** outcome. The other four were marked resolved (three calls) or escalated (CALL-00999).\n- Notably, CALL-01114's transcript ends exactly like the resolved calls (\"Done. You'll get a confirmation by email shortly.\"), with no visible difference in the conversation. Its payment amount ($98.37) is nearly identical to the resolved CALL-00559 ($98.22), so the amount quoted doesn't appear to explain the different outcome either.\n\n**What this suggests for supervisors:** The visible driver in every call is inability to afford the quoted minimum payment, which prompts a hardship deferral request. But based on this sample alone, there is nothing in the transcript content that distinguishes the callback case from the resolved cases \u2014 the reason for the callback (e.g., incomplete account verification, system issue, or member availability) likely happened outside what's captured here.\n\n**Caveat:** This is 5 of 113 calls in the payment_assistance category, so these observations describe the sample only and may not reflect patterns across the full category. To understand what actually drives callbacks, you'd want to review the callback scheduling notes or recordings for calls like CALL-01114 rather than the transcript text alone.\n\nSources: CALL-00559, CALL-00978, CALL-01114, CALL-01079, CALL-00999",
+        "route": "retrieve",
+        "metric_names": [],
+        "sql": null,
+        "citations": [
+          "CALL-00559",
+          "CALL-00978",
+          "CALL-01114",
+          "CALL-01079",
+          "CALL-00999"
+        ],
+        "grounded": true
+      }
+    },
+    {
+      "id": "h15",
+      "kind": "open",
+      "error": null,
+      "results": {
+        "route": {
+          "key": "route",
+          "score": true,
+          "comment": "expected retrieve, got retrieve"
+        },
+        "interrupt": {
+          "key": "interrupt",
+          "score": true,
+          "comment": "no interrupt"
+        },
+        "metric": {
+          "key": "metric",
+          "score": null,
+          "comment": ""
+        },
+        "sql": {
+          "key": "sql",
+          "score": null,
+          "comment": ""
+        },
+        "citations": {
+          "key": "citations",
+          "score": true,
+          "comment": "CALL-00626, CALL-00113, CALL-00326, CALL-01065, CALL-00533"
+        },
+        "call_id": {
+          "key": "call_id",
+          "score": null,
+          "comment": ""
+        },
+        "judge": {
+          "key": "judge",
+          "score": 0.75,
+          "comment": "4/5 (prompt v1): The answer cites real-looking call ids in account_balance and stays within what the transcripts support. It states plainly that the sample shows no clear transfer reason and does not guess. It is faithful and honest about its limits, but it rests on only 3 of 179 calls and offers little insight, and the speculative list of possible causes plus the fraud_dispute calls add little to the question."
+        }
+      },
+      "tool_error": null,
+      "outputs": {
+        "answer": "Based on a sample of 5 retrieved calls: 3 of 179 calls in account_balance; 2 of 143 calls in fraud_dispute.\n\n**Short answer: this sample doesn't show a clear reason.** Only one of the three balance calls here ended in a transfer \u2014 **CALL-00626 (2026-04-27)** \u2014 and its transcript is essentially identical to the two that resolved (CALL-00113, CALL-00326): the member asks for a balance, verifies their member number, and the agent reads out the ledger and available balance. No escalation trigger is visible in the text \u2014 no complaint, no complex request, no failed verification, no unusual account activity.\n\nA few observations:\n\n- The transferred call (CALL-00626) shows the standard balance script playing out normally, then ends as \"transferred.\" Whatever caused the transfer isn't captured in the transcript itself \u2014 it may have happened after the visible conversation, or the transfer flag may reflect a member request, a system/tooling issue, or a need for another department.\n- The two fraud_dispute calls in the sample (CALL-01065, CALL-00533) were handled end-to-end by the front-line agent (dispute opened, provisional credit issued) and did not transfer \u2014 they ended resolved or with a callback scheduled.\n\n**Recommendation:** Since this is 3 of 179 balance calls, don't treat this as a pattern. To answer the question properly, pull the full call recordings or agent notes for transferred balance calls specifically (starting with CALL-00626) and compare them against resolved ones \u2014 the transfer reason likely lives in metadata or post-transcript conversation rather than the scripted portion shown here.\n\nSources: CALL-00626, CALL-00113, CALL-00326, CALL-01065, CALL-00533",
+        "route": "retrieve",
+        "metric_names": [],
+        "sql": null,
+        "citations": [
+          "CALL-00626",
+          "CALL-00113",
+          "CALL-00326",
+          "CALL-01065",
+          "CALL-00533"
+        ],
+        "grounded": true
+      }
+    }
+  ]
+}
