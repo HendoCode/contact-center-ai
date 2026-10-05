@@ -70,8 +70,9 @@ def test_postgres_unreachable_message():
 
 
 def test_ollama_unreachable_message():
-    with pytest.raises(PreflightError, match=r"Ollama is not reachable at http://127.0.0.1:\d+ .*make up"):
-        preflight.check_ollama(f"http://127.0.0.1:{closed_port()}", timeout=2)
+    # The real ollama client against a closed port; the fake-client cases are in test_ollama_models.
+    with pytest.raises(PreflightError, match=r"Ollama is not reachable at http://127.0.0.1:\d+: .*make up"):
+        preflight.check_ollama(f"http://127.0.0.1:{closed_port()}", "nomic-embed-text")
 
 
 def test_judge_equal_to_agent_is_refused(monkeypatch):

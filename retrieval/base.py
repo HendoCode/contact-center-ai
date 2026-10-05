@@ -107,13 +107,19 @@ def validate_where(where: dict | None) -> list[tuple[str, str, object]]:
     return triples
 
 
-def get_retriever(backend: str | None = None) -> Retriever:
-    """Return the backend named by `backend` or RETRIEVER_BACKEND (default "pgvector")."""
+def get_retriever(backend: str | None = None, embeddings=None) -> Retriever:
+    """Return the backend named by `backend` or RETRIEVER_BACKEND (default "pgvector").
+
+    `embeddings` overrides the shared `get_embeddings()` model (ingest passes a cached one).
+    """
     backend = (backend or os.getenv("RETRIEVER_BACKEND", "pgvector")).lower()
     if backend == "pgvector":
         from retrieval.pgvector_backend import PgVectorRetriever
-        return PgVectorRetriever()
+        if embeddings is None:
+            return PgVectorRetriever()
+        from rag.embeddings import get_vector_store
+        return PgVectorRetriever(store=get_vector_store(embeddings))
     if backend == "lancedb":
         from retrieval.lancedb_backend import LanceDBRetriever
-        return LanceDBRetriever()
+        return LanceDBRetriever(embeddings=embeddings)
     raise ValueError(f"Unknown retriever backend: {backend!r} (available: pgvector, lancedb)")

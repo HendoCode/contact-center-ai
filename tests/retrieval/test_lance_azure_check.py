@@ -108,7 +108,8 @@ def test_run_uses_the_cache_and_no_blank_azure_var_reaches_the_store(monkeypatch
     _fake_embeddings_loading_blank_dotenv(monkeypatch)
     monkeypatch.setattr(lac.shutil, "which", lambda name: "/usr/bin/az")
     monkeypatch.delenv("AZURE_STORAGE_SAS_KEY", raising=False)
-    monkeypatch.setattr("retrieval.bench.CACHE_DIR", tmp_path / "cache")
+    monkeypatch.setattr("rag.embedding_cache.CACHE_DIR", tmp_path / "cache")
+    monkeypatch.setattr("rag.embedding_cache.LEGACY_CACHE_DIR", tmp_path / "legacy")
     seen = {}
 
     def fake_run_bench(docs, queries, embeddings, **kw):
@@ -136,7 +137,8 @@ def test_azure_failure_is_one_short_line_with_the_fix(monkeypatch, tmp_path, cap
 
     _fake_embeddings_loading_blank_dotenv(monkeypatch)
     monkeypatch.setattr(lac.shutil, "which", lambda name: "/usr/bin/az")
-    monkeypatch.setattr("retrieval.bench.CACHE_DIR", tmp_path / "cache")
+    monkeypatch.setattr("rag.embedding_cache.CACHE_DIR", tmp_path / "cache")
+    monkeypatch.setattr("rag.embedding_cache.LEGACY_CACHE_DIR", tmp_path / "legacy")
     rust = "Failed to connect to namespace: MicrosoftAzure TokenRequest POST " + "x" * 2000
 
     class Failing:

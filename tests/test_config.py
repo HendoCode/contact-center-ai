@@ -50,6 +50,7 @@ def test_get_llm_resolution_from_environment(monkeypatch):
 
 
 def test_get_llm_ollama_provider(monkeypatch):
+    monkeypatch.setattr("rag.ollama_models.ensure_ready", lambda model: None)  # no server here
     monkeypatch.setenv("LLM_PROVIDER", "ollama")
     monkeypatch.setenv("OLLAMA_MODEL", "llama3.2")
 
@@ -90,6 +91,7 @@ def test_get_embeddings_resolution_from_environment(monkeypatch):
 
 
 def test_get_embeddings_ollama_provider(monkeypatch):
+    monkeypatch.setattr("rag.ollama_models.ensure_ready", lambda model: None)  # no server here
     monkeypatch.setenv("EMBEDDING_PROVIDER", "ollama")
     monkeypatch.setenv("OLLAMA_EMBEDDING_MODEL", "nomic-embed-text")
 

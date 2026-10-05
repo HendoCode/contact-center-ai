@@ -47,10 +47,14 @@ def get_llm(provider: str | None = None):
 
     if provider == "ollama":
         from langchain_ollama import ChatOllama
-        return ChatOllama(
+
+        from rag.ollama_models import ensure_ready
+        llm = ChatOllama(
             model=os.getenv("OLLAMA_MODEL", "llama3.2"),
             base_url=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"),
         )
+        ensure_ready(llm)  # pulls the model if the server lacks it
+        return llm
 
     if provider == "anthropic":
         from langchain_anthropic import ChatAnthropic
@@ -163,12 +167,14 @@ def transcripts_to_documents(transcripts: list[dict]) -> list[Document]:
     return docs
 
 
-def ingest(source: str = "synthetic"):
+def ingest(source: str = "synthetic", use_cache: bool = True):
     """
-    Ingest call transcripts into pgvector.
+    Ingest call transcripts into the vector store.
 
     Args:
         source: "synthetic" (local JSON) or "s3" (TODO: S3 integration)
+        use_cache: read and fill the on-disk embedding cache (.cache/embeddings/) that
+            `make bench` shares, so only transcripts never embedded before hit the model.
     """
     print(f"Loading transcripts from source: {source}")
 
@@ -185,7 +191,15 @@ def ingest(source: str = "synthetic"):
     docs = transcripts_to_documents(transcripts)
     print(f"Embedding and storing {len(docs)} documents...")
 
-    retriever = get_retriever()
+    from rag.embedding_cache import CachedEmbeddings, cache_file_for, embed_progress
+    from rag.embeddings import get_embeddings
+
+    embeddings = get_embeddings()  # an Ollama model is pulled here if missing
+    cached = CachedEmbeddings(embeddings, cache_file=cache_file_for(embeddings) if use_cache else None,
+                              label="ingest")
+    cached.warm_documents((d.page_content for d in docs), progress=embed_progress("ingest"))
+
+    retriever = get_retriever(embeddings=cached)
     written = retriever.ingest(
         [{"call_id": d.metadata["call_id"], "text": d.page_content, "metadata": d.metadata}
          for d in docs]
@@ -245,15 +259,22 @@ if __name__ == "__main__":
     parser.add_argument("--source", default="synthetic", help="Data source: synthetic or s3")
     parser.add_argument("--query", type=str, help="Query to run against the vector store")
     parser.add_argument("--reset", action="store_true", help="Delete the vector store collection")
+    parser.add_argument("--no-cache", action="store_true",
+                        help="ingest: do not read or write the embedding cache (.cache/embeddings/)")
     args = parser.parse_args()
 
-    if args.reset:
-        from rag.embeddings import get_vector_store
-        get_vector_store().delete_collection()
-        print("Collection deleted. Re-run --ingest to rebuild it.")
-    elif args.ingest:
-        ingest(source=args.source)
-    elif args.query:
-        print(rag_query(args.query))
-    else:
-        parser.print_help()
+    from rag.ollama_models import OllamaUnavailable
+
+    try:
+        if args.reset:
+            from rag.embeddings import get_vector_store
+            get_vector_store().delete_collection()
+            print("Collection deleted. Re-run --ingest to rebuild it.")
+        elif args.ingest:
+            ingest(source=args.source, use_cache=not args.no_cache)
+        elif args.query:
+            print(rag_query(args.query))
+        else:
+            parser.print_help()
+    except OllamaUnavailable as e:
+        raise SystemExit(f"rag: {e}") from None

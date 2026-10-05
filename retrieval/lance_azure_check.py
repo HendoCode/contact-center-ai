@@ -34,7 +34,6 @@ from retrieval.bench import (
     MODES,
     Store,
     cache_file_for,
-    ensure_ollama_model,
     load_corpus,
     load_queries,
     open_lancedb,
@@ -126,7 +125,7 @@ def main(argv: list[str] | None = None, embeddings=None) -> int:
     p.add_argument("--keep", action="store_true", help="leave the Azure table in place")
     p.add_argument("--emulator", action="store_true", help="Azurite on 127.0.0.1:10000 (local test)")
     p.add_argument("--no-cache", action="store_true",
-                   help="do not read or write the embedding cache (.cache/bench-embeddings/)")
+                   help="do not read or write the embedding cache (.cache/embeddings/)")
     p.add_argument("--dry-run", action="store_true", help="print the plan and touch nothing")
     args = p.parse_args(argv)
     # AZURE_* the caller set on purpose, before .env is loaded by importing rag below.
@@ -164,8 +163,7 @@ def _run(args: argparse.Namespace, embeddings, deliberate: set[str]) -> int:
     if embeddings is None:
         from rag.embeddings import get_embeddings  # importing rag loads .env
 
-        embeddings = get_embeddings()
-        ensure_ollama_model(embeddings)
+        embeddings = get_embeddings()  # an Ollama model is pulled here if missing
     sas = sas or os.getenv("AZURE_STORAGE_SAS_KEY") or None  # .env is loaded now
     dropped = scrub_azure_env(deliberate, using_cli=not (sas or args.emulator))
     if dropped:

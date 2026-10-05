@@ -41,7 +41,6 @@ import json
 import math
 import os
 import platform
-import re
 import shutil
 import statistics
 import subprocess
@@ -53,6 +52,7 @@ from datetime import date
 from importlib import metadata
 from pathlib import Path
 
+from rag.embedding_cache import CACHE_DIR, CachedEmbeddings, cache_file_for, embed_progress, embedding_model  # noqa: F401
 from retrieval.base import Retriever
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -64,7 +64,6 @@ BACKENDS = ("pgvector", "lancedb")
 # one call is the prime suspect for the x80 failure.
 INGEST_BATCH = 12_500
 ERROR_CHARS = 300
-CACHE_DIR = REPO_ROOT / ".cache" / "bench-embeddings"
 MODES = ("vector", "fts", "hybrid")
 QUERY_TYPES = ("topical", "filter", "exact", "paraphrase")
 K = 10
@@ -171,44 +170,6 @@ def scale_up(docs: list[dict], queries: list[dict], n: int) -> tuple[list[dict],
 
 # ── embeddings ────────────────────────────────────────────────────────────────
 
-def ensure_ollama_model(embeddings, client=None) -> None:
-    """Pull the Ollama embedding model when the server lacks it; a no-op otherwise.
-
-    Only `make demo` pulls models (the Compose `ollama-pull` service), so after a bare
-    `make up` the first embed call would 404. Other embedding providers are skipped.
-    """
-    if type(embeddings).__name__ != "OllamaEmbeddings":
-        return
-    if client is None:
-        import ollama
-
-        client = ollama.Client(host=embeddings.base_url)
-    model = embeddings.model
-    tagged = model if ":" in model else f"{model}:latest"
-    if tagged in {m.model for m in client.list().models}:
-        return
-    print(f"bench: pulling Ollama model {model} (one-time download; nomic-embed-text is "
-          "~270 MB)", flush=True)
-    client.pull(model)
-
-
-def embed_progress() -> Callable[[int, int], None]:
-    """A `warm_documents` progress callback: a notice up front, then a line per ~10%."""
-    last = 0
-
-    def report(done: int, total: int) -> None:
-        nonlocal last
-        step = max(1, total // 10)
-        if done == 0:
-            print(f"bench: embedding {total} unique docs once up front; on a CPU this can "
-                  "take several minutes", flush=True)
-        elif done == total or done // step > last // step:
-            print(f"  embedded {done}/{total}", flush=True)
-        last = done
-
-    return report
-
-
 def short_error(exc: BaseException, limit: int = ERROR_CHARS) -> str:
     """`Class: message` on one line, at most `limit` characters: never a driver's payload dump."""
     text = " ".join(f"{type(exc).__name__}: {exc}".split())
@@ -299,80 +260,6 @@ def sweep_table(metrics: dict) -> str:
         ann = "n/a" if r.get("ann_recall@10") is None else f"{r['ann_recall@10']:.3f}"
         lines.append(f"| {k} | {r['recall@10']:.3f} | {ann} | {r['mrr@10']:.3f} | {r['p50_ms']:.1f} | {r['p95_ms']:.1f} |")
     return "\n".join(lines)
-
-
-def cache_file_for(embeddings) -> Path:
-    """The on-disk embedding cache for this model; every bench caller shares it."""
-    return CACHE_DIR / (re.sub(r"[^A-Za-z0-9_.-]+", "_", embedding_model(embeddings)) + ".jsonl")
-
-
-def _text_key(text: str) -> str:
-    return hashlib.sha256(text.encode()).hexdigest()
-
-
-class CachedEmbeddings:
-    """Embed each unique text once; later calls (ingest, search) hit the cache.
-
-    With `cache_file`, document vectors also persist on disk (JSONL keyed by text hash, one
-    file per embedding model), so a rerun skips the slow CPU embedding step.
-    """
-
-    def __init__(self, inner, cache_file: Path | None = None):
-        self.inner = inner
-        self._docs: dict[str, list[float]] = {}
-        self._queries: dict[str, list[float]] = {}
-        self.cache_file = cache_file
-        self._disk: dict[str, list[float]] = {}
-        if cache_file and cache_file.exists():
-            for line in cache_file.read_text().splitlines():
-                row = json.loads(line)
-                self._disk[row["h"]] = row["v"]
-
-    def warm_documents(self, texts: Iterable[str], batch: int = 64,
-                       progress: Callable[[int, int], None] | None = None) -> tuple[int, float]:
-        """Embed every uncached text; `progress(done, total)` runs at 0 and after each batch."""
-        todo = [t for t in dict.fromkeys(texts) if t not in self._docs]
-        hits = [t for t in todo if _text_key(t) in self._disk]
-        for t in hits:
-            self._docs[t] = self._disk[_text_key(t)]
-        if hits:
-            print(f"bench: {len(hits)} document embeddings loaded from {self.cache_file}", flush=True)
-        todo = [t for t in todo if t not in self._docs]
-        if progress and todo:
-            progress(0, len(todo))
-        t0 = time.perf_counter()
-        for i in range(0, len(todo), batch):
-            chunk = todo[i : i + batch]
-            vectors = self.inner.embed_documents(chunk)
-            self._docs.update(zip(chunk, vectors))
-            if self.cache_file:
-                self.cache_file.parent.mkdir(parents=True, exist_ok=True)
-                with open(self.cache_file, "a") as fh:
-                    for t, v in zip(chunk, vectors):
-                        fh.write(json.dumps({"h": _text_key(t), "v": list(v)}) + "\n")
-            if progress:
-                progress(i + len(chunk), len(todo))
-        return len(todo), time.perf_counter() - t0
-
-    def warm_queries(self, texts: Iterable[str]) -> list[float]:
-        """Embed each query text; returns per-query seconds."""
-        times = []
-        for t in dict.fromkeys(texts):
-            t0 = time.perf_counter()
-            self._queries[t] = self.inner.embed_query(t)
-            times.append(time.perf_counter() - t0)
-        return times
-
-    def embed_documents(self, texts: list[str]) -> list[list[float]]:
-        missing = [t for t in texts if t not in self._docs]
-        if missing:
-            self.warm_documents(missing)
-        return [self._docs[t] for t in texts]
-
-    def embed_query(self, text: str) -> list[float]:
-        if text not in self._queries:
-            self._queries[text] = self.inner.embed_query(text)
-        return self._queries[text]
 
 
 # ── backends ──────────────────────────────────────────────────────────────────
@@ -886,12 +773,6 @@ def postgres_versions() -> dict[str, str]:
     return {"postgres": server, "pgvector_ext": ext[0] if ext else "not installed"}
 
 
-def embedding_model(embeddings) -> str:
-    provider = os.getenv("EMBEDDING_PROVIDER", os.getenv("LLM_PROVIDER", "openai")).lower()
-    model = getattr(embeddings, "model", None) or type(embeddings).__name__
-    return f"{provider}:{model}"
-
-
 def build_record(metrics: dict, *, run: str, hardware: str, versions: dict, params: dict,
                  notes: str) -> dict:
     return {
@@ -958,7 +839,7 @@ def main(argv: list[str] | None = None) -> int:
                         help="LanceDB recall-vs-latency sweep; repeat to combine into a grid, e.g. "
                              "--sweep nprobes=20,50,100 --sweep refine_factor=1,20")
     parser.add_argument("--no-cache", action="store_true",
-                        help="do not read or write the embedding cache (.cache/bench-embeddings/)")
+                        help="do not read or write the embedding cache (.cache/embeddings/)")
     args = parser.parse_args(argv)
     if args.ingest_batch < 1:
         parser.error("--ingest-batch must be at least 1")
@@ -997,8 +878,7 @@ def _main(args: argparse.Namespace, backends: list[str], modes: list[str]) -> in
     labels_text = labels.read_text()
     queries = load_queries(labels)
     docs, queries = scale_up(load_corpus(), queries, args.scale)
-    embeddings = get_embeddings()
-    ensure_ollama_model(embeddings)
+    embeddings = get_embeddings()  # an Ollama model is pulled here if missing
     print(f"bench: {len(docs)} docs, {len(queries)} queries, backends={backends}, modes={modes}")
 
     cache_file = None if args.no_cache else cache_file_for(embeddings)
