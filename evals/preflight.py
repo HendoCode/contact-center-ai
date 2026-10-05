@@ -9,7 +9,8 @@ check prints one clear message and the run stops at the first failure:
   loading the corpus);
 - olap/dbt/target/semantic_manifest.json was built for the local Postgres target, not by
   a Snowflake or Databricks build (which made every metric answer a SQL error);
-- every marts table the metric tool queries exists in the dev Postgres (`dbt build` ran);
+- every marts table the metric tool queries exists in the dev Postgres; when not, whether the
+  raw OLTP tables are missing too (load them) or only the marts (build them);
 - Postgres is reachable and the transcripts are embedded in it (the agent searches them),
   when RETRIEVER_BACKEND is pgvector;
 - Ollama answers and has the embedding model (pulled once if missing), when
@@ -189,6 +190,16 @@ def check_manifest() -> str:
 
 
 MARTS_HINT = "run 'make dbt-build-dev' (or cd olap/dbt && uv run --group dbt dbt build)"
+RAW_HINT = ("run 'make dev-data' (or olap/oltp/apply.sh then uv run python olap/seed.py, then "
+            "make dbt-build-dev)")
+
+
+def source_relations(manifest: Path) -> list[tuple[str, str]]:
+    """(schema, table) of every dbt source: the raw OLTP tables `dbt build` reads."""
+    if not manifest.exists():
+        return []
+    data = json.loads(manifest.read_text())
+    return sorted({(s["schema"], s["identifier"]) for s in data.get("sources", {}).values()})
 
 
 def mart_relations(semantic_manifest: Path) -> list[tuple[str, str]]:
@@ -206,23 +217,36 @@ def dev_conninfo(env: os._Environ | dict = os.environ) -> str:
             f"dbname={env.get('DBT_DBNAME', 'contactcenter')}")
 
 
-def check_marts(relations: list[tuple[str, str]], conninfo: str) -> str:
-    """Every relation the metric tool queries exists in the dev Postgres."""
+def _shown(missing: list[str]) -> str:
+    return ", ".join(missing[:3]) + (f" and {len(missing) - 3} more" if len(missing) > 3 else "")
+
+
+def check_marts(relations: list[tuple[str, str]], conninfo: str,
+                raw: list[tuple[str, str]] = ()) -> str:
+    """Every relation the metric tool queries exists in the dev Postgres. When some do not,
+    the raw source tables say which fix applies: load the raw data first, or only build."""
     import psycopg
+
+    def absent(cur, rels):
+        out = []
+        for schema, table in rels:
+            cur.execute("SELECT to_regclass(%s)", (f'"{schema}"."{table}"',))
+            if cur.fetchone()[0] is None:
+                out.append(f"{schema}.{table}")
+        return out
 
     try:
         with psycopg.connect(conninfo, connect_timeout=5) as conn, conn.cursor() as cur:
-            missing = []
-            for schema, table in relations:
-                cur.execute("SELECT to_regclass(%s)", (f'"{schema}"."{table}"',))
-                if cur.fetchone()[0] is None:
-                    missing.append(f"{schema}.{table}")
+            missing = absent(cur, relations)
+            missing_raw = absent(cur, raw) if missing else []
     except psycopg.OperationalError as exc:
         first = str(exc).strip().splitlines()[0] if str(exc).strip() else type(exc).__name__
         raise PreflightError(f"the dbt dev Postgres is not reachable ({first}): run 'make up'") from exc
+    if missing_raw:
+        raise PreflightError(f"raw tables absent ({_shown(missing_raw)} missing), so the marts cannot "
+                             f"be built: {RAW_HINT}")
     if missing:
-        shown = ", ".join(missing[:3]) + (f" and {len(missing) - 3} more" if len(missing) > 3 else "")
-        raise PreflightError(f"marts not built ({shown} missing): {MARTS_HINT}")
+        raise PreflightError(f"marts not built ({_shown(missing)} missing): {MARTS_HINT}")
     return f"marts built: {len(relations)} tables the metric tool queries exist"
 
 
@@ -232,7 +256,9 @@ def run_checks(env: os._Environ | dict = os.environ) -> Iterator[str]:
     yield check_manifest()
     from ccai_mcp.metrics import DBT_DIR
 
-    yield check_marts(mart_relations(DBT_DIR / "target" / "semantic_manifest.json"), dev_conninfo(env))
+    target = DBT_DIR / "target"
+    yield check_marts(mart_relations(target / "semantic_manifest.json"), dev_conninfo(env),
+                      source_relations(target / "manifest.json"))
     if env.get("RETRIEVER_BACKEND", "pgvector").lower() == "pgvector":
         yield check_postgres(env.get("DATABASE_URL", DEFAULT_DATABASE_URL),
                              env.get("COLLECTION_NAME", "call_transcripts"))

@@ -6,7 +6,7 @@
 # `evals` is the L2 agent golden set offline (a CI gate); `evals-live` is the same set
 # against real models, uploaded to LangSmith.
 
-.PHONY: up down seed ingest test lint check-public demo bench evals evals-live evals-compare evals-export finetune-data finetune-label load-snowflake load-databricks load-dry-run dbt-build dbt-build-dev lance-azure-check
+.PHONY: up down seed ingest test lint check-public demo bench evals evals-live evals-compare evals-export finetune-data finetune-label load-snowflake load-databricks load-dry-run dbt-build dbt-build-dev dev-data lance-azure-check
 
 PYTHON := uv run python
 
@@ -108,6 +108,12 @@ load-databricks:
 dbt-build:
 	@case "$(WAREHOUSE)" in snowflake|databricks) ;; *) echo "usage: make dbt-build WAREHOUSE=snowflake|databricks" >&2; exit 2 ;; esac
 	$(call WAREHOUSE_RUN,$(WAREHOUSE)) uv run --group dbt --group $(WAREHOUSE) dbt build --project-dir olap/dbt --profiles-dir olap/dbt --target $(WAREHOUSE) --target-path target/$(WAREHOUSE)
+
+# All local data on the host, in order, idempotent, one line per step: generate the synthetic
+# JSON, apply the OLTP schema, load it, ingest (embedding cache), dbt build for dev. The
+# first step to fail stops the run with its fix. Needs Postgres up (make up).
+dev-data:
+	tools/dev-data.sh
 
 # dbt build on the local dev target (the Compose Postgres): the marts the metric tools and
 # make evals-live query. Run it after make seed; artifacts go to the default olap/dbt/target/.

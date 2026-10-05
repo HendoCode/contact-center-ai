@@ -90,7 +90,7 @@ def test_checks_skip_postgres_and_ollama_when_not_used(monkeypatch):
     monkeypatch.setattr(preflight, "check_models_differ", lambda: "models ok")
     monkeypatch.setattr(preflight, "check_manifest", lambda: "manifest ok")
     monkeypatch.setattr(preflight, "mart_relations", lambda path: [])
-    monkeypatch.setattr(preflight, "check_marts", lambda rels, conninfo: "marts ok")
+    monkeypatch.setattr(preflight, "check_marts", lambda rels, conninfo, raw: "marts ok")
     monkeypatch.setattr(preflight, "check_postgres", lambda *a: pytest.fail("pgvector not in use"))
     monkeypatch.setattr(preflight, "check_ollama", lambda *a: pytest.fail("ollama not in use"))
     env = {"RETRIEVER_BACKEND": "lancedb", "EMBEDDING_PROVIDER": "openai"}
@@ -157,3 +157,69 @@ def test_unreachable_dev_postgres_says_make_up():
     with pytest.raises(PreflightError, match=r"dbt dev Postgres is not reachable .*make up"):
         preflight.check_marts([("marts", "f_transaction")],
                               f"host=127.0.0.1 port={closed_port()} user=postgres dbname=x")
+
+
+RAW = [("public", "account"), ("public", "member"), ("public", "interaction")]
+MARTS = [("marts", "f_transaction"), ("marts", "d_member")]
+
+
+def test_raw_tables_absent_is_its_own_line(monkeypatch):
+    import psycopg
+
+    monkeypatch.setattr(psycopg, "connect", lambda *a, **k: _FakeConn(set()))
+    with pytest.raises(PreflightError) as err:
+        preflight.check_marts(MARTS, "host=x", RAW)
+    assert str(err.value) == ("raw tables absent (public.account, public.member, public.interaction missing), "
+                              "so the marts cannot be built: run 'make dev-data' (or olap/oltp/apply.sh then "
+                              "uv run python olap/seed.py, then make dbt-build-dev)")
+
+
+def test_raw_present_marts_absent_says_build(monkeypatch):
+    import psycopg
+
+    monkeypatch.setattr(psycopg, "connect", lambda *a, **k: _FakeConn({f'"{s}"."{t}"' for s, t in RAW}))
+    with pytest.raises(PreflightError, match=r"^marts not built \(marts.f_transaction, marts.d_member missing\)"):
+        preflight.check_marts(MARTS, "host=x", RAW)
+
+
+def test_source_relations_come_from_the_dbt_manifest(tmp_path):
+    f = tmp_path / "manifest.json"
+    f.write_text(json.dumps({"sources": {"a": {"schema": "public", "identifier": "member"},
+                                         "b": {"schema": "public", "identifier": "account"}}}))
+    assert preflight.source_relations(f) == [("public", "account"), ("public", "member")]
+    assert preflight.source_relations(tmp_path / "absent.json") == []
+
+
+def test_dev_data_runs_every_step_in_order(tmp_path):
+    import os
+    import subprocess
+
+    from pathlib import Path
+
+    REPO_ROOT = Path(preflight.__file__).resolve().parents[1]
+    log = tmp_path / "calls"
+    fake_uv = tmp_path / "uv"
+    fake_uv.write_text(f'#!/usr/bin/env bash\necho "uv $*" >> {log}\n[[ "$*" == *"dbt build"* && -n "$FAIL_DBT" ]] && exit 1\nexit 0\n')
+    fake_uv.chmod(0o755)
+    shadow = tmp_path / "root"
+    (shadow / "tools").mkdir(parents=True)
+    (shadow / "olap" / "oltp").mkdir(parents=True)
+    (shadow / "tools" / "dev-data.sh").write_text((REPO_ROOT / "tools" / "dev-data.sh").read_text())
+    (shadow / "tools" / "dev-data.sh").chmod(0o755)
+    (shadow / "olap" / "oltp" / "apply.sh").write_text(f'#!/usr/bin/env bash\necho "apply" >> {log}\n')
+    (shadow / "olap" / "oltp" / "apply.sh").chmod(0o755)
+    env = {**os.environ, "UV": str(fake_uv), "TMPDIR": str(tmp_path)}
+    res = subprocess.run([str(shadow / "tools" / "dev-data.sh")], capture_output=True, text=True, env=env)
+    assert res.returncode == 0, res.stderr
+    assert [line.split(" ... ")[0] for line in res.stdout.splitlines()[:5]] == \
+        ["[1/5] generate", "[2/5] schema  ", "[3/5] load    ", "[4/5] ingest  ", "[5/5] dbt     "]
+    assert log.read_text().splitlines() == [
+        "uv run python data/synthetic/generate_data.py", "apply", "uv run python olap/seed.py",
+        "uv run python -m rag.pipeline --ingest",
+        "uv run --group dbt dbt build --project-dir olap/dbt --profiles-dir olap/dbt --target dev"]
+    log.unlink()
+    res = subprocess.run([str(shadow / "tools" / "dev-data.sh")], capture_output=True, text=True,
+                         env={**env, "FAIL_DBT": "1"})
+    assert res.returncode == 1
+    assert "[5/5] dbt      ... FAILED" in res.stdout
+    assert "dev-data: step 5 (dbt) failed: rerun 'make dbt-build-dev'" in res.stderr
