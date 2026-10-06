@@ -413,34 +413,48 @@ LLM_PROVIDER=anthropic ANTHROPIC_MODEL=claude-sonnet-5-5 make finetune-label ARG
 
 ## Azure portal tour
 
-What you can click into once `bootstrap` and `envs/dev` are applied. Names follow the Terraform
-naming patterns; `<suffix>` is a random string generated per root, masked here. Get the exact names
-with `terraform output` in each root, or filter the portal on the `project = contact-center-ai`
-tag or the `ccai` prefix.
+What you can click into once `bootstrap` and `envs/dev` are applied (steps in
+[`infra/azure/README.md`](../infra/azure/README.md)). Names follow the Terraform naming patterns;
+`<suffix>` is a random string generated per root, so the real names are not stored in the repo.
+Each row says how to find the real name: a `terraform output` run from that root, an `az` command,
+or a portal search. You can also filter the portal on the `project = contact-center-ai` tag or the
+`ccai` prefix. First confirm the subscription, then list every output of each root:
+
+```bash
+az account show -o table                                # confirm the subscription
+terraform -chdir=infra/azure/envs/dev output                    # every dev output at once
+terraform -chdir=infra/azure/bootstrap output               # every bootstrap output at once
+```
 
 **Dev resource group `rg-ccai-dev`** (deployed in Central US; `envs/dev` defaults `location` to
 `eastus2` per `docs/design/infra.md`, and `gpu_location` exists for the Central US Spot-quota
-fallback, so the region is a tfvars override). Destroyed each session.
+fallback, so the region is a tfvars override). Destroyed each session, so its suffixes can change
+after a re-apply: look the names up again. Portal: Resource groups > `rg-ccai-dev`
+(`terraform -chdir=infra/azure/envs/dev output -raw resource_group_name`).
 
-| Resource | Name pattern | What to look at |
-|---|---|---|
-| PostgreSQL Flexible Server | `psql-ccai-dev-<suffix>` | B1ms, PostgreSQL 16, `VECTOR` allow-listed in `azure.extensions`, database `contactcenter` |
-| Storage account (ADLS Gen2) | `stccaidev<suffix>` | filesystems `lance` (Lance datasets) and `dbt-artifacts` |
-| Container registry | `acrccaidev<suffix>` | Basic SKU |
-| Container Apps environment | `cae-ccai-dev` | `mcp-server` and `agent-api` apps appear only when their `enable_*` flags are true |
-| Log Analytics workspace | `log-ccai-dev` | 0.5 GB/day cap |
-| User-assigned managed identity | `id-ccai-dev-app` | the apps' identity: Key Vault secrets, ACR pull, storage |
+| Resource | Name pattern | How to find the name | What to look at |
+|---|---|---|---|
+| PostgreSQL Flexible Server | `psql-ccai-dev-<suffix>` | the first label of `terraform -chdir=infra/azure/envs/dev output -raw postgres_fqdn`; or `az postgres flexible-server list -g rg-ccai-dev -o table` | B1ms, PostgreSQL 16, `VECTOR` allow-listed in `azure.extensions`, database `contactcenter` |
+| Storage account (ADLS Gen2) | `stccaidev<suffix>` | `terraform -chdir=infra/azure/envs/dev output -raw adls_account_name` | filesystems `lance` (Lance datasets) and `dbt-artifacts` |
+| Container registry | `acrccaidev<suffix>` | `terraform -chdir=infra/azure/envs/dev output -raw acr_name` | Basic SKU |
+| Container Apps environment | `cae-ccai-dev` | fixed name: `az containerapp env show -g rg-ccai-dev -n cae-ccai-dev` | `mcp-server` and `agent-api` apps appear only when their `enable_*` flags are true (URLs: `terraform -chdir=infra/azure/envs/dev output app_urls`) |
+| Log Analytics workspace | `log-ccai-dev` | fixed name: `az monitor log-analytics workspace show -g rg-ccai-dev -n log-ccai-dev` | 0.5 GB/day cap |
+| User-assigned managed identity | `id-ccai-dev-app` | fixed name: `az identity show -g rg-ccai-dev -n id-ccai-dev-app` | the apps' identity: Key Vault secrets, ACR pull, storage |
 
-**Bootstrap resource group `rg-ccai-bootstrap`** (East US 2). Persistent; never destroyed.
+**Bootstrap resource group `rg-ccai-bootstrap`** (East US 2). Persistent; never destroyed. Portal:
+Resource groups > `rg-ccai-bootstrap`
+(`terraform -chdir=infra/azure/bootstrap output -raw state_resource_group_name`).
 
-| Resource | Name pattern | What to look at |
-|---|---|---|
-| Storage account | `stccaitf<suffix>` | Terraform state, versioning on |
-| Key Vault | `kv-ccai-<suffix>` | app secrets |
-| Budget (subscription scope) | `budget-ccai-monthly` | alerts at 50% and 90% actual, 100% forecast |
+| Resource | Name pattern | How to find the name | What to look at |
+|---|---|---|---|
+| Storage account | `stccaitf<suffix>` | `terraform -chdir=infra/azure/bootstrap output -raw state_storage_account_name` | Terraform state, versioning on |
+| Key Vault | `kv-ccai-<suffix>` | `terraform -chdir=infra/azure/bootstrap output -raw key_vault_name` | app secrets (names only: never paste values into docs or PRs) |
+| Budget (subscription scope) | `budget-ccai-monthly` | fixed name; portal: Cost Management > Budgets, or `az consumption budget show --budget-name budget-ccai-monthly` | alerts at 50% and 90% actual, 100% forecast |
 
-**Entra ID:** the `id-ccai-dev-app` managed identity, and the service principal used for
-Terraform.
+**Entra ID:** the `id-ccai-dev-app` managed identity (portal: Managed Identities, or the `az identity
+show` command above), and the service principal used for Terraform (portal: Entra ID > App
+registrations > Owned applications; it is the identity you ran `az login --service-principal` with,
+and its name is not a Terraform output).
 
 **Cross-cloud by design.** Postgres, storage, the apps, the GPU VM and Databricks are on Azure.
 Snowflake is not an Azure resource: it is a Snowflake trial account hosted on AWS, and the I-SF
