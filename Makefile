@@ -6,7 +6,7 @@
 # `evals` is the L2 agent golden set offline (a CI gate); `evals-live` is the same set
 # against real models, uploaded to LangSmith.
 
-.PHONY: up down seed ingest test lint check-public demo bench evals evals-live evals-compare evals-export evals-retrieval-experiment finetune-data finetune-label load-snowflake load-databricks load-dry-run dbt-build dbt-build-dev dev-data lance-azure-check
+.PHONY: up down seed ingest test lint check-public demo bench evals evals-live evals-compare evals-export evals-retrieval-experiment finetune-data finetune-label load-snowflake load-databricks load-dry-run dbt-build dbt-build-dev dev-data lance-azure-check tour-names
 
 PYTHON := uv run python
 # RETRIEVER_BACKEND=lancedb needs the lance dependency group wherever the store is read or written.
@@ -63,6 +63,10 @@ lint:
 
 check-public:
 	tools/check_public.sh
+
+# Azure portal tour (docs/TOUR.md) with live names from `terraform output`; masked when no deployment.
+tour-names:
+	python3 tools/tour_names.py
 
 # ── Benchmarks ───────────────────────────────────────────────────────────────
 

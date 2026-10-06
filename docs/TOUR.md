@@ -414,9 +414,18 @@ LLM_PROVIDER=anthropic ANTHROPIC_MODEL=claude-sonnet-5-5 make finetune-label ARG
 ## Azure portal tour
 
 What you can click into once `bootstrap` and `envs/dev` are applied. Names follow the Terraform
-naming patterns; `<suffix>` is a random string generated per root, masked here. Get the exact names
-with `terraform output` in each root, or filter the portal on the `project = contact-center-ai`
-tag or the `ccai` prefix.
+naming patterns; `<suffix>` is a random string generated per root, so the real names are not
+stored in the repo. Print this section with the live names filled in:
+
+```bash
+make tour-names     # python3 tools/tour_names.py
+```
+
+It reads the tables below and replaces each `<suffix>` name with the value from `terraform output`
+in `infra/azure/envs/dev` and `infra/azure/bootstrap`. It needs `terraform` on PATH and each root
+initialised against its state; a row keeps its masked pattern when either is missing (for example
+when no deployment is up), and the output says which roots resolved. Nothing is written to disk.
+You can also filter the portal on the `project = contact-center-ai` tag or the `ccai` prefix.
 
 **Dev resource group `rg-ccai-dev`** (deployed in Central US; `envs/dev` defaults `location` to
 `eastus2` per `docs/design/infra.md`, and `gpu_location` exists for the Central US Spot-quota
@@ -440,7 +449,8 @@ fallback, so the region is a tfvars override). Destroyed each session.
 | Budget (subscription scope) | `budget-ccai-monthly` | alerts at 50% and 90% actual, 100% forecast |
 
 **Entra ID:** the `id-ccai-dev-app` managed identity, and the service principal used for
-Terraform.
+Terraform (Entra ID > App registrations; its name is not a Terraform output, so `make tour-names`
+does not resolve it).
 
 **Cross-cloud by design.** Postgres, storage, the apps, the GPU VM and Databricks are on Azure.
 Snowflake is not an Azure resource: it is a Snowflake trial account hosted on AWS, and the I-SF
