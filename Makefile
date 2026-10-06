@@ -6,7 +6,7 @@
 # `evals` is the L2 agent golden set offline (a CI gate); `evals-live` is the same set
 # against real models, uploaded to LangSmith.
 
-.PHONY: up down seed ingest test lint check-public demo bench evals evals-live evals-compare evals-export evals-retrieval-experiment finetune-data finetune-label load-snowflake load-databricks load-dry-run dbt-build dbt-build-dev dev-data lance-azure-check
+.PHONY: up down seed ingest test lint check-public demo bench evals evals-live evals-compare evals-export evals-retrieval-experiment finetune-data finetune-label load-snowflake load-databricks load-dry-run dbt-build dbt-build-dev dev-data lance-azure-check parity
 
 PYTHON := uv run python
 # RETRIEVER_BACKEND=lancedb needs the lance dependency group wherever the store is read or written.
@@ -87,6 +87,15 @@ finetune-data:
 # resumable. Pass flags with ARGS, e.g. ARGS="--limit 5" or ARGS="--dry-run".
 finetune-label:
 	$(PYTHON) -m models.finetune.data_gen label $(ARGS)
+
+# ── Semantic-layer parity (S3) ───────────────────────────────────────────────
+
+# Run five agreed metrics from the semantic layer on Postgres, Snowflake and
+# Databricks, diff the numbers to a tolerance, and write results to
+# `results/semantics/` with each target's generated SQL saved next to the JSON.
+# Set PARITY_TARGETS=snowflake,databricks to skip the local Postgres target.
+parity:
+	$(PYTHON) -m tools.parity
 
 # ── Warehouse loaders (S2) ────────────────────────────────────────────────────
 

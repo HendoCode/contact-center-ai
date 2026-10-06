@@ -563,15 +563,17 @@ Grounded in `olap/dbt/models/marts/semantic/metrics.yml`:
   truncate-and-load (idempotent) with explicit casts per warehouse, and a row-count check per table.
   Types come from `olap/oltp/schema.sql`; an unmapped type raises.
 - **I-SF (#24):** Snowflake objects in Terraform, plan only.
-- **S3, "one metric, three warehouses" parity (`make parity`): not built yet.** It is the next
-  ticket: run `mf query` for five agreed metrics on all three targets, diff to a tolerance, and save
-  each target's SQL next to the numbers. Nothing has run on a real Snowflake or Databricks yet.
+- **S3, "one metric, three warehouses" parity (`make parity`): built.** It runs five
+  metrics (`call_volume`, `average_mortgage_note_rate`, `banking_available_balance`,
+  `credit_card_outstanding`, `first_contact_resolution_rate`) on all three targets, diffs
+  them to a tolerance, and saves each target's generated SQL to `results/semantics/`.
+  Verified against Snowflake and Databricks; the local Postgres run needs `make up` + `make dbt-build-dev`.
 
 ---
 
 ## Known limits and not built yet
 
-- **Not built yet:** S3 parity (`make parity`); fine-tune F2–F6; S3 (AWS) ingestion
+- **Not built yet:** fine-tune F2–F6; S3 (AWS) ingestion
   (`rag.pipeline --source s3` raises `NotImplementedError`); CSAT in the vector store; the agent
   talking to the MCP server over HTTP (it still spawns it over stdio); an agent HTTP endpoint (L4).
 - **No results yet:** `results/retrieval/` and `results/evals/` both render "not run". The numbers
