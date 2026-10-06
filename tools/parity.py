@@ -72,10 +72,36 @@ TARGETS: dict[str, dict] = {
 ANSI_RE = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
 _SECRET_PLACEHOLDER_RE = re.compile(r"<concealed by 1Password>")
 
+# Environment variable names whose values may be account identifiers or credentials.
+_SENSITIVE_ENV_PATTERNS = (
+    "ACCOUNT", "HOST", "CATALOG", "TOKEN", "KEY", "PASSWORD", "PASSPHRASE",
+    "SECRET", "CREDENTIAL", "PRIVATE_KEY", "HTTP_PATH",
+)
+
+
+def _sensitive_env_values() -> list[str]:
+    """Collect non-empty environment values that look like secrets or account ids."""
+    values: set[str] = set()
+    for name, value in os.environ.items():
+        if not value or len(value) <= 3:
+            continue
+        if any(pattern in name for pattern in _SENSITIVE_ENV_PATTERNS):
+            values.add(value)
+            # For URLs, also redact the bare hostname/host:port portion.
+            if value.startswith(("http://", "https://")):
+                host = value.split("://", 1)[1].split("/")[0]
+                if host:
+                    values.add(host)
+    # Replace longest values first so shorter substrings do not leave partial matches.
+    return sorted(values, key=len, reverse=True)
+
 
 def sanitize_sql(sql: str) -> str:
-    """Replace 1Password-masked account identifiers with a neutral placeholder."""
-    return _SECRET_PLACEHOLDER_RE.sub("<name>", sql)
+    """Redact account identifiers, hosts, tokens, and 1Password placeholders."""
+    for value in _sensitive_env_values():
+        sql = sql.replace(value, "<redacted>")
+    sql = _SECRET_PLACEHOLDER_RE.sub("<name>", sql)
+    return sql
 # Pure helpers
 # ---------------------------------------------------------------------------
 
@@ -126,9 +152,12 @@ def extract_sql(explain_output: str) -> str:
     return ""
 
 
-def diff_metric(values: dict[str, float], tolerance: float) -> dict:
-    """Compare numeric values across targets."""
+def diff_metric(values: dict[str, float], tolerance: float, targets: list[str]) -> dict:
+    """Compare numeric values across requested targets."""
     numeric = {k: v for k, v in values.items() if isinstance(v, (int, float))}
+    missing = [t for t in targets if t not in numeric]
+    if missing:
+        return {"max_diff": None, "ok": False, "note": f"missing targets: {missing}"}
     if len(numeric) < 2:
         return {"max_diff": None, "ok": False, "note": "fewer than 2 targets returned numbers"}
     vals = list(numeric.values())
@@ -173,6 +202,14 @@ def stage_semantic_manifest(target_name: str, original_path: Path) -> None:
             f"{target_manifest} not found; run `make dbt-build WAREHOUSE={target_name}` first"
         )
     shutil.copy2(target_manifest, original_path)
+
+
+def restore_manifest(original_path: Path, original_text: str | None) -> None:
+    """Restore the original manifest, or remove it if there was none at the start."""
+    if original_text is not None:
+        original_path.write_text(original_text)
+    elif original_path.exists():
+        original_path.unlink()
 
 
 # ---------------------------------------------------------------------------
@@ -299,7 +336,9 @@ def run_parity(targets: list[str], dry_run: bool = False) -> dict:
 
             profiles_dir = DBT_DIR if target == "postgres" else make_temp_profile(config["profile_target"])
             try:
-                if target != "postgres":
+                if target == "postgres":
+                    restore_manifest(original_manifest, original_text)
+                else:
                     stage_semantic_manifest(config["profile_target"], original_manifest)
 
                 with tempfile.TemporaryDirectory(prefix=f"parity-csv-{target}-") as td:
@@ -317,10 +356,9 @@ def run_parity(targets: list[str], dry_run: bool = False) -> dict:
                 if target != "postgres":
                     shutil.rmtree(profiles_dir, ignore_errors=True)
     finally:
-        if original_text is not None:
-            original_manifest.write_text(original_text)
+        restore_manifest(original_manifest, original_text)
 
-    # Diff across targets that returned numbers
+    # Diff across requested targets; a missing target is a failure.
     diff: dict[str, dict] = {}
     for metric in metrics:
         values = {
@@ -329,12 +367,17 @@ def run_parity(targets: list[str], dry_run: bool = False) -> dict:
             if results[target].get("status") == "ok" and metric in results[target]["values"]
         }
         tolerance = float(METRICS[metric]["tolerance"])  # type: ignore[arg-type]
-        diff[metric] = {"values": values, **diff_metric(values, tolerance)}
+        diff[metric] = {"values": values, **diff_metric(values, tolerance, targets)}
+
+    all_targets_ok = all(results[t].get("status") == "ok" for t in targets)
+    all_metrics_ok = all(diff[m]["ok"] for m in metrics)
+    run_ok = all_targets_ok and all_metrics_ok
 
     return {
         "results": results,
         "diff": diff,
         "sql_files": sql_files,
+        "run_ok": run_ok,
     }
 
 
@@ -361,15 +404,15 @@ def build_record(parity: dict, targets: list[str]) -> dict:
         if sql_file:
             status[target]["sql_file"] = sql_file
 
-    all_ok = all(row["ok"] for row in metrics_table.values())
+    all_metrics_ok = all(row["ok"] for row in metrics_table.values())
+    all_targets_ok = all(status[t]["status"] == "ok" for t in targets)
     notes = []
-    if not all_ok:
+    if not all_metrics_ok:
         mismatches = [m for m, row in metrics_table.items() if not row["ok"]]
-        notes.append(f"Mismatches beyond tolerance: {', '.join(mismatches)}")
-    for target in targets:
-        res = parity["results"][target]
-        if res["status"] != "ok":
-            notes.append(f"{target}: {res['status']}")
+        notes.append(f"Mismatches beyond tolerance or missing data: {', '.join(mismatches)}")
+    if not all_targets_ok:
+        bad = [t for t in targets if status[t]["status"] != "ok"]
+        notes.append(f"Target errors: {', '.join(bad)}")
     if not notes:
         notes.append("All targets agree within tolerance.")
 
@@ -440,7 +483,7 @@ def main(argv: list[str] | None = None) -> int:
         vals = " | ".join(str(row.get(t, "n/a")) for t in targets)
         print(f"| {metric} | {vals} | {row['tolerance']} | {row['max_diff']} | {row['ok']} |")
 
-    return 0 if all(record["metrics"][m]["ok"] for m in METRICS) else 1
+    return 0 if parity["run_ok"] else 1
 
 
 if __name__ == "__main__":

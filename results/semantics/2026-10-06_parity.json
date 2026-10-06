@@ -1,6 +1,6 @@
 {
   "date": "2026-10-06",
-  "git_sha": "b84734151caa43b4898d1d2b6b6a425703d5a2fa",
+  "git_sha": "99e12f5d82f32ad6d5c85fa1d739a8a4eb3109cc",
   "area": "semantics",
   "run": "parity",
   "hardware": "Linux-7.0.14-16-pve-x86_64-with-glibc2.41, unknown",
