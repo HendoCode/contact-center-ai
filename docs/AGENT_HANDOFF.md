@@ -253,11 +253,16 @@ Follows `docs/design/infra.md`.
 
 ### Wave 4: writing (after each piece has results)
 
-**B1–B3 · Post drafts** · O drafts, Stephen finalizes · deps: the results they cite
-- B1 "Fine-tune or retrieve?" (F6 results). B2 "One metric, three warehouses" (S3 and S4). B3 "Statecharts for agents" (L1 and L2).
+**B1–B4 · Post drafts** · O drafts, Stephen finalizes · deps: the results they cite
+- Content briefs for all four (thesis, evidence paths, must-not-claim lines) are in `blogs/PROPOSED_POSTS.md`. Draft from the brief, not from this list.
+- B1 "Fine-tune or retrieve? Measuring it on call summaries." Blocked until F2–F6 have results; F1 (the labeled dataset) is done.
+- B2 "One metric, three warehouses." Ready except the headline claim: the models build on all three targets, and the Ossie export and its known issues are written up, but "the numbers match" needs S3 (`make parity`). Without S3 the post says "builds on," never "matches."
+- B3 "Reading an agent graph as a statechart." Ready (L1 and L2). The graph has hierarchy (the `analyst` subgraph) and a persisted interrupt; it has no orthogonal regions or history states, and the post says so.
+- B4 "pgvector and LanceDB on 100,000 calls." Ready (R1–R3 results). New since this plan was written.
+- The evals findings (three environment causes behind the first live run) go into post 10, "Trust, but Verify," rather than a new post.
 - Before drafting, propose in a PR comment whether each one fills an existing placeholder slot (05–12) or becomes a new post. Stephen decides.
 - Every number in a post comes from a rendered `results/` table. Every command shown is one the draft's author ran.
-- Plain, specific, first-person engineering prose. Avoid aphorism openers, "here's what everyone gets wrong," setup-then-hero sentences, "not X, but Y" reveals, and marketing adjectives. Stephen rewrites in his own voice; the draft's job is structure and accurate facts.
+- Plain, specific, first-person engineering prose. Avoid aphorism openers, "here's what everyone gets wrong," setup-then-hero sentences, "not X, but Y" reveals, marketing adjectives, and titles that start with "What." Stephen rewrites in his own voice; the draft's job is structure and accurate facts.
 
 ---
 
@@ -282,7 +287,7 @@ Follows `docs/design/infra.md`.
 | L3 Compose/demo | C | L1, R1 | Fri Oct 9 |
 | S1–S4, I-SF | S / C / O | as listed | Snowflake by Fri Oct 23 |
 | I1 modules | S | D0.3 | rolling |
-| B1–B3 | O | results | after each piece |
+| B1–B4 | O | results | after each piece |
 
 **Parallel lanes that don't touch the same files:** {T00, P1} · {R1 → R2 → R3} · {D0 → F1 → F2/F3 → F4 → F5/F6} · {I1}. Merge order inside a lane follows the arrows. The only shared files are `pyproject.toml`/`uv.lock`, `.env.example`, `CLAUDE.md`, and the `Makefile`: rebase onto `main` before opening the PR and resolve conflicts by keeping both sides.
 
@@ -325,7 +330,7 @@ Follows `docs/design/infra.md`.
 | Mon–Tue | Run `make bench` on his machine for the canonical retrieval numbers. |
 | Week of Oct 12 | Create the Snowflake dbt user and key pair, and the Databricks workspace or Free Edition; run the S2 loads and S3 parity. |
 | Any `apply` | `terraform apply`, then `terraform destroy` at the end of the session. Check the budget alert email is set. |
-| Every PR | Merge, or send back. Decide B1–B3 slots. Publish posts. |
+| Every PR | Merge, or send back. Decide B1–B4 slots. Publish posts. |
 
 ---
 
