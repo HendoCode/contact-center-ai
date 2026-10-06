@@ -418,13 +418,12 @@ What you can click into once `bootstrap` and `envs/dev` are applied (steps in
 `<suffix>` is a random string generated per root, so the real names are not stored in the repo.
 Each row says how to find the real name: a `terraform output` run from that root, an `az` command,
 or a portal search. You can also filter the portal on the `project = contact-center-ai` tag or the
-`ccai` prefix. Set the groups once for the commands below (the subscription is whichever `az login`
-selected):
+`ccai` prefix. First confirm the subscription, then list every output of each root:
 
 ```bash
-az account show -o table                                # the subscription `az login` selected
-terraform -chdir=infra/azure/envs/dev output          # every dev output at once
-terraform -chdir=infra/azure/bootstrap output         # every bootstrap output at once
+az account show -o table                                # confirm the subscription
+terraform -chdir=infra/azure/envs/dev output                    # every dev output at once
+terraform -chdir=infra/azure/bootstrap output               # every bootstrap output at once
 ```
 
 **Dev resource group `rg-ccai-dev`** (deployed in Central US; `envs/dev` defaults `location` to
