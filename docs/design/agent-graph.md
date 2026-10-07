@@ -65,7 +65,7 @@ L1 owns this contract; the demo, L4 and L2 consume it.
 
 `agent/tools.py` opens one `MCPAdapter({"mcpServers": {"ccai": {"command": sys.executable, "args": ["-m", "ccai_mcp.server"]}}})` per process. Nodes call the resulting tools with explicit arguments, so no tool code lives in `agent/`.
 
-The client is `langchain.mcp`, because langchain-mcp-adapters' README says it is no longer maintained. Catch: `langchain[mcp]` needs fastmcp 4, which needs `mcp>=2`, and mcp 2.0 rebuilt the low-level `Server` that `ccai_mcp/server.py` uses. Because one `uv.lock` covers the repo, M0 ports the server first. If M0 slips, L1 starts on `langchain-mcp-adapters==0.3.2` (which needs `mcp<2`) behind `agent/tools.py`. The transport stays stdio until M1 adds `MCP_SERVER_URL`.
+The client is `langchain.mcp`, because langchain-mcp-adapters' README says it is no longer maintained. Catch: `langchain[mcp]` needs fastmcp 4, which needs `mcp>=2`, and mcp 2.0 rebuilt the low-level `Server` that `ccai_mcp/server.py` uses. Because one `uv.lock` covers the repo, M0 ported the server first ([#18](https://github.com/HendoCode/contact-center-ai/pull/18)), so the agent uses `langchain.mcp` directly and the `langchain-mcp-adapters` fallback was never needed. M1 ([#30](https://github.com/HendoCode/contact-center-ai/pull/30)) added Streamable HTTP and `MCP_SERVER_URL`; stdio stays the default transport.
 
 ## Serving
 
@@ -86,5 +86,5 @@ We don't use the standalone Agent Server. Its docs require Redis, `LANGSMITH_API
 - **L1 · Agent** (refined) · S · deps D0.2, R1, M0 or the fallback. Adds an `agent` group: langgraph, langgraph-checkpoint-postgres, `langgraph-cli[inmem]`, `langchain[mcp]`.
 - **M1 · Streamable HTTP** (**new**) · S · deps M0. Uses `MCP_SERVER_HOST` and `MCP_SERVER_PORT`; adds `MCP_SERVER_URL` per §4.5.
 - **L2** (refined). Golden items carry `route`, `expect_interrupt`, `metric_names` and `call_id`.
-- **L3** (refined). Dev server as above. No `mcp-server` service until M1.
+- **L3** (refined). Dev server as above. The Compose `mcp-server` service arrived with M1.
 - **L4 · Agent HTTP endpoint** (**new**) · S · deps L1. Start and resume runs over `AsyncPostgresSaver`. Safe to scale to zero.

@@ -3,9 +3,12 @@
 # Rule enforced here: an ambiguous spoken word ("interest rate", "balance",
 # "limit", "LCV") maps to N DISTINCT metric names, and NONE of them keeps the
 # bare word. There is no `interest_rate`, no `balance`, no `limit` metric. A
-# supervisor asking "what is our average interest rate?" therefore gets four
+# supervisor asking "what is our average interest rate?" therefore gets seven
 # side-by-side answers, each a declared metric with its own description and
-# commit history.
+# commit history: six interest rates (mortgage note rate, weighted mortgage
+# portfolio rate, HELOC current rate, card purchase APR, card cash-advance APR,
+# deposit APY) and one investment return that is not interest at all.
+# note_rate_times_balance is only the weighted rate's numerator, not an answer.
 
 metrics:
 

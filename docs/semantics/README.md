@@ -108,7 +108,7 @@ directly will get different numbers from `mf query`:
    `product__lob`. That is a MetricFlow join path (entity `product`, then dimension `lob` on
    `products`), not a field of `account_snapshot`. Ossie has the `account_snapshot → products`
    relationship, but the expression doesn't say `products.lob`. This is the filter that keeps the
-   four "interest rate" meanings apart.
+   seven "interest rate" metrics apart.
 2. **The three row counts look identical.** `call_volume`, `responses` and `rate_locks_count` all
    export as `SUM(1)`, with no dataset qualifier. `first_contact_resolved_calls` and
    `note_rate_times_balance` are also unqualified. A consumer cannot tell which dataset these count.

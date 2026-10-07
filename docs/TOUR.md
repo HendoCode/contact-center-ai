@@ -88,7 +88,8 @@ uv run --group dbt mf query --explain \
 cd ../..
 ```
 
-This is the ambiguity demo: "interest rate" is five declared metrics, and the compiled SQL shows
+This is the ambiguity demo: "interest rate" is seven declared metrics (six interest rates plus an
+investment return that is not interest), and the compiled SQL shows
 each one filtered to its own line of business:
 
 ```
@@ -524,7 +525,8 @@ Azure backend, under its own state key. Cross-cloud traffic is the few MB of loa
 Grounded in `olap/dbt/models/marts/semantic/metrics.yml`:
 
 - **No ambiguous metric exists.** There is no `interest_rate`, `balance`, `limit` or `lcv`.
-  "Interest rate" maps to seven LOB-filtered metrics, "balance" to several, each a different number.
+  "Interest rate" maps to seven declared metrics (six interest rates and one investment return,
+  each LOB-filtered or built from LOB-filtered metrics), "balance" to several, each a different number.
 - **One discriminator:** `product.lob`, surfaced as `Dimension('product__lob')` in each metric's
   filter. `mf query --explain` shows it as a `WHERE product__lob = '…'` per metric (A3).
 - **Sign conventions are declared:** `banking_available_balance` is an asset,
