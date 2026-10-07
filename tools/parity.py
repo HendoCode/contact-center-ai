@@ -72,10 +72,11 @@ TARGETS: dict[str, dict] = {
 ANSI_RE = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
 _SECRET_PLACEHOLDER_RE = re.compile(r"<concealed by 1Password>")
 
-# Environment variable names whose values may be account identifiers or credentials.
+# Environment variable names whose values may be account identifiers, schemas, or credentials.
 _SENSITIVE_ENV_PATTERNS = (
-    "ACCOUNT", "HOST", "CATALOG", "TOKEN", "KEY", "PASSWORD", "PASSPHRASE",
-    "SECRET", "CREDENTIAL", "PRIVATE_KEY", "HTTP_PATH",
+    "ACCOUNT", "HOST", "CATALOG", "DATABASE", "SCHEMA", "USER", "ROLE", "WAREHOUSE",
+    "TOKEN", "KEY", "PASSWORD", "PASSPHRASE", "SECRET", "CREDENTIAL", "PRIVATE_KEY",
+    "HTTP_PATH",
 )
 
 

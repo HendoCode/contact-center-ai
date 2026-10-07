@@ -75,6 +75,29 @@ class TestSanitizeSql:
         sql = "SELECT * FROM acct_12345.marts.f_interaction"
         assert parity.sanitize_sql(sql) == "SELECT * FROM <redacted>.marts.f_interaction"
 
+    def test_redacts_snowflake_and_databricks_identifier_env_vars(self, monkeypatch):
+        # These are the exact names that appear in generated SQL when credentials
+        # come from plain environment variables rather than 1Password.
+        env = {
+            "SNOWFLAKE_DATABASE": "sfdb_123",
+            "SNOWFLAKE_SCHEMA": "sfschema_456",
+            "SNOWFLAKE_USER": "sfuser_789",
+            "SNOWFLAKE_ROLE": "sfrole_012",
+            "SNOWFLAKE_WAREHOUSE": "sfwh_345",
+            "DATABRICKS_SCHEMA": "dbschema_678",
+        }
+        for name, value in env.items():
+            monkeypatch.setenv(name, value)
+        sql = (
+            "SELECT * FROM sfdb_123.sfschema_456.table_one "
+            "WHERE user = 'sfuser_789' AND role = 'sfrole_012' "
+            "AND warehouse = 'sfwh_345' AND other = 'dbschema_678'"
+        )
+        redacted = parity.sanitize_sql(sql)
+        for value in env.values():
+            assert value not in redacted
+        assert redacted.count("<redacted>") >= 6
+
     def test_redacts_url_and_hostname(self, monkeypatch):
         monkeypatch.setenv("PARITY_TEST_HOST", "https://dbc-abc-123.cloud.databricks.com")
         sql = (
@@ -299,7 +322,7 @@ class TestDryRun:
 
 
 class TestMainExitCode:
-    def test_main_returns_nonzero_when_target_errors(self, monkeypatch, tmp_path: Path):
+    def test_main_returns_nonzero_when_one_of_two_targets_errors(self, monkeypatch, tmp_path: Path):
         dbt_dir = tmp_path / "dbt"
         results_dir = tmp_path / "results"
         (dbt_dir / "target" / "fake_wh").mkdir(parents=True)
@@ -308,10 +331,19 @@ class TestMainExitCode:
         (dbt_dir / "target" / "fake_wh" / "semantic_manifest.json").write_text("WAREHOUSE")
 
         monkeypatch.setattr(parity, "METRICS", {"m1": {"tolerance": 0}})
-        monkeypatch.setattr(parity, "TARGETS", {"fake_a": _fake_target_config()})
+        monkeypatch.setattr(parity, "TARGETS", {
+            "fake_ok": _fake_target_config(),
+            "fake_bad": _fake_target_config(),
+        })
         monkeypatch.setattr(parity, "DBT_DIR", dbt_dir)
         monkeypatch.setattr(parity, "RESULTS_DIR", results_dir)
         monkeypatch.setattr(parity, "check_postgres_reachable", lambda: True)
-        monkeypatch.setattr(parity, "run_mf_target", lambda *a, **k: {"status": "error", "error": "boom"})
 
-        assert parity.main(["--targets", "fake_a"]) == 1
+        def fake_run(target, *args, **kwargs):
+            if target == "fake_ok":
+                return {"status": "ok", "values": {"m1": 100}, "sql": "SELECT 100"}
+            return {"status": "error", "error": "boom"}
+
+        monkeypatch.setattr(parity, "run_mf_target", fake_run)
+
+        assert parity.main(["--targets", "fake_ok,fake_bad"]) == 1
