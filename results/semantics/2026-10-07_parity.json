@@ -1,0 +1,86 @@
+{
+  "date": "2026-10-07",
+  "git_sha": "f46c7bdeb65df3ce6985328c78dc18b2f666d49d",
+  "area": "semantics",
+  "run": "parity",
+  "hardware": "Linux-7.0.14-16-pve-x86_64-with-glibc2.41, unknown",
+  "versions": {
+    "python": "3.13.5"
+  },
+  "params": {
+    "metrics": [
+      "call_volume",
+      "average_mortgage_note_rate",
+      "banking_available_balance",
+      "credit_card_outstanding",
+      "first_contact_resolution_rate"
+    ],
+    "targets": [
+      "postgres",
+      "snowflake",
+      "databricks"
+    ],
+    "tolerances": {
+      "call_volume": 0.0,
+      "average_mortgage_note_rate": 0.0001,
+      "banking_available_balance": 0.01,
+      "credit_card_outstanding": 0.01,
+      "first_contact_resolution_rate": 0.0001
+    }
+  },
+  "metrics": {
+    "call_volume": {
+      "tolerance": 0,
+      "postgres": 1250,
+      "snowflake": 1250,
+      "databricks": 1250,
+      "max_diff": 0,
+      "ok": true
+    },
+    "average_mortgage_note_rate": {
+      "tolerance": 0.0001,
+      "postgres": 6.588841176470588,
+      "snowflake": 6.588841176,
+      "databricks": 6.5888412,
+      "max_diff": 2.4000000209412065e-08,
+      "ok": true
+    },
+    "banking_available_balance": {
+      "tolerance": 0.01,
+      "postgres": 38287038.69,
+      "snowflake": 38287038.69,
+      "databricks": 38287038.69,
+      "max_diff": 0.0,
+      "ok": true
+    },
+    "credit_card_outstanding": {
+      "tolerance": 0.01,
+      "postgres": 2354869.83,
+      "snowflake": 2354869.83,
+      "databricks": 2354869.83,
+      "max_diff": 0.0,
+      "ok": true
+    },
+    "first_contact_resolution_rate": {
+      "tolerance": 0.0001,
+      "postgres": 0.5752,
+      "snowflake": 0.5752,
+      "databricks": 0.5752,
+      "max_diff": 0.0,
+      "ok": true
+    },
+    "postgres": {
+      "status": "ok",
+      "sql_file": "2026-10-07_parity_postgres.sql"
+    },
+    "snowflake": {
+      "status": "ok",
+      "sql_file": "2026-10-07_parity_snowflake.sql"
+    },
+    "databricks": {
+      "status": "ok",
+      "sql_file": "2026-10-07_parity_databricks.sql"
+    }
+  },
+  "notes": "All targets agree within tolerance."
+}
