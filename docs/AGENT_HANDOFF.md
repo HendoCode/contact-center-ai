@@ -36,6 +36,8 @@ infra: Docker Compose (local, no cloud bill) and Terraform on Azure (Snowflake s
 
 ## 2. The repo today (verified Oct 1 against `main`)
 
+_History: a dated 2026-10-01 snapshot, kept as written. For current state see the [README](../README.md), [docs/TOUR.md](TOUR.md) and [results/](../results/)._
+
 - `data/synthetic/generate_data.py`: seeded generator (`random.seed(42)`, `Faker.seed(42)`). Writes `transcripts.json`, `csat.json`, and the OLTP JSON files. `N_INTERACTIONS = 1250`.
 - `olap/`: OLTP schema plus `seed.py` (idempotent JSON → Postgres); a dbt project with staging, a star schema (`d_*` dims, `f_*` facts), `semantic/semantic_models.yml` and `metrics.yml`, assertion tests, and a `profiles.yml` with a single Postgres target. The `dbt` dependency group pins `dbt-core==1.12.5`, `dbt-postgres==1.11.0`, `dbt-metricflow==0.15.0`.
 - `rag/embeddings.py`: `get_embeddings()` (`EMBEDDING_PROVIDER` = openai | ollama) and `get_vector_store()` (LangChain `PGVector`). `rag/pipeline.py`: `get_llm()` (`LLM_PROVIDER` = openai-compatible, defaulting to OpenRouter, or ollama), `--ingest` and `--query`, `rag_query()`. **Ingest is not idempotent:** running it twice duplicates documents.

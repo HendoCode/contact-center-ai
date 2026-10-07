@@ -103,7 +103,8 @@ Before running anything, the wrapper checks, with one message each:
 - `uv sync --group dbt --group <warehouse>` has been done;
 - the warehouse answers `SELECT 1` (`tools/warehouse-run.sh --no-check ...` skips this check).
 
-Not run against a real warehouse or 1Password yet; the first run is the test.
+Run against real Snowflake and Databricks through 1Password: see the parity runs in
+[`results/semantics/`](../../results/semantics/) (`make parity`).
 
 ### Loaders (`olap/dbt/loaders/`)
 
@@ -190,8 +191,10 @@ uv run --group dbt mf query --metrics banking_available_balance,credit_card_outs
 
 The single question **"what is our average interest rate?"** has no answer —
 and no metric with that bare name exists. Ask the semantic layer and you get
-five declared metrics side by side (via `mf query --metrics ... --explain`,
-each generating its own lob-filtered SQL):
+seven declared metrics side by side (via `mf query --metrics ... --explain`,
+each generating its own lob-filtered SQL). The table shows the five simple
+averages, one per line of business; the other two are
+`weighted_mortgage_portfolio_rate` and `average_credit_card_cash_advance_apr`:
 
 | Metric | Value |
 |---|---|
