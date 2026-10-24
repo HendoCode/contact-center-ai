@@ -82,7 +82,7 @@ without connecting anywhere, and `mf` can list the catalog and compile SQL from 
 ```bash
 cd olap/dbt
 uv run --group dbt dbt parse
-uv run --group dbt mf list metrics          # "We've found 43 metrics."
+uv run --group dbt mf list metrics          # "We've found 47 metrics."
 uv run --group dbt mf query --explain \
   --metrics average_mortgage_note_rate,average_credit_card_purchase_apr,average_deposit_apy,average_heloc_current_rate,average_investment_return_pct
 cd ../..
@@ -319,7 +319,7 @@ when the two models match.
 
 ```bash
 make evals-live ARGS="--limit 5"    # cheap smoke run
-make evals-live                     # all 51; writes results/evals/ and a LangSmith experiment
+make evals-live                     # all 52; writes results/evals/ and a LangSmith experiment
 ```
 
 **C3. Snowflake. Costs warehouse credits** (XS, 60 s auto-suspend if you used the Terraform root).
@@ -474,7 +474,7 @@ Azure backend, under its own state key. Cross-cloud traffic is the few MB of loa
 | pgvector | `retrieval/pgvector_backend.py` | LangChain `PGVector`, row id = `call_id`; vector-only, `fts`/`hybrid` raise |
 | Retrieval benchmark | `retrieval/bench.py`, `retrieval/labels/` | method in the docstring; labels derived from generator facts (`build_labels.py`), capped recall@k, MRR@10, `--scale` |
 | DuckDB over Lance | `retrieval/duckdb_lance.py`, `retrieval/README.md` | read-only SQL over the same dataset; gaps vs the LanceDB backend |
-| Semantic layer | `olap/dbt/models/marts/semantic/metrics.yml`, `semantic_models.yml` | 43 metrics, none named `interest_rate`/`balance`/`lcv`; `filter: "{{ Dimension('product__lob') }} = '…'"`; derived `net_member_liquidity` and `member_lifetime_value` |
+| Semantic layer | `olap/dbt/models/marts/semantic/metrics.yml`, `semantic_models.yml` | 47 metrics, none named `interest_rate`/`balance`/`lcv`; `filter: "{{ Dimension('product__lob') }} = '…'"`; derived `net_member_liquidity` and `member_lifetime_value` |
 | Star schema | `olap/dbt/models/marts/dim/`, `fact/`, `olap/dbt/tests/` | `d_*`/`f_*` models; sign-convention and LOB-isolation tests |
 | Warehouse targets | `olap/dbt/profiles.yml` | `dev` (Postgres), `snowflake` (key pair, no password), `databricks`; every value from env |
 | Warehouse loaders | `olap/dbt/loaders/` | `__main__.py` (CLI), `snowflake_loader.py` (PUT + `COPY INTO`), `databricks_loader.py` (volume + `COPY INTO`), `schema.py` (DDL type mapping), `plan.py` |
@@ -551,7 +551,7 @@ Grounded in `olap/dbt/models/marts/semantic/metrics.yml`:
   `Command(resume={"choices": [...]})` on the same `thread_id`. `AsyncPostgresSaver` persists the
   paused run, so it resumes after a restart. Served with `langgraph dev` (a dev server, not
   production).
-- **LangSmith:** tracing on by env only. Golden set of 51 questions (11 ambiguous, 18 metric,
+- **LangSmith:** tracing on by env only. Golden set of 52 questions (12 ambiguous, 18 metric,
   10 call lookup, 12 open) whose expectations are computed from committed data. `make evals` runs
   it offline as a CI gate; `make evals-live` runs it as a LangSmith experiment with an
   LLM-as-judge that must differ from the agent's model. `results/evals/` says **not run**.

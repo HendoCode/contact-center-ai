@@ -61,7 +61,7 @@ def test_priced_models_follow_the_providers():
 
 
 def test_golden_count_matches_the_set():
-    assert preflight.golden_count() == 51
+    assert preflight.golden_count() == 52
 
 
 def test_postgres_unreachable_message():

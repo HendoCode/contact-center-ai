@@ -1,12 +1,12 @@
 # Agent evals (L2)
 
-A golden set of 51 questions for the LangGraph agent (`agent/`), the evaluators that score it, and two runners: offline in CI and live in LangSmith.
+A golden set of 52 questions for the LangGraph agent (`agent/`), the evaluators that score it, and two runners: offline in CI and live in LangSmith.
 
 ```bash
 make evals                                          # offline: no keys, no DB, no network
 python -m evals.datasets.build_golden --check       # exit 1 if the golden set is stale
 make evals-live ARGS="--limit 5"                    # live smoke run: 5 questions (costs money)
-make evals-live                                     # live: all 51, real models and tools, to LangSmith
+make evals-live                                     # live: all 52, real models and tools, to LangSmith
 make evals-live DRY=1                               # the live plan and cost estimate; resolves and runs nothing
 make evals-compare A=<run name>                     # before/after table: that run against the latest
 make evals-export EXP=<LangSmith experiment>       # per-item results of an older run, read-only

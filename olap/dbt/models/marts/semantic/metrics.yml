@@ -236,6 +236,38 @@ metrics:
     type_params:
       measure: fee_revenue
 
+  - name: overdraft_fee_revenue
+    label: Overdraft Fee Revenue
+    description: Overdraft fees posted over the transaction window (one of the fee types behind total_fee_revenue).
+    type: simple
+    type_params:
+      measure: fee_revenue
+    filter: "{{ Dimension('transaction__fee_type') }} = 'overdraft'"
+
+  - name: nsf_fee_revenue
+    label: NSF Fee Revenue
+    description: Non-sufficient-funds fees posted over the transaction window (one of the fee types behind total_fee_revenue).
+    type: simple
+    type_params:
+      measure: fee_revenue
+    filter: "{{ Dimension('transaction__fee_type') }} = 'nsf'"
+
+  - name: monthly_maintenance_fee_revenue
+    label: Monthly Maintenance Fee Revenue
+    description: Monthly account maintenance fees posted over the transaction window (one of the fee types behind total_fee_revenue).
+    type: simple
+    type_params:
+      measure: fee_revenue
+    filter: "{{ Dimension('transaction__fee_type') }} = 'monthly_maintenance'"
+
+  - name: atm_fee_revenue
+    label: ATM Fee Revenue
+    description: ATM fees posted over the transaction window (one of the fee types behind total_fee_revenue).
+    type: simple
+    type_params:
+      measure: fee_revenue
+    filter: "{{ Dimension('transaction__fee_type') }} = 'atm'"
+
   - name: total_interest_income
     label: Total Interest Income
     description: Interest/dividends earned by members over the transaction window.

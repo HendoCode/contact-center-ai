@@ -4,10 +4,11 @@ MCP tool definitions — these are the capabilities exposed to any MCP client.
 Tools:
     search_transcripts   — semantic search over call transcripts
     get_call_summary     — summarize a specific call by ID
-    query_csat           — query CSAT data with optional filters
+    query_csat           — query CSAT data with optional score, category and date filters
 """
 
 import os
+from datetime import date
 
 import psycopg2
 
@@ -78,6 +79,8 @@ def query_csat(
     min_score: int | None = None,
     max_score: int | None = None,
     category: str | None = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
 ) -> str:
     """
     Query CSAT survey results with optional filters.
@@ -86,6 +89,9 @@ def query_csat(
         min_score: Minimum CSAT score (1-5)
         max_score: Maximum CSAT score (1-5)
         category: Filter by call category (e.g. "fraud_dispute")
+        start_date: Only surveys on or after this ISO date (by survey date)
+        end_date: Only surveys before this ISO date (exclusive, by survey date), so
+            the window is half-open like query_metric's time_window
 
     Returns:
         Summary of CSAT results matching the filters
@@ -103,6 +109,14 @@ def query_csat(
     if category:
         where_clauses.append("category_code = %s")
         params.append(category)
+    for bound, op in ((start_date, ">="), (end_date, "<")):
+        if bound:
+            try:
+                day = date.fromisoformat(str(bound))
+            except ValueError:
+                return f"TOOL ERROR (query_csat): dates must be YYYY-MM-DD, got {bound!r}"
+            where_clauses.append(f"surveyed_at {op} %s")
+            params.append(day)
     where_sql = (" WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
 
     with psycopg2.connect(CONNECTION_STRING) as conn, conn.cursor() as cur:

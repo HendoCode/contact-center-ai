@@ -58,6 +58,12 @@ models:
           - accepted_values:
               arguments:
                 values: ["individual", "business"]
+      - name: home_branch
+        description: Branch the member is served by; null until the raw load carries it.
+        tests:
+          - accepted_values:
+              arguments:
+                values: ["Westside", "Downtown", "Northgate", "Riverside"]
       - name: household_id
         tests:
           - relationships:
