@@ -149,6 +149,10 @@ SPECS: list[dict] = [
      "categories": ["investment_review"]},
     {"kind": "open", "question": "What card services requests do members make?",
      "categories": ["card_services"]},
+
+    # appended last so the ids of the rows above keep their numbers
+    {"kind": "ambiguous", "question": "What do we make on fees?",
+     "clarify_with": ["overdraft_fee_revenue"]},
 ]
 
 

@@ -17,7 +17,7 @@ the OLTP schema/seed.
 | `models/marts/dim/` | `d_date`, `d_time`, `d_member`, `d_household`, `d_staff`, `d_team`, `d_category`, `d_product`, `d_account` (snowflake→`d_product`), degenerate `d_channel`/`d_outcome`/`d_account_status` |
 | `models/marts/fact/` | `f_interaction`, `f_interaction_account` (bridge), `f_csat`, `f_account_snapshot`, `f_transaction`, `f_rate_lock`, `f_rate` |
 | `models/marts/semantic/semantic_models.yml` | MetricFlow semantic models (entities, the `lob` discriminator, measures) |
-| `models/marts/semantic/metrics.yml` | The public metric catalog — 43 named metrics, none keeps a bare ambiguous word |
+| `models/marts/semantic/metrics.yml` | The public metric catalog — 47 named metrics, none keeps a bare ambiguous word |
 | `tests/` | Singular tests: transaction sign convention, balance sign convention, LOB-filter isolation |
 | `models/marts/_*.yml` | Generic tests: referential integrity (`relationships`), keys, `accepted_values` |
 

@@ -15,5 +15,7 @@ select
     residence_state,
     business_id,
     naics_code,
-    employee_count
+    employee_count,
+    -- branch the member is served by; null on a raw load that predates the column
+    {% if has_source_column('oltp', 'member', 'home_branch') %}home_branch{% else %}cast(null as {{ dbt.type_string() }}) as home_branch{% endif %}
 from {{ source('oltp', 'member') }}

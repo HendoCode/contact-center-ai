@@ -50,3 +50,20 @@ terms:
     candidates:
       member_lifetime_value: [lifetime, customer value, member value]
       loan_to_value: [loan to value, underwriting, origination]
+
+  fee:
+    aliases: [fee, fees]
+    unless:
+      - fee call
+      - fee calls
+      - fee dispute
+      - fee disputes
+      - dispute fees
+      - fee schedule
+      - fee change
+    candidates:
+      overdraft_fee_revenue: [overdraft]
+      nsf_fee_revenue: [nsf, insufficient funds]
+      monthly_maintenance_fee_revenue: [maintenance, monthly]
+      atm_fee_revenue: [atm]
+      total_fee_revenue: [total, all]

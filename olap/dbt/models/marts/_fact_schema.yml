@@ -154,6 +154,12 @@ models:
           - accepted_values:
               arguments:
                 values: ["deposit", "withdrawal", "payment", "purchase", "fee", "interest", "premium", "transfer"]
+      - name: fee_type
+        description: Which fee a 'fee' line is; null on every other line.
+        tests:
+          - accepted_values:
+              arguments:
+                values: ["overdraft", "nsf", "monthly_maintenance", "atm", "other"]
 
   - name: f_rate_lock
     description: Mortgage/home rate-lock pipeline fact, grain = 1 lock.

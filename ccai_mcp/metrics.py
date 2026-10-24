@@ -18,11 +18,13 @@ Tools:
 
 import csv
 import json
+import math
 import os
 import re
 import shutil
 import subprocess
 import tempfile
+from datetime import date, timedelta
 from pathlib import Path
 
 import yaml
@@ -144,16 +146,107 @@ def _as_list(value) -> list[str]:
     return [str(value).strip()]
 
 
+# Dimensions a `where` filter may name, and the operators it may use.
+WHERE_DIMENSIONS = (
+    "interaction__category_code",
+    "member__home_branch",
+    "transaction__fee_type",
+)
+WHERE_OPS = ("eq", "in")
+
+
+def _parse_day(value, field: str) -> date:
+    try:
+        return date.fromisoformat(str(value))
+    except ValueError:
+        raise ValueError(f"time_window {field} must be an ISO date (YYYY-MM-DD), got {value!r}") from None
+
+
+def _window_args(time_window) -> list[str]:
+    """`mf` flags for a half-open {"start", "end"} window.
+
+    MetricFlow's --end-time is inclusive, so the day before `end` is passed and the
+    window is [start, end), the same as `query_csat`'s start_date/end_date.
+    """
+    if time_window is None:
+        return []
+    if not isinstance(time_window, dict) or set(time_window) - {"start", "end"}:
+        raise ValueError('time_window must be {"start": "YYYY-MM-DD", "end": "YYYY-MM-DD"}')
+    start = _parse_day(time_window["start"], "start") if time_window.get("start") is not None else None
+    end = _parse_day(time_window["end"], "end") if time_window.get("end") is not None else None
+    if start and end and end <= start:
+        raise ValueError(f"time_window end {end} must be after start {start}")
+    args: list[str] = []
+    if start:
+        args += ["--start-time", start.isoformat()]
+    if end:
+        args += ["--end-time", (end - timedelta(days=1)).isoformat()]
+    return args
+
+
+MAX_WHERE_VALUE_LEN = 100
+# MetricFlow renders the whole --where string as Jinja, so template syntax inside a value
+# would be evaluated or rewritten rather than compared as text.
+_TEMPLATE_MARKERS = ("{{", "{%", "{#")
+
+
+def _quote(value) -> str:
+    if isinstance(value, bool) or not isinstance(value, (str, int, float)):
+        raise ValueError(f"where values must be strings or numbers, got {value!r}")
+    if isinstance(value, float) and not math.isfinite(value):
+        raise ValueError(f"where values must be finite numbers, got {value!r}")
+    if isinstance(value, str):
+        if len(value) > MAX_WHERE_VALUE_LEN:
+            raise ValueError(f"where value is longer than {MAX_WHERE_VALUE_LEN} characters")
+        if any(m in value for m in _TEMPLATE_MARKERS):
+            raise ValueError(f"where value {value!r} contains template syntax ('{{{{', '{{%', '{{#')")
+        if any(ord(c) < 32 or ord(c) == 127 for c in value):
+            raise ValueError("where value contains a control character")
+        return "'" + value.replace("'", "''") + "'"
+    return str(value)
+
+
+def _where_clause(where) -> str | None:
+    """Render structured filters as one MetricFlow `--where` string (entries ANDed)."""
+    if not where:
+        return None
+    if isinstance(where, dict):
+        where = [where]
+    parts = []
+    for item in where:
+        if not isinstance(item, dict) or not {"dimension", "op", "value"} <= set(item):
+            raise ValueError('each where entry needs "dimension", "op" and "value"')
+        dim, op, value = item["dimension"], item["op"], item["value"]
+        if dim not in WHERE_DIMENSIONS:
+            raise ValueError(f"where dimension {dim!r} is not filterable; use one of {list(WHERE_DIMENSIONS)}")
+        if op not in WHERE_OPS:
+            raise ValueError(f"where op {op!r} is not supported; use one of {list(WHERE_OPS)}")
+        ref = "{{ Dimension('" + dim + "') }}"
+        if op == "eq":
+            parts.append(f"{ref} = {_quote(value)}")
+        else:
+            values = value if isinstance(value, (list, tuple)) else [value]
+            if not values:
+                raise ValueError("where 'in' needs at least one value")
+            parts.append(f"{ref} IN ({', '.join(_quote(v) for v in values)})")
+    return " AND ".join(parts)
+
+
 def query_metric_raw(
     metric_names,
     group_by=None,
     limit=None,
+    *,
+    time_window=None,
+    where=None,
 ) -> dict:
     """
     Execute one or more DECLARED metrics and return the structured result.
 
     Returns {"metric_names", "columns", "rows", "sql"} where rows is parsed
     from `mf query --csv` and sql is extracted from `mf query --explain`.
+    `time_window` ({"start", "end"}, half-open) and `where` (structured eq/in
+    filters on named dimensions) are optional and narrow the query.
     """
     names = _as_list(metric_names)
     if not names:
@@ -172,6 +265,10 @@ def query_metric_raw(
         base += ["--group-by", ",".join(_as_list(group_by))]
     if limit is not None:
         base += ["--limit", str(int(limit))]
+    base += _window_args(time_window)
+    clause = _where_clause(where)
+    if clause:
+        base += ["--where", clause]
 
     problem = manifest_problem()
     if problem:
@@ -241,6 +338,8 @@ def query_metric(
     group_by=None,
     decimals=None,
     limit=None,
+    time_window=None,
+    where=None,
 ) -> str:
     """
     MCP tool: execute DECLARED metric(s) via MetricFlow and return the result
@@ -251,9 +350,14 @@ def query_metric(
         group_by: optional dimensions/entities to group by
         decimals: optional fixed-decimal rounding for the displayed numbers
         limit: optional row limit
+        time_window: optional {"start", "end"} ISO dates, half-open [start, end)
+        where: optional list of {"dimension", "op": "eq"|"in", "value"} filters, ANDed;
+            dimension is interaction__category_code, member__home_branch or transaction__fee_type
     """
     try:
-        result = query_metric_raw(metrics, group_by=group_by, limit=limit)
+        result = query_metric_raw(
+            metrics, group_by=group_by, limit=limit, time_window=time_window, where=where
+        )
     except (ValueError, RuntimeError) as exc:
         return f"TOOL ERROR (query_metric): {exc}"
     return _render_result(result, decimals=decimals)

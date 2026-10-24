@@ -51,6 +51,9 @@ semantic_models:
         type: categorical
       - name: residence_state
         type: categorical
+      - name: home_branch
+        type: categorical
+        description: Branch the member is served by (null when the raw load has none).
 
   - name: households
     description: Household dimension (relationship pricing / household LCV).
@@ -352,6 +355,9 @@ semantic_models:
         type: categorical
       - name: status
         type: categorical
+      - name: fee_type
+        type: categorical
+        description: Which fee a fee line is (overdraft, nsf, monthly_maintenance, atm, other); null on non-fee lines.
     measures:
       - name: amount
         agg: sum

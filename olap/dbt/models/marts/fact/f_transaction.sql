@@ -16,6 +16,22 @@ select
     t.status,
     t.description,
 
+    -- which fee a 'fee' line is; null on other lines. Uses the raw column when the load
+    -- has it, otherwise reads the posting description.
+    {% if has_source_column('oltp', 'account_transaction', 'fee_type') %}
+    case when t.txn_type = 'fee' then t.fee_type end
+    {% else %}
+    case
+        when t.txn_type <> 'fee' then null
+        when lower(t.description) like '%overdraft%' then 'overdraft'
+        when lower(t.description) like '%maintenance%' then 'monthly_maintenance'
+        when lower(t.description) like '%nsf%' then 'nsf'
+        when lower(t.description) like '%atm%' then 'atm'
+        else 'other'
+    end
+    {% endif %}
+        as fee_type,
+
     -- fee revenue to the CU (stored as a debit -> negate to a positive amount)
     case when t.txn_type = 'fee' then -t.amount else 0 end
         as fee_revenue_amount,

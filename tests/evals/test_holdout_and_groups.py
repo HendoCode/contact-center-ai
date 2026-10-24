@@ -55,7 +55,7 @@ def test_select_examples_filters_groups_in_id_order_then_limits():
 
 def test_estimate_counts_only_the_chosen_set_and_groups():
     golden = build_golden.GOLDEN_PATH
-    assert preflight.golden_count(golden) == 51
+    assert preflight.golden_count(golden) == 52
     assert preflight.golden_count(golden, ["open"]) == 12
     assert preflight.golden_count(build_golden.HOLDOUT_PATH, ["open"]) == 4
 

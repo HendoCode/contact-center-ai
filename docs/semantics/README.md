@@ -34,7 +34,7 @@ Two dbt-to-Ossie converters exist today:
    pairs when building relationships").
 
 Apart from that, the two outputs agree: the same 11 datasets with identical fields, and the same
-43 metrics with identical expressions. Both pass the upstream validator for their own spec version
+47 metrics with identical expressions. Both pass the upstream validator for their own spec version
 (`validation/validate.py` at `b6c702e` and at `osi-0.1.1-rc1`).
 
 ## Reproduce
