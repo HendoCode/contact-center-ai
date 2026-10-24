@@ -1,12 +1,12 @@
 # Agent evals (L2)
 
-A golden set of 51 questions for the LangGraph agent (`agent/`), the evaluators that score it, and two runners: offline in CI and live in LangSmith.
+A golden set of 52 questions for the LangGraph agent (`agent/`), the evaluators that score it, and two runners: offline in CI and live in LangSmith.
 
 ```bash
 make evals                                          # offline: no keys, no DB, no network
 python -m evals.datasets.build_golden --check       # exit 1 if the golden set is stale
 make evals-live ARGS="--limit 5"                    # live smoke run: 5 questions (costs money)
-make evals-live                                     # live: all 51, real models and tools, to LangSmith
+make evals-live                                     # live: all 52, real models and tools, to LangSmith
 make evals-live DRY=1                               # the live plan and cost estimate; resolves and runs nothing
 make evals-compare A=<run name>                     # before/after table: that run against the latest
 make evals-export EXP=<LangSmith experiment>       # per-item results of an older run, read-only
@@ -20,7 +20,7 @@ LLM_MODEL=<openrouter id> make evals-live ARGS="--group open --run open-<model>"
 
 | kind | n | what it checks |
 |---|---|---|
-| ambiguous | 11 | A bare "rate", "balance" or "LCV/LTV" must interrupt with the right term and options. The run answers with `clarify_with`, then expects those metrics and SQL. |
+| ambiguous | 12 | A bare "rate", "balance", "fee" or "LCV/LTV" must interrupt with the right term and options. The run answers with `clarify_with`, then expects those metrics and SQL. |
 | metric | 18 | A question that names a declared metric, or settles a term with one qualifier: no interrupt, the right metric names, and SQL in the answer. |
 | call_lookup | 10 | One call by id: route `summarize_call` and cite that id. Includes one lowercase id and one id past the end of the corpus. |
 | open | 12 | Answered from transcripts: route `retrieve`, with citations that exist in the corpus. |

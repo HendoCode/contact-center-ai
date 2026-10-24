@@ -80,7 +80,8 @@ TOOLS = [
     Tool(
         name="query_csat",
         description=(
-            "Query CSAT survey results from Postgres. Filter by score range or call category. "
+            "Query CSAT survey results from Postgres. Filter by score range, call category "
+            "or survey date window (start_date inclusive, end_date exclusive). "
             "Use this to understand member satisfaction trends."
         ),
         inputSchema={
@@ -101,6 +102,14 @@ TOOLS = [
                 "category": {
                     "type": "string",
                     "description": "Filter by call category (e.g. fraud_dispute, loan_inquiry)"
+                },
+                "start_date": {
+                    "type": "string",
+                    "description": "Only surveys on or after this date (YYYY-MM-DD, by survey date)"
+                },
+                "end_date": {
+                    "type": "string",
+                    "description": "Only surveys before this date (YYYY-MM-DD, exclusive, by survey date)"
                 }
             }
         }
@@ -114,7 +123,9 @@ TOOLS = [
             "ambiguous metric ('interest rate', 'balance', 'LCV'): resolve the "
             "word to its specific lob-qualified metric names first, e.g. "
             "average_mortgage_note_rate, average_deposit_apy, "
-            "banking_available_balance, net_member_liquidity, member_lifetime_value."
+            "banking_available_balance, net_member_liquidity, member_lifetime_value. "
+            "Optionally narrow the query to a half-open time window and to dimension filters "
+            "so one metric can be compared across two windows."
         ),
         inputSchema={
             "type": "object",
@@ -136,6 +147,30 @@ TOOLS = [
                 "limit": {
                     "type": "integer",
                     "description": "Optional row limit"
+                },
+                "time_window": {
+                    "type": "object",
+                    "description": "Optional half-open window [start, end) on the metric's own time (calls by started_at, CSAT by surveyed_at)",
+                    "properties": {
+                        "start": {"type": "string", "description": "ISO date, inclusive"},
+                        "end": {"type": "string", "description": "ISO date, exclusive"}
+                    }
+                },
+                "where": {
+                    "type": "array",
+                    "description": "Optional filters, ANDed together",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "dimension": {
+                                "type": "string",
+                                "enum": ["interaction__category_code", "member__home_branch", "transaction__fee_type"]
+                            },
+                            "op": {"type": "string", "enum": ["eq", "in"]},
+                            "value": {"description": "A value for eq, or a list of values for in"}
+                        },
+                        "required": ["dimension", "op", "value"]
+                    }
                 }
             },
             "required": ["metrics"]
@@ -218,6 +253,8 @@ async def _run_tool(name: str, arguments: dict) -> str:
             min_score=arguments.get("min_score"),
             max_score=arguments.get("max_score"),
             category=arguments.get("category"),
+            start_date=arguments.get("start_date"),
+            end_date=arguments.get("end_date"),
         )
     elif name == "query_metric":
         result = await asyncio.to_thread(
@@ -226,6 +263,8 @@ async def _run_tool(name: str, arguments: dict) -> str:
             group_by=arguments.get("group_by"),
             decimals=arguments.get("decimals"),
             limit=arguments.get("limit"),
+            time_window=arguments.get("time_window"),
+            where=arguments.get("where"),
         )
     elif name == "ask_the_analyst":
         result = await asyncio.to_thread(

@@ -424,7 +424,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--run", help="live only: run name in the results file "
                                       "(default agent-<dataset>-<LLM_PROVIDER>)")
     parser.add_argument("--dataset", choices=sorted(DATASETS), default="golden",
-                        help="live only: golden (default, 51 questions) or holdout (agent_holdout.jsonl)")
+                        help="live only: golden (default, 52 questions) or holdout (agent_holdout.jsonl)")
     parser.add_argument("--group", help=f"live only: score only these groups, comma-separated ({', '.join(KINDS)})")
     args = parser.parse_args(argv)
     groups = [g.strip() for g in args.group.split(",") if g.strip()] if args.group else None

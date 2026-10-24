@@ -1,6 +1,6 @@
 {
   "ask_the_analyst": {
-    "description": "Answer a natural-language analytics question by resolving it to one or more DECLARED metrics (seeded with the metrics.yml descriptions), then executing those metrics through the semantic layer and returning a grounded answer with the generated SQL. Use this for aggregate metric questions like 'what is our average interest rate?' \u2014 it will NOT return a single blended number; it returns each declared metric.",
+    "description": "Answer a natural-language analytics question by resolving it to one or more DECLARED metrics (seeded with the metrics.yml descriptions), then executing those metrics through the semantic layer and returning a grounded answer with the generated SQL. Use this for aggregate metric questions like 'what is our average interest rate?' — it will NOT return a single blended number; it returns each declared metric.",
     "inputSchema": {
       "properties": {
         "decimals": {
@@ -34,11 +34,15 @@
     }
   },
   "query_csat": {
-    "description": "Query CSAT survey results from Postgres. Filter by score range or call category. Use this to understand member satisfaction trends.",
+    "description": "Query CSAT survey results from Postgres. Filter by score range, call category or survey date window (start_date inclusive, end_date exclusive). Use this to understand member satisfaction trends.",
     "inputSchema": {
       "properties": {
         "category": {
           "description": "Filter by call category (e.g. fraud_dispute, loan_inquiry)",
+          "type": "string"
+        },
+        "end_date": {
+          "description": "Only surveys before this date (YYYY-MM-DD, exclusive, by survey date)",
           "type": "string"
         },
         "max_score": {
@@ -52,13 +56,17 @@
           "maximum": 5,
           "minimum": 1,
           "type": "integer"
+        },
+        "start_date": {
+          "description": "Only surveys on or after this date (YYYY-MM-DD, by survey date)",
+          "type": "string"
         }
       },
       "type": "object"
     }
   },
   "query_metric": {
-    "description": "Query one or more DECLARED metrics from the MetricFlow semantic layer (olap/dbt/models/marts/semantic/metrics.yml) and return the result table plus the SQL the semantic layer generated. There is no bare ambiguous metric ('interest rate', 'balance', 'LCV'): resolve the word to its specific lob-qualified metric names first, e.g. average_mortgage_note_rate, average_deposit_apy, banking_available_balance, net_member_liquidity, member_lifetime_value.",
+    "description": "Query one or more DECLARED metrics from the MetricFlow semantic layer (olap/dbt/models/marts/semantic/metrics.yml) and return the result table plus the SQL the semantic layer generated. There is no bare ambiguous metric ('interest rate', 'balance', 'LCV'): resolve the word to its specific lob-qualified metric names first, e.g. average_mortgage_note_rate, average_deposit_apy, banking_available_balance, net_member_liquidity, member_lifetime_value. Optionally narrow the query to a half-open time window and to dimension filters so one metric can be compared across two windows.",
     "inputSchema": {
       "properties": {
         "decimals": {
@@ -80,6 +88,52 @@
           "description": "Metric name(s) from metrics.yml (e.g. average_mortgage_note_rate)",
           "items": {
             "type": "string"
+          },
+          "type": "array"
+        },
+        "time_window": {
+          "description": "Optional half-open window [start, end) on the metric's own time (calls by started_at, CSAT by surveyed_at)",
+          "properties": {
+            "end": {
+              "description": "ISO date, exclusive",
+              "type": "string"
+            },
+            "start": {
+              "description": "ISO date, inclusive",
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "where": {
+          "description": "Optional filters, ANDed together",
+          "items": {
+            "properties": {
+              "dimension": {
+                "enum": [
+                  "interaction__category_code",
+                  "member__home_branch",
+                  "transaction__fee_type"
+                ],
+                "type": "string"
+              },
+              "op": {
+                "enum": [
+                  "eq",
+                  "in"
+                ],
+                "type": "string"
+              },
+              "value": {
+                "description": "A value for eq, or a list of values for in"
+              }
+            },
+            "required": [
+              "dimension",
+              "op",
+              "value"
+            ],
+            "type": "object"
           },
           "type": "array"
         }

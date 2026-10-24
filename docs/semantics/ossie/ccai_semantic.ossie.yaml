@@ -83,6 +83,14 @@ datasets:
         expression: residence_state
     dimension:
       is_time: false
+  - name: home_branch
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: home_branch
+    dimension:
+      is_time: false
+    description: Branch the member is served by (null when the raw load has none).
 - name: households
   source: '"contactcenter"."marts"."d_household"'
   primary_key:
@@ -563,6 +571,15 @@ datasets:
         expression: status
     dimension:
       is_time: false
+  - name: fee_type
+    expression:
+      dialects:
+      - dialect: ANSI_SQL
+        expression: fee_type
+    dimension:
+      is_time: false
+    description: Which fee a fee line is (overdraft, nsf, monthly_maintenance, atm,
+      other); null on non-fee lines.
   - name: amount
     expression:
       dialects:
@@ -1042,6 +1059,38 @@ metrics:
     - dialect: ANSI_SQL
       expression: SUM(transactions.fee_revenue_amount)
   description: Fee revenue to the CU over the transaction window.
+- name: overdraft_fee_revenue
+  expression:
+    dialects:
+    - dialect: ANSI_SQL
+      expression: SUM(CASE WHEN transaction__fee_type = 'overdraft' THEN transactions.fee_revenue_amount
+        END)
+  description: Overdraft fees posted over the transaction window (one of the fee types
+    behind total_fee_revenue).
+- name: nsf_fee_revenue
+  expression:
+    dialects:
+    - dialect: ANSI_SQL
+      expression: SUM(CASE WHEN transaction__fee_type = 'nsf' THEN transactions.fee_revenue_amount
+        END)
+  description: Non-sufficient-funds fees posted over the transaction window (one of
+    the fee types behind total_fee_revenue).
+- name: monthly_maintenance_fee_revenue
+  expression:
+    dialects:
+    - dialect: ANSI_SQL
+      expression: SUM(CASE WHEN transaction__fee_type = 'monthly_maintenance' THEN
+        transactions.fee_revenue_amount END)
+  description: Monthly account maintenance fees posted over the transaction window
+    (one of the fee types behind total_fee_revenue).
+- name: atm_fee_revenue
+  expression:
+    dialects:
+    - dialect: ANSI_SQL
+      expression: SUM(CASE WHEN transaction__fee_type = 'atm' THEN transactions.fee_revenue_amount
+        END)
+  description: ATM fees posted over the transaction window (one of the fee types behind
+    total_fee_revenue).
 - name: total_interest_income
   expression:
     dialects:
