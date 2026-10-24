@@ -2,7 +2,7 @@
 
 import pytest
 
-pytest.importorskip("langgraph", reason="install the agent group: uv sync --extra dev --group agent")
+pytest.importorskip("fastmcp", reason="install the agent group: uv sync --extra dev --group agent")
 
 from agent.changes import load_branches, load_change_log  # noqa: E402
 from agent.subgraphs.change import load_subjects  # noqa: E402

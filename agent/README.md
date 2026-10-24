@@ -41,7 +41,7 @@ A question about why a measure moved, or what members said, around a change ("wh
 
 A term that leaves several supported metrics goes through the analyst's `clarify` interrupt, unchanged. `analyze` then calls the one `explain_change` MCP tool, which runs the metric over the two windows (with the SQL), reads the calls in them and counts the drivers in code. `ground` accepts the answer only with both window SQLs, citations that are real calls inside the windows, and no agent id.
 
-The stored `change` outlives the run. A follow-up on the same `thread_id` ("what should supervisors coach on?") reuses its evidence and asks the tool for patterns across the calls of each driver, never a score per agent. The change log and branch list are the generator's `change_log.json` and `branches.json` in `data/synthetic/`; a service that cannot see them says so rather than guessing a date.
+The latest analysis is kept on the thread as `prior_change` (the output `change` is only what the run produced). A follow-up on the same `thread_id` ("what should supervisors coach on?") reuses its evidence and asks the tool for patterns across the calls of each driver, never a score per agent. The change log and branch list are the generator's `change_log.json` and `branches.json` in `data/synthetic/`; a service that cannot see them says so rather than guessing a date.
 
 ## Checkpointer
 

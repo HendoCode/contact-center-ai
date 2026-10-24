@@ -1,7 +1,7 @@
 """The `explain_change` subgraph: answer "why did X change after, since or around Y".
 
     frame -> resolve_measure <-> clarify -> resolve_subject -> resolve_when -> analyze
-    frame -> analyze                       (a follow-up on a stored change: coaching mode)
+    frame -> analyze                       (a follow-up on the thread's prior change: coaching mode)
 
 It shares the parent's state keys and is compiled without a checkpointer, as `analyst` is, so
 it inherits the parent's checkpointer and its one interrupt (`clarify`, the analyst's node
@@ -36,7 +36,7 @@ from agent.state import AgentState
 from agent.subgraphs.analyst import clarify
 from agent.terms import match_terms, option_label
 from agent.tools import Toolbox
-from ccai_mcp.change import split_change
+from ccai_mcp.change import METRICS, split_change
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 PROMPT_DIR = Path(__file__).resolve().parent.parent / "prompts"
@@ -70,13 +70,18 @@ def load_subjects(path: Path = DATA_DIR / "change_subjects.yml") -> list[tuple[t
     return [(tuple(entry["phrases"]), tuple(entry["categories"])) for entry in raw]
 
 
+def _label(metric: str) -> str:
+    """The metric's name as the tool shows it ("CSAT Average Score")."""
+    return METRICS[metric]["label"]
+
+
 def _refuse(reason: str) -> dict:
     """End the run: say why, call no tool."""
     return {"refusal": reason, "tool_output": reason, "sql": None, "citations": []}
 
 
 def _supported_list() -> str:
-    return ", ".join(option_label(metric) for metric in load_measures())
+    return ", ".join(_label(metric) for metric in load_measures())
 
 
 # ── frame ────────────────────────────────────────────────────────────────────
@@ -85,7 +90,7 @@ def make_frame(get_llm: Callable[[], object]):
     async def frame(state: AgentState) -> dict:
         log = await asyncio.to_thread(load_change_log)
         listing = "\n".join(f"- {e['name']} ({e['date']})" for e in log) or "(none)"
-        prior = state.get("change")
+        prior = state.get("prior_change")
         llm = get_llm().with_structured_output(FrameDecision)
         decision = await llm.ainvoke(FRAME_PROMPT.format(
             change_log=listing, has_prior_change="yes" if prior else "no",
@@ -123,7 +128,7 @@ async def resolve_measure(state: AgentState) -> dict:
     if len(names) > 1:
         return _refuse(
             "A change analysis explains one measure at a time, and this one matched "
-            f"{', '.join(option_label(n) for n in names)}. Ask about one of them."
+            f"{', '.join(_label(n) for n in names)}. Ask about one of them."
         )
     if names:
         return {"metric_names": names, "term": None, "candidates": []}
@@ -139,7 +144,7 @@ async def resolve_measure(state: AgentState) -> dict:
         if len(top) == 1:
             return {"metric_names": top, "term": None, "candidates": []}
         return _refuse(
-            f'"{phrase}" could mean {", ".join(option_label(m) for m in top)}. '
+            f'"{phrase}" could mean {", ".join(_label(m) for m in top)}. '
             "Ask about one of them."
         )
 
@@ -278,7 +283,7 @@ def _coaching_arguments(question: str, change: dict) -> dict | None:
 
 def make_analyze(toolbox: Toolbox):
     async def analyze(state: AgentState) -> dict:
-        frame, prior = state.get("change_frame") or {}, state.get("change")
+        frame, prior = state.get("change_frame") or {}, state.get("prior_change")
         question = state["question"]
         coaching = bool(frame.get("follow_up") and prior)
 
@@ -337,7 +342,7 @@ def _windows_sql(change: dict) -> str | None:
 
 def _after_frame(state: AgentState) -> str:
     frame = state.get("change_frame") or {}
-    return "analyze" if frame.get("follow_up") and state.get("change") else "resolve_measure"
+    return "analyze" if frame.get("follow_up") and state.get("prior_change") else "resolve_measure"
 
 
 def _next_unless_refused(target: str):

@@ -32,11 +32,12 @@ class AgentState(TypedDict, total=False):
     change_filters: dict              # {"category": [...], "home_branch": [...]}
     change_point: str | None          # ISO date, when the question gives one
     change_search: dict | None        # {"start", "end"} when it gives a period
-    change: dict | None               # the tool's result; kept across runs on a thread
+    change: dict | None               # the tool's result for this run
+    prior_change: dict | None         # the latest analysis on the thread, for a follow-up
     refusal: str | None               # why the question was not run
 ```
 
-The output is `{answer, route, metric_names, sql, citations, grounded, change}`, all JSON, so L2 reads fields instead of prose. Each run takes one question. `change` is `None` unless the run took the `explain_change` route, and `classify` is the one node that does not reset it, so a follow-up on the same thread can reuse that evidence.
+The output is `{answer, route, metric_names, sql, citations, grounded, change}`, all JSON, so L2 reads fields instead of prose. Each run takes one question. `change` is the evidence this run produced, and `None` for any run that did not (another route, a refusal, a tool error). The latest analysis on a thread is kept in `prior_change`, the one key `classify` carries over, so a follow-up can reuse that evidence.
 
 | Node | Behavior |
 |---|---|
@@ -53,7 +54,7 @@ The output is `{answer, route, metric_names, sql, citations, grounded, change}`,
 
 `explain_change` is the `change` subgraph (`agent/subgraphs/change.py`), shared state and parent checkpointer as above. It answers "why did X change after, since or around Y" and the design is in [change-analysis.md](change-analysis.md). Its nodes:
 
-- `frame` makes one structured LLM call that sees the question and the change log and returns the measure, the calls, the time and any logged change the question names. A follow-up flag counts only when a stored `change` exists.
+- `frame` makes one structured LLM call that sees the question and the change log and returns the measure, the calls, the time and any logged change the question names. A follow-up flag counts only when a `prior_change` exists.
 - `resolve_measure` matches the measure phrase by label, then `data/change_measures.yml`, then `ambiguous_terms.yml`. It keeps the supported metrics (call volume, CSAT average score, first contact resolution rate, average handle time); several of them go to `clarify`, the analyst's node unchanged, and none ends the run with a refusal. No phrase means call volume, and the answer says so.
 - `resolve_subject` maps call types through `data/change_subjects.yml` and branches through `branches.json`. No subject leaves the filters to the tool, which keeps the call types whose volume rose.
 - `resolve_when` uses the logged change, a date, or a period from `parse_period` (`agent/changes.py`). Anything else is refused, and the refusal names the phrase.

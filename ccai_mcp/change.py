@@ -387,11 +387,9 @@ def _propose(calls: list[tuple[str, str]], question: str | None, *, coaching: bo
     asked = f'A supervisor asked: "{question}"\n\n' if question else ""
     if coaching:
         task = (
-            f"Find up to {MAX_PATTERNS} patterns in how the AGENT handled these calls that "
-            "differ from call to call or that a supervisor could coach on: an explanation "
-            "that varies between calls, something not offered, an unclear next step. Describe "
-            "what the agent said or did across calls. Never name, identify or rate an "
-            "individual agent."
+            f"Find up to {MAX_PATTERNS} patterns in how the AGENT handled these calls that a "
+            "supervisor could coach on. Describe what the agent said or did across calls. "
+            "Never name, identify or rate an individual agent."
         )
     else:
         task = (

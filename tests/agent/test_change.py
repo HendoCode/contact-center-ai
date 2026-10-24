@@ -15,6 +15,8 @@ from agent_support import (
 
 pytestmark = pytest.mark.usefixtures("change_files")
 
+NO_FRAME_FOLLOW_UP = {"measure": None, "subject": None, "when": None, "logged_change": None,
+                      "follow_up": True}
 FEE_FRAME = {"measure": "satisfaction", "subject": "fee calls",
              "logged_change": "Fee schedule change"}
 
@@ -266,7 +268,7 @@ async def test_a_measure_that_cannot_be_explained_is_refused(make, toolbox, fram
 
     assert toolbox.calls == []
     assert f'"{phrase}"' in out["answer"]
-    assert "Call Volume, Csat Average Score" in out["answer"]  # what can be explained
+    assert "Call Volume, CSAT Average Score" in out["answer"]  # what can be explained
     assert out["change"] is None and out["citations"] == [] and out["sql"] is None
     assert out["grounded"] is True and not out["answer"].startswith("Not grounded")
 
@@ -451,23 +453,40 @@ async def test_a_follow_up_on_an_analysis_without_drivers_is_refused(make, toolb
 
 
 @pytest.mark.asyncio
-async def test_change_survives_other_routes_and_everything_else_is_reset(make):
+async def test_change_is_only_what_this_run_produced_but_the_thread_keeps_the_latest_analysis(
+    make, toolbox
+):
     graph, llm = make("explain_change", frame=FEE_FRAME)
     cfg = config("kept")
     first = await graph.ainvoke({"question": "Why did satisfaction on fee calls drop?"}, cfg)
+    assert first["change"]["metric"] == "csat_average_score"
 
+    # Another route on the same thread: nothing from the analysis is in this run's output.
     llm.route = "retrieve"
     second = await graph.ainvoke({"question": "What are members saying about fraud?"}, cfg)
+    assert second["route"] == "retrieve" and second["change"] is None
+    assert "Members did not know" not in second["answer"]
 
-    assert second["route"] == "retrieve"
-    assert second["change"] == first["change"]  # kept for a later follow-up
-    assert "Sources: CALL-00001, CALL-00002" in second["answer"]
-    assert "Members did not know" not in second["answer"]  # nothing else carried over
-
-    llm.route = "explain_change"
-    llm.frame = {**llm.frame, "subject": "the moon base"}
+    # A refusal, a tool error and a metric question likewise.
+    llm.route, llm.frame = "explain_change", {**llm.frame, "subject": "the moon base"}
     refused = await graph.ainvoke({"question": "Why did the moon base calls rise?"}, cfg)
-    assert refused["citations"] == [] and refused["sql"] is None
+    assert refused["change"] is None and refused["citations"] == [] and refused["sql"] is None
+
+    llm.frame = {**llm.frame, "subject": "fee calls"}
+    toolbox.change = "TOOL ERROR (explain_change): boom"
+    errored = await graph.ainvoke({"question": "Why did satisfaction on fee calls drop?"}, cfg)
+    assert errored["change"] is None and errored["grounded"] is False
+
+    llm.route = "resolve_metric"
+    metric = await graph.ainvoke({"question": "How many calls did we handle?"}, cfg)
+    assert metric["change"] is None
+
+    # The latest analysis is still there for a follow-up.
+    toolbox.change, toolbox.calls[:] = None, []
+    llm.route, llm.frame = "explain_change", {**NO_FRAME_FOLLOW_UP}
+    follow = await graph.ainvoke({"question": "What should supervisors coach on?"}, cfg)
+    assert toolbox.calls[0][1]["mode"] == "coaching"
+    assert follow["change"]["windows"] == first["change"]["windows"]
 
 
 def test_the_rendered_answer_has_no_stray_sql_marker_before_the_end():

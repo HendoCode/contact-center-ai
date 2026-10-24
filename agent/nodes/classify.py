@@ -21,20 +21,22 @@ def make_classify(get_llm: Callable[[], object]):
     async def classify(state: AgentState) -> dict:
         question = state["question"]
         # Reset per-run keys so a reused thread_id never inherits the last question's state.
-        # `change` is the one exception: a follow-up on the thread reuses that evidence.
+        # `prior_change` is the one exception: the latest analysis on the thread, kept so a
+        # follow-up can reuse its evidence. `change` is only what this run produced.
+        prior_change = state.get("change") or state.get("prior_change")
         fresh = {
             "call_id": None, "term": None, "candidates": [], "metric_names": [],
             "resolved_terms": [], "clarify_attempts": 0, "tool_output": "", "sql": None,
             "citations": [], "grounded": False, "answer": "", "change_frame": None,
             "change_filters": {}, "change_point": None, "change_search": None, "refusal": None,
-            "change": state.get("change"),
+            "change": None, "prior_change": prior_change,
         }
         call_id = _QUESTION_CALL_ID_RE.search(question)
         if call_id:
             return {**fresh, "route": "summarize_call", "call_id": call_id.group(0).upper()}
 
         llm = get_llm().with_structured_output(RouteDecision)
-        prior = "yes" if state.get("change") else "no"
+        prior = "yes" if prior_change else "no"
         decision = await llm.ainvoke(PROMPT.format(question=question, has_prior_change=prior))
         # summarize_call needs an id; without one the question is an open one.
         route = "retrieve" if decision.route == "summarize_call" else decision.route
