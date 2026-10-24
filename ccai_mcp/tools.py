@@ -109,14 +109,17 @@ def query_csat(
     if category:
         where_clauses.append("category_code = %s")
         params.append(category)
-    for bound, op in ((start_date, ">="), (end_date, "<")):
+    days = {}
+    for field, bound, op in (("start_date", start_date, ">="), ("end_date", end_date, "<")):
         if bound:
             try:
-                day = date.fromisoformat(str(bound))
+                days[field] = date.fromisoformat(str(bound))
             except ValueError:
-                return f"TOOL ERROR (query_csat): dates must be YYYY-MM-DD, got {bound!r}"
+                return f"TOOL ERROR (query_csat): {field} must be YYYY-MM-DD, got {bound!r}"
             where_clauses.append(f"surveyed_at {op} %s")
-            params.append(day)
+            params.append(days[field])
+    if len(days) == 2 and days["end_date"] <= days["start_date"]:
+        return "TOOL ERROR (query_csat): end_date must be after start_date"
     where_sql = (" WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
 
     with psycopg2.connect(CONNECTION_STRING) as conn, conn.cursor() as cur:

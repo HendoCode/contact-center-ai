@@ -65,7 +65,7 @@ _History: a dated 2026-10-01 snapshot, kept as written. For current state see th
 **Don't break what's published**
 - Posts 01–04 are live. Every command they show must keep working: `docker compose up -d`, `uv sync --extra dev`, `python data/synthetic/generate_data.py`, `python -m rag.pipeline --ingest`, `python -m rag.pipeline --query "..."`, `python -m ccai_mcp.server`, `pytest`. T00 adds a smoke test for these. If a change would break one, keep a compatible path or stop and ask. **Never edit a published post's text** to match changed code.
 - MCP tool names and input schemas don't change. `test_server_handshake.py` guards the names.
-  - Exception (change analysis, `docs/design/change-analysis.md`): a tool may gain *optional* inputs, and a sixth tool is added. Every existing call behaves exactly as before. So far `query_metric` gained `time_window` and `where`, and `query_csat` gained `start_date` and `end_date`.
+  - Exception (change analysis, `docs/design/change-analysis.md`): a tool may gain *optional* inputs, and a sixth tool is added. Every existing call behaves exactly as before. So far `query_metric` gained `time_window` and `where`, and `query_csat` gained `start_date` and `end_date`. Their descriptions were reworded to mention the new inputs; no existing input changed.
 
 **Money and accounts**
 - Agents never run `terraform apply`, start a Fireworks fine-tuning job, rent a GPU, create a Databricks cluster, resume a Snowflake warehouse, or create any cloud account. You write the scripts and configs; Stephen runs anything that bills. Mark such steps in the PR as **"Stephen runs:"** with the exact command.

@@ -18,6 +18,7 @@ Tools:
 
 import csv
 import json
+import math
 import os
 import re
 import shutil
@@ -171,8 +172,8 @@ def _window_args(time_window) -> list[str]:
         return []
     if not isinstance(time_window, dict) or set(time_window) - {"start", "end"}:
         raise ValueError('time_window must be {"start": "YYYY-MM-DD", "end": "YYYY-MM-DD"}')
-    start = _parse_day(time_window["start"], "start") if time_window.get("start") else None
-    end = _parse_day(time_window["end"], "end") if time_window.get("end") else None
+    start = _parse_day(time_window["start"], "start") if time_window.get("start") is not None else None
+    end = _parse_day(time_window["end"], "end") if time_window.get("end") is not None else None
     if start and end and end <= start:
         raise ValueError(f"time_window end {end} must be after start {start}")
     args: list[str] = []
@@ -183,10 +184,24 @@ def _window_args(time_window) -> list[str]:
     return args
 
 
+MAX_WHERE_VALUE_LEN = 100
+# MetricFlow renders the whole --where string as Jinja, so template syntax inside a value
+# would be evaluated or rewritten rather than compared as text.
+_TEMPLATE_MARKERS = ("{{", "{%", "{#")
+
+
 def _quote(value) -> str:
     if isinstance(value, bool) or not isinstance(value, (str, int, float)):
         raise ValueError(f"where values must be strings or numbers, got {value!r}")
+    if isinstance(value, float) and not math.isfinite(value):
+        raise ValueError(f"where values must be finite numbers, got {value!r}")
     if isinstance(value, str):
+        if len(value) > MAX_WHERE_VALUE_LEN:
+            raise ValueError(f"where value is longer than {MAX_WHERE_VALUE_LEN} characters")
+        if any(m in value for m in _TEMPLATE_MARKERS):
+            raise ValueError(f"where value {value!r} contains template syntax ('{{{{', '{{%', '{{#')")
+        if any(ord(c) < 32 or ord(c) == 127 for c in value):
+            raise ValueError("where value contains a control character")
         return "'" + value.replace("'", "''") + "'"
     return str(value)
 
