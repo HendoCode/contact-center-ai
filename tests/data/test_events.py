@@ -342,6 +342,51 @@ def test_csat_shifts_match_events_yml_within_tolerance(corpus, events_config):
         assert ints  # surveys belong to real calls
 
 
+def test_mean_per_call_shift_is_within_a_tenth_of_csat_shift(corpus, events_config):
+    """Per phase, the mean drop over the event's responses against the phase's `csat_shift`.
+
+    Before clamping the shift is exact up to one response (the fraction is a quota, not a coin
+    flip). After clamping to 1-5 a response already at 1 cannot drop, so a phase on a low
+    baseline falls short by the clamp loss; the test allows exactly that loss and no more, and
+    the loss stays small.
+    """
+    surveys = corpus.load("csat.json")
+    n_phases = 0
+    for ev_cfg, ev in zip(events_config["events"], corpus.truth["events"], strict=True):
+        assert len(ev["csat_phases"]) == len(ev_cfg["phases"])
+        for phase, spec in zip(ev["csat_phases"], ev_cfg["phases"], strict=True):
+            n_phases += 1
+            own = [s for s in surveys if s["call_id"] in corpus.truth["calls"]
+                   and corpus.truth["calls"][s["call_id"]]["event"] == ev["id"]
+                   and corpus.truth["calls"][s["call_id"]]["phase"] == phase["phase"]]
+            assert phase["responses"] == len(own) > 0
+            assert phase["csat_shift"] == spec["csat_shift"]
+            before_clamp, after_clamp = phase["shift_before_clamp"], phase["shift_after_clamp"]
+            assert abs(before_clamp - spec["csat_shift"]) <= 0.1, (ev["id"], phase)
+            clamp_loss = after_clamp - before_clamp           # positive: drops the clamp absorbed
+            assert 0 <= clamp_loss <= 0.15, (ev["id"], phase)
+            assert abs(after_clamp - spec["csat_shift"]) <= 0.1 + clamp_loss, (ev["id"], phase)
+    assert n_phases == 7
+
+
+def test_observed_satisfaction_falls_after_the_events_that_questions_ask_about(corpus):
+    """The after-minus-before difference in the default window, as an analyst would see it,
+    points the planted way for the fee, card and Westside events. (The app release is not asked
+    about through satisfaction: its before-window mean is low in this seed; see its notes.)"""
+    by_id = {e["id"]: e for e in corpus.truth["events"]}
+    for event_id in ("fee_schedule_change", "card_fraud_rule_change", "westside_branch_closure"):
+        mean = by_id[event_id]["default_window"]["metrics"]["csat_average_score"]
+        assert mean["after"] - mean["before"] < -0.2, event_id
+
+
+def test_answer_key_notes_say_what_the_data_does_not_show(corpus):
+    notes = {e["id"]: " ".join(e["notes"]) for e in corpus.truth["events"]}
+    assert "past the default window" in notes["card_fraud_rule_change"]
+    assert "call volume" in notes["mobile_app_v5_release"]
+    assert "clamping" in notes["westside_branch_closure"]
+    assert not notes["fee_schedule_change"]
+
+
 def test_default_window_metrics_recompute_from_the_data_files(corpus):
     ints = corpus.interactions
     members = {f"MBR-{m['member_id']:06d}": m for m in corpus.load("members.json")}
@@ -426,6 +471,7 @@ def test_ground_truth_schema_and_hash(corpus):
     assert truth["events_yml_sha256"] == hashlib.sha256(yml.read_bytes()).hexdigest()
     assert [e["split"] for e in truth["events"]] == ["golden", "golden", "heldout", "heldout"]
     for ev in truth["events"]:
+        assert set(ev) == {"id", "split", "date", "notes", "csat_phases", "phases", "default_window"}
         window = ev["default_window"]
         assert set(window) == {"filters", "before", "after", "metrics", "drivers", "patterns"}
         assert set(window["metrics"]) >= {"call_volume", "csat_average_score", "responses",

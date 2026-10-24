@@ -24,6 +24,8 @@
 #                  keywords: words the driver's dialogue uses, for the isolation tests;
 #                  ledger: facts the OLTP ledger must back up;
 #                  patterns: a behavior spread across a share of the driver's calls
+#   notes          how the planted effect shows (or does not) in the served data; copied
+#                  into the answer key so whoever scores answers sees it
 version: 1
 branches: {Westside: 0.20, Downtown: 0.30, Northgate: 0.25, Riverside: 0.25}
 events:
@@ -51,7 +53,7 @@ events:
             variants: [once_a_year, once_ever, partial_refund]
             keywords:
               once_a_year: [once a year]
-              once_ever: [one-time, once ever]
+              once_ever: [life of the account, lifetime of the account, once ever]
               partial_refund: [partial refund]
       - id: multiple_overdrafts_same_day
         share: {fee_dispute: 0.20, account_balance: 0.40}
@@ -69,6 +71,8 @@ events:
     change_log_name: Card fraud rule change
     population: {category: [card_services, fraud_dispute], home_branch: null}
     default_filters: {category: [card_services, fraud_dispute]}
+    notes:
+      - Recovery shows past the default window. The 42-day after-window covers the three weeks of the first phase and only the first three of the five weeks of the second, so the window mean does not show satisfaction recovering; the full second phase does.
     phases:
       - {weeks: 3, volume: {card_services: 3.0, fraud_dispute: 3.0}, csat_shift: -0.9}
       - {weeks: 5, volume: {card_services: 1.5, fraud_dispute: 1.5}, csat_shift: -0.45}
@@ -89,6 +93,8 @@ events:
     change_log_name: Mobile app version 5 release
     population: {category: [online_banking_support], home_branch: null}
     default_filters: {category: [online_banking_support]}
+    notes:
+      - The planted effect is mainly in call volume. The default before-window happens to hold a low baseline satisfaction mean in this seed, so the observed after-minus-before satisfaction difference is positive even though every event response was lowered. Score satisfaction questions on this event against the realized shift in the answer key, not the observed difference.
     phases:
       - {weeks: 2, volume: {online_banking_support: 5.0}, csat_shift: -0.8}
       - {weeks: 4, volume: {online_banking_support: 1.5}, csat_shift: -0.4}
@@ -109,6 +115,8 @@ events:
     change_log_name: Westside branch closure
     population: {category: [account_balance, account_opening, payment_assistance], home_branch: Westside}
     default_filters: {home_branch: [Westside]}
+    notes:
+      - Several of the window's responses already sit at the lowest score, so clamping to 1-5 absorbs part of the planted shift; csat_phases lists the mean shift before and after clamping.
     phases:
       - {weeks: 4, volume: {account_balance: 6.0, account_opening: 6.0, payment_assistance: 6.0}, csat_shift: -1.0}
     drivers:

@@ -372,5 +372,19 @@ CREATE TABLE IF NOT EXISTS account_transaction (
 -- Databases created before these two columns existed: add them in place. Re-running is safe.
 ALTER TABLE member ADD COLUMN IF NOT EXISTS home_branch TEXT NULL;
 ALTER TABLE account_transaction ADD COLUMN IF NOT EXISTS fee_type TEXT NULL;
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conname = 'chk_account_transaction_fee_type'
+          AND conrelid = 'account_transaction'::regclass
+    ) THEN
+        ALTER TABLE account_transaction ADD CONSTRAINT chk_account_transaction_fee_type CHECK (
+            fee_type IS NULL OR
+            fee_type IN ('overdraft', 'nsf', 'monthly_maintenance', 'atm', 'other')
+        );
+    END IF;
+END
+$$;
 
 COMMIT;

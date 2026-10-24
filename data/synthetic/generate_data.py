@@ -1099,11 +1099,10 @@ def draw_event_calls(ev, plan, member_accounts, ev_rng, dialogue_rng):
                 call_day = call["started"].date()
                 offset = ev_rng.randint(0, max(0, (call_day - ev["date"]).days - 1))
                 fee_day = ev["date"] + timedelta(days=offset)
-                hour = 7 if fee_day == call_day else 12
                 for _ in range(count):
                     ledger.append({
                         "account_id": call["subject_id"],
-                        "posted_at": datetime.combine(fee_day, time(hour)).isoformat(),
+                        "posted_at": datetime.combine(fee_day, time(12)).isoformat(),
                         "amount": -overdraft_price(fee_day), "txn_type": "fee",
                         "status": "posted", "description": "Overdraft fee",
                         "fee_type": "overdraft",
@@ -1140,6 +1139,7 @@ def shift_surveys(ev, calls, ev_rng):
         for j, row in enumerate(rows):
             drop = whole + (1 if j in extra else 0)
             new = max(1, min(5, row["score"] - drop))
+            row["shift_asked"] = drop
             row["shift_applied"] = row["score"] - new
             if new != row["score"]:
                 row["score"] = new
@@ -1395,6 +1395,16 @@ def _event_truth(ev, plan, ordered):
         expected = round(sum(nominal[c["label"]["phase"]] for c in own) / len(s_after), 4)
         realized = round(-sum(c["csat"]["shift_applied"] for c in own) / len(s_after), 4)
 
+    csat_phases = []
+    for p in event_phases(ev):
+        rows = [c["csat"] for c in ordered if c["csat"] and c["label"]
+                and c["label"]["event"] == ev["id"] and c["label"]["phase"] == p["index"]]
+        csat_phases.append({
+            "phase": p["index"], "csat_shift": p["spec"]["csat_shift"], "responses": len(rows),
+            "shift_before_clamp": round(-sum(r["shift_asked"] for r in rows) / max(1, len(rows)), 4),
+            "shift_after_clamp": round(-sum(r["shift_applied"] for r in rows) / max(1, len(rows)), 4),
+        })
+
     drivers = [{"id": d["id"],
                 "before": _call_ids(scoped, ev["id"], before, lambda lab, d=d: lab["driver"] == d["id"]),
                 "after": _call_ids(scoped, ev["id"], after, lambda lab, d=d: lab["driver"] == d["id"])}
@@ -1405,6 +1415,8 @@ def _event_truth(ev, plan, ordered):
                 for d in ev["drivers"] for pat in d.get("patterns", [])]
     return {
         "id": ev["id"], "split": ev["split"], "date": ev["date"].isoformat(),
+        "notes": ev.get("notes", []),
+        "csat_phases": csat_phases,
         "phases": [{"start": p["phase"]["start"].isoformat(), "end": p["phase"]["end"].isoformat(),
                     "planned": p["planned"]} for p in plan],
         "default_window": {

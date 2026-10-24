@@ -65,26 +65,54 @@ def test_no_variant_introduces_the_agent_by_name(templates):
                 assert "my name is" not in text.lower() and "this is " not in text.lower()
 
 
+def mentions(text: str, keyword: str) -> bool:
+    """Whole-word, case-insensitive: 'once ever' is not in 'once every 12 months'."""
+    return re.search(rf"(?<!\w){re.escape(keyword)}(?!\w)", text, re.IGNORECASE) is not None
+
+
 def test_each_driver_has_keywords_in_its_calls_and_baseline_calls_have_none(corpus, events_config):
-    keywords = {d["id"]: [k.lower() for k in d["keywords"]]
-                for ev in events_config["events"] for d in ev["drivers"]}
+    keywords = {d["id"]: d["keywords"] for ev in events_config["events"] for d in ev["drivers"]}
     planted = corpus.truth["calls"]
     for cid, label in planted.items():
-        text = corpus.transcripts[cid]["full_text"].lower()
-        assert any(k in text for k in keywords[label["driver"]]), (cid, label["driver"])
+        text = corpus.transcripts[cid]["full_text"]
+        assert any(mentions(text, k) for k in keywords[label["driver"]]), (cid, label["driver"])
     all_keywords = {k for words in keywords.values() for k in words}
     for cid, t in corpus.transcripts.items():
         if cid not in planted:
-            text = t["full_text"].lower()
-            assert not [k for k in all_keywords if k in text], cid
+            assert not [k for k in all_keywords if mentions(t["full_text"], k)], cid
+
+
+def test_held_out_keywords_do_not_appear_in_golden_event_calls(corpus, events_config):
+    """The words that mark a held-out driver are heard only in that event's own calls."""
+    heldout = {e["id"]: [k for d in e["drivers"] for k in d["keywords"]]
+               for e in events_config["events"] if e["split"] == "heldout"}
+    for cid, label in corpus.truth["calls"].items():
+        text = corpus.transcripts[cid]["full_text"]
+        for event_id, words in heldout.items():
+            if label["event"] != event_id:
+                assert not [k for k in words if mentions(text, k)], (cid, label["event"], event_id)
 
 
 def test_pattern_calls_say_their_misstatement(corpus, events_config):
     pattern = events_config["events"][0]["drivers"][1]["patterns"][0]
     for cid, label in corpus.truth["calls"].items():
         if label["pattern"]:
-            text = corpus.transcripts[cid]["full_text"].lower()
-            assert any(k in text for k in pattern["keywords"][label["variant"]]), (cid, label)
+            text = corpus.transcripts[cid]["full_text"]
+            assert any(mentions(text, k) for k in pattern["keywords"][label["variant"]]), (cid, label)
+
+
+def test_each_pattern_keyword_marks_only_its_own_variant(corpus, events_config):
+    """No variant's keywords show up in another variant's calls or in the correct-policy
+    refusals of the same driver (which say 'once every 12 months')."""
+    driver = events_config["events"][0]["drivers"][1]
+    pattern = driver["patterns"][0]
+    refusals = [cid for cid, lab in corpus.truth["calls"].items() if lab["driver"] == driver["id"]]
+    assert any(not corpus.truth["calls"][cid]["pattern"] for cid in refusals)
+    for cid in refusals:
+        label, text = corpus.truth["calls"][cid], corpus.transcripts[cid]["full_text"]
+        for variant, words in pattern["keywords"].items():
+            said = any(mentions(text, k) for k in words)
+            assert said == (label["variant"] == variant), (cid, variant, label)
 
 
 def test_account_numbers_are_masked_to_the_last_four_digits(corpus):

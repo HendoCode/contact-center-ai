@@ -14,6 +14,14 @@ def test_schema_declares_both_columns_with_an_in_place_upgrade():
     sql = seed.REPO_ROOT.joinpath("olap", "oltp", "schema.sql").read_text()
     assert "ALTER TABLE member ADD COLUMN IF NOT EXISTS home_branch" in sql
     assert "ALTER TABLE account_transaction ADD COLUMN IF NOT EXISTS fee_type" in sql
+    # the CHECK on fee_type is added on the upgrade path too, once (guarded by pg_constraint)
+    upgrade = sql[sql.index("ADD COLUMN IF NOT EXISTS fee_type"):]
+    assert re.search(r"IF NOT EXISTS \(\s*SELECT 1 FROM pg_constraint\s+WHERE conname = "
+                     r"'chk_account_transaction_fee_type'", upgrade)
+    assert "ADD CONSTRAINT chk_account_transaction_fee_type CHECK" in upgrade
+    created = re.search(r"CONSTRAINT chk_account_transaction_fee_type CHECK \((.*?)\)\s*\);", sql, re.S)
+    added = re.search(r"ADD CONSTRAINT chk_account_transaction_fee_type CHECK \((.*?)\);\s*END IF", upgrade, re.S)
+    assert created and added and re.sub(r"\s+", " ", created.group(1)) == re.sub(r"\s+", " ", added.group(1))
 
 
 def test_loader_columns_match_the_schema_and_the_generated_rows(corpus):
