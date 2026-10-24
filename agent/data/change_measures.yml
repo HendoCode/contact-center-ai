@@ -1,0 +1,36 @@
+# Measures a change analysis can explain (the `explain_change` route).
+#
+# Data, not code. Each key is a metric `ccai_mcp.change.SUPPORTED_METRICS` can compare across
+# two windows (tests/agent/test_change_data.py checks the two lists agree, and that every key is
+# a declared metric). The phrases are the words a question uses for that measure; a phrase
+# matches as a whole word, case-insensitive, and the longest match wins. A phrase that matches
+# no measure here is looked up in ambiguous_terms.yml next.
+measures:
+  call_volume:
+    - call volume
+    - volume
+    - calls
+    - number of calls
+    - call count
+    - call counts
+  csat_average_score:
+    - satisfaction
+    - csat
+    - customer satisfaction
+    - member satisfaction
+    - survey score
+    - survey scores
+    - survey results
+  first_contact_resolution_rate:
+    - first contact resolution
+    - first-contact resolution
+    - fcr
+    - resolved on first contact
+    - resolution
+  average_handle_time:
+    - handle time
+    - average handle time
+    - aht
+    - call length
+    - call duration
+    - talk time

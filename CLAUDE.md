@@ -57,7 +57,7 @@ generate_data.py → transcripts.json + csat.json
                         ↓
 pipeline.py --ingest → embed (OpenAI default / Ollama local) → pgvector (PostgreSQL)
                         ↓
-ccai_mcp/server.py (stdio; HTTP opt-in) → 5 tools exposed to MCP clients
+ccai_mcp/server.py (stdio; HTTP opt-in) → 6 tools exposed to MCP clients
 ```
 
 **Data flow across files:**
@@ -66,7 +66,7 @@ ccai_mcp/server.py (stdio; HTTP opt-in) → 5 tools exposed to MCP clients
 - `rag/pipeline.py` owns ingestion (`--ingest`) and querying (`rag_query()`). Ingestion upserts by `call_id`, so re-running `--ingest` is idempotent (rows ingested before this change have UUID ids and need `--reset` first).
 - `ccai_mcp/tools.py` implements the RAG/CSAT tools (`search_transcripts`, `get_call_summary`, `query_csat`). `search_transcripts` goes through `rag_query()` and `get_call_summary` uses `get_retriever().get_by_id()`; `query_csat` reads the Postgres `f_csat` fact (falling back to the `csat_survey` source), not `csat.json`.
 - `ccai_mcp/metrics.py` implements the semantic-layer tools (`query_metric`, `ask_the_analyst`), which shell out to the committed `mf` (MetricFlow) CLI over the `metrics.yml` catalog.
-- `ccai_mcp/server.py` is a thin router: it receives MCP tool calls over stdio and dispatches to `ccai_mcp/tools.py` and `ccai_mcp/metrics.py`.
+- `ccai_mcp/server.py` is a thin router: it receives MCP tool calls over stdio and dispatches to `ccai_mcp/tools.py`, `ccai_mcp/metrics.py` and `ccai_mcp/change.py` (the `explain_change` tool: a metric before and after a change, plus the calls in between).
 
 **Auth:** No authentication logic exists in Python code. In production, Azure App Service Easy Auth (Entra) intercepts all requests before they reach the server; the Python app sees authenticated traffic only. `AZURE_TENANT_ID` / `AZURE_CLIENT_ID` env vars are used by Terraform, not by the app.
 
@@ -185,6 +185,6 @@ Deployed via GitHub Actions → GitHub Pages at https://hendocode.github.io/cont
 
 ## What's built vs. what's next
 
-**Built:** synthetic data generator, full RAG ingest/retrieve/respond pipeline, pgvector + OpenAI integration, Ollama as local provider alternative (no API key), 5-tool MCP server (RAG/CSAT + semantic-layer metric tools), Terraform for Azure (App Service + PostgreSQL Flexible Server), Docker Compose for local dev.
+**Built:** synthetic data generator, full RAG ingest/retrieve/respond pipeline, pgvector + OpenAI integration, Ollama as local provider alternative (no API key), 6-tool MCP server (RAG/CSAT + semantic-layer metric tools + change analysis), Terraform for Azure (App Service + PostgreSQL Flexible Server), Docker Compose for local dev.
 
 **Not yet implemented:** S3 ingestion, CSAT → vector store (currently SQL-backed via `f_csat`, not embedded), observability, end-to-end deployment of the CI workflow.

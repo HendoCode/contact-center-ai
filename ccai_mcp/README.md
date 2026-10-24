@@ -1,13 +1,24 @@
 # ccai_mcp
 
-The MCP server: five tools (`search_transcripts`, `get_call_summary`, `query_csat`, `query_metric`, `ask_the_analyst`) over two transports. Tool names and input schemas are identical on both.
+The MCP server: six tools (`search_transcripts`, `get_call_summary`, `query_csat`, `query_metric`, `ask_the_analyst`, `explain_change`) over two transports. Tool names and input schemas are identical on both.
 
 | Transport | How to start | Use it for |
 |---|---|---|
 | stdio (default) | `python -m ccai_mcp.server` | a client on the same machine that spawns the server (Claude Desktop, the agent) |
 | streamable HTTP (opt in) | `python -m ccai_mcp.server --http` or `MCP_TRANSPORT=http` | clients on other machines: register a URL |
 
-Built on `mcp` 2.2.0 (`Server.streamable_http_app()`, served by uvicorn). Code: `server.py` (tools, transport choice), `http_transport.py` (settings, bearer check, `/healthz`), `http_smoke.py` (a client for checking it).
+Built on `mcp` 2.2.0 (`Server.streamable_http_app()`, served by uvicorn). Code: `server.py` (tools, transport choice), `change.py` (`explain_change`), `http_transport.py` (settings, bearer check, `/healthz`), `http_smoke.py` (a client for checking it).
+
+## `explain_change`
+
+Why did a governed metric move around a change? The tool compares one metric (`call_volume`, `csat_average_score`, `first_contact_resolution_rate` or `average_handle_time`) before and after a change point, reads the calls in both windows, and answers with:
+
+- both windows' values and the SQL MetricFlow generated for each;
+- how the change point was found: given as a date, the one logged change in a period (`search_range`), or the largest weekly shift, snapped to a logged change within 7 days. A shift that is not clear gives "no clear change point" and a request for a date;
+- the drivers found in the calls after the change, each as "n of M calls in the after window" with its count before the change and up to three verbatim quotes with call ids. A model proposes and assigns the drivers; code counts them and keeps only quotes found in the call;
+- what the data could not determine, always including that it cannot show the change caused the shift.
+
+It never reports a per-agent score. `mode="coaching"` takes `groups` (call ids from an earlier answer) and reports patterns in how those calls were handled. The result is two text blocks: the cited answer, then `CHANGE RESULT (JSON, v1):` and the result as JSON. `change_log.json` and `branches.json` are read from `data/synthetic/` (see `agent/changes.py`); the windows are half-open ISO dates. Code: `change.py`; the agent's route is described in [agent/README.md](../agent/README.md).
 
 ## Streamable HTTP
 
@@ -128,8 +139,8 @@ The request comes from the Open WebUI **backend**, not your browser. If Open Web
 
 | Client | Status |
 |---|---|
-| Real MCP client (`mcp` 2.2.0) over HTTP | tested in `tests/test_server_http.py`: handshake, five tools, a call, 401s |
-| `mcp-remote` 0.14.3 (the Claude Desktop route 1 bridge) | run by hand against this server with the header form above: `tools/list` returned the five tools. Claude Desktop itself was not run |
+| Real MCP client (`mcp` 2.2.0) over HTTP | tested in `tests/test_server_http.py`: handshake, six tools, a call, 401s |
+| `mcp-remote` 0.14.3 (the Claude Desktop route 1 bridge) | run by hand against this server with the header form above: `tools/list` returned the five tools it had then. Claude Desktop itself was not run |
 | Claude Desktop custom connector, Cursor, Open WebUI | **not run.** The snippets follow each product's current docs (Anthropic's custom-connector help page, Cursor's MCP docs, Open WebUI's MCP docs, read 2026-10-02). The `mcp-server` service name from inside the `open-webui` container is also untested |
 
 ## Tests

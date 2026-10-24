@@ -18,6 +18,111 @@
       "type": "object"
     }
   },
+  "explain_change": {
+    "description": "Explain why a governed metric moved around a change. Compares the metric before and after a change point (a date you give, the one logged change in a period, or the largest weekly shift) with the SQL for both windows, then reads the calls in the windows and reports the drivers it finds as 'n of M calls', with verbatim quotes and call ids. Always states what the data could not determine, including that it cannot show the change caused the shift. Reports patterns across calls, never per-agent scores. mode='coaching' finds patterns in how calls were handled inside groups of call ids from an earlier answer.",
+    "inputSchema": {
+      "properties": {
+        "change_point": {
+          "description": "ISO date the change happened (YYYY-MM-DD)",
+          "type": "string"
+        },
+        "filters": {
+          "description": "Narrow the calls; with none, the call types whose volume rose are used",
+          "properties": {
+            "category": {
+              "description": "Call categories (e.g. fee_dispute)",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "home_branch": {
+              "description": "Members' home branches",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "type": "object"
+        },
+        "groups": {
+          "description": "Coaching mode only: groups of calls to look for patterns in",
+          "items": {
+            "properties": {
+              "call_ids": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "label": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "label",
+              "call_ids"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "metric": {
+          "description": "The metric to explain (average_handle_time needs change_point)",
+          "enum": [
+            "call_volume",
+            "csat_average_score",
+            "first_contact_resolution_rate",
+            "average_handle_time"
+          ],
+          "type": "string"
+        },
+        "mode": {
+          "default": "drivers",
+          "description": "drivers (default) or coaching",
+          "enum": [
+            "drivers",
+            "coaching"
+          ],
+          "type": "string"
+        },
+        "question": {
+          "description": "The question being asked, to focus the reading of the calls",
+          "type": "string"
+        },
+        "search_range": {
+          "description": "Half-open period to look for the change in when no date is given",
+          "properties": {
+            "end": {
+              "description": "ISO date, exclusive",
+              "type": "string"
+            },
+            "start": {
+              "description": "ISO date, inclusive",
+              "type": "string"
+            }
+          },
+          "required": [
+            "start",
+            "end"
+          ],
+          "type": "object"
+        },
+        "window_days": {
+          "default": 42,
+          "description": "Length of each window in days (default 42; shorter where the data ends)",
+          "maximum": 91,
+          "minimum": 14,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "metric"
+      ],
+      "type": "object"
+    }
+  },
   "get_call_summary": {
     "description": "Get a summary of a specific call by its ID.",
     "inputSchema": {

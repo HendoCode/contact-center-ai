@@ -1,0 +1,38 @@
+# Which calls a change question is about: phrases for a subject -> call categories.
+#
+# Data, not code. A subject phrase in the question ("fee calls", "card calls") narrows a change
+# analysis to these categories; matching is whole-word and case-insensitive, and every entry
+# whose phrase appears contributes its categories. A branch name from branches.json in the
+# subject narrows it to members who bank at that branch instead (no entry needed here).
+# tests/agent/test_change_data.py checks that every category is one the generator writes.
+subjects:
+  - phrases: [fee calls, fee call, fee disputes, fee dispute, fees, dispute fees]
+    categories: [fee_dispute]
+  - phrases: [card calls, card call, card services, declined cards, declined card, cards]
+    categories: [card_services, fraud_dispute]
+  - phrases: [card services calls]
+    categories: [card_services]
+  - phrases: [fraud calls, fraud call, fraud disputes, fraud dispute, fraud]
+    categories: [fraud_dispute]
+  - phrases: [online banking calls, online banking, digital banking, app calls]
+    categories: [online_banking_support]
+  - phrases: [balance calls, account balance calls, account balance]
+    categories: [account_balance]
+  - phrases: [account opening calls, account opening, new accounts]
+    categories: [account_opening]
+  - phrases: [payment assistance calls, payment assistance, payment help, hardship calls]
+    categories: [payment_assistance]
+  - phrases: [rate calls, rate inquiries, rate inquiry, rate questions]
+    categories: [rate_inquiry]
+  - phrases: [rate lock calls, rate lock status, rate locks]
+    categories: [rate_lock_status]
+  - phrases: [loan calls, loan inquiries, loan inquiry]
+    categories: [loan_inquiry]
+  - phrases: [mortgage calls, mortgage inquiries, mortgage inquiry, mortgages]
+    categories: [mortgage_inquiry]
+  - phrases: [insurance calls, insurance service, insurance]
+    categories: [insurance_service]
+  - phrases: [investment calls, investment reviews, investment review, investments]
+    categories: [investment_review]
+  - phrases: [escrow calls, escrow analysis, escrow]
+    categories: [escrow_analysis]

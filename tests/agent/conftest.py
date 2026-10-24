@@ -6,7 +6,7 @@ pytest.importorskip(
     "fastmcp", reason="install the agent group: uv sync --extra dev --group agent"
 )
 
-from agent_support import FakeLLM, StubToolbox, call_exists  # noqa: E402
+from agent_support import BRANCHES, CHANGE_LOG, FakeLLM, StubToolbox, call_exists  # noqa: E402
 from langgraph.checkpoint.memory import InMemorySaver  # noqa: E402
 
 from agent.graph import build_graph  # noqa: E402
@@ -23,9 +23,19 @@ def saver():
 
 
 @pytest.fixture
+def change_files(monkeypatch):
+    """Services read change_log.json and branches.json from the generated data; tests give
+    the change subgraph fixed ones instead, so they need no generator run."""
+    from agent.subgraphs import change
+
+    monkeypatch.setattr(change, "load_change_log", lambda: list(CHANGE_LOG))
+    monkeypatch.setattr(change, "load_branches", lambda: list(BRANCHES))
+
+
+@pytest.fixture
 def make(toolbox, saver):
-    def _make(route: str = "retrieve", *, tools=None, checkpointer=None):
-        llm = FakeLLM(route)
+    def _make(route: str = "retrieve", *, tools=None, checkpointer=None, frame=None):
+        llm = FakeLLM(route, frame)
         graph = build_graph(
             get_llm=lambda: llm,
             toolbox=tools or toolbox,
