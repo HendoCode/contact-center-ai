@@ -25,7 +25,7 @@ DEMO_LLM_PROVIDER ?= ollama
 
 # Brings the stack up (db, ollama, model pulls, seed, dbt build, the langgraph dev server)
 # and runs the five scripted questions from agent/demo.py. The first run pulls models and
-# embeds 1,250 transcripts on CPU, so expect several minutes; later runs reuse the volumes.
+# embeds 1,540 transcripts on CPU, so expect several minutes; later runs reuse the volumes.
 # Works from `cp .env.example .env`; no cloud key is needed on the default path.
 demo:
 	export LLM_PROVIDER=$(DEMO_LLM_PROVIDER) EMBEDDING_PROVIDER=ollama; \

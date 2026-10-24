@@ -2,7 +2,7 @@
 
 One JSONL file per embedding model under `.cache/embeddings/`, each line
 `{"h": sha256(text), "v": vector}`, so a rerun embeds only text it has not seen. On a CPU
-the 1,250 transcripts take minutes through Ollama; from the cache they take a second.
+the 1,540 transcripts take minutes through Ollama; from the cache they take a second.
 Files written by older versions under `.cache/bench-embeddings/` are still read, and new
 vectors go to `.cache/embeddings/`.
 """

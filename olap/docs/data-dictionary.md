@@ -10,7 +10,7 @@ DDL lives in `olap/oltp/schema.sql`; seed data comes from
 | # | Table | What it holds | Seed rows |
 |---|-------|---------------|-----------|
 | 1 | `household` | Retail relationship groupings for pricing / household-level LCV | 150 |
-| 2 | `member` | A person (`individual`) or a business entity (`business`); business *contacts* are `individual` rows linked via `business_id` (self-FK) | 700 |
+| 2 | `member` | A person (`individual`) or a business entity (`business`); business *contacts* are `individual` rows linked via `business_id` (self-FK); `home_branch` is the branch the member banks at | 700 |
 | 3 | `team` | Function area a staff group belongs to (6 areas) | 8 |
 | 4 | `staff` | Agents / specialists / supervisors who handle interactions | 60 |
 | 5 | `product` | One row per product, tagged with its `lob` (the polymorphic discriminator) | 24 |
@@ -25,11 +25,11 @@ DDL lives in `olap/oltp/schema.sql`; seed data comes from
 | 14 | `product_rate` | Posted rates per product per effective date (teaser vs standard) | 126 |
 | 15 | `rate_lock` | Mortgage/home rate-lock pipeline (active/expired/exercised/cancelled) | 500 |
 | 16 | `interaction_category` | Lookup: the 14 call categories (loose `lob_id` hint, often NULL) | 14 |
-| 17 | `interaction` | A contact (mostly phone) with outcome, channel, first-contact-resolved | 1,250 |
-| 18 | `interaction_account` | **Junction** interaction↔account (subject vs referenced) — the "which account" trap | 1,388 |
-| 19 | `interaction_transcript` | 1:1 with interaction; `utterances` JSONB mirrors `transcripts.json` | 1,250 |
+| 17 | `interaction` | A contact (mostly phone) with outcome, channel, first-contact-resolved | 1,540 |
+| 18 | `interaction_account` | **Junction** interaction↔account (subject vs referenced) — the "which account" trap | 1,718 |
+| 19 | `interaction_transcript` | 1:1 with interaction; `utterances` JSONB mirrors `transcripts.json` | 1,540 |
 | 20 | `csat_survey` | Post-call survey (1–5 + comment); `survey_id == interaction_id` | 945 |
-| 21 | `account_transaction` | Signed ledger entries (credits +, debits −) — the flow that makes "balance" mean stock-vs-flow | 25,000 |
+| 21 | `account_transaction` | Signed ledger entries (credits +, debits −) — the flow that makes "balance" mean stock-vs-flow; `fee_type` says which fee a fee line is | 25,078 |
 
 ## LOB ambiguity notes (why the semantic layer exists)
 

@@ -22,6 +22,35 @@ def translate_where(where: dict | None) -> dict | None:
     return clauses[0] if len(clauses) == 1 else {"$and": clauses}
 
 
+_COUNT_OPS = {"gte": ">=", "lte": "<=", "lt": "<"}
+
+
+def _count_sql(where: dict | None) -> tuple[str, list]:
+    """SQL and parameters for `count`: each portable condition on the JSONB metadata text.
+
+    Dates and every other filterable value are stored as ISO or plain strings, and PGVector's
+    own `$gte` and `$lt` compare them as text too, so this agrees with `search`.
+    """
+    sql, params = _ROW_SQL.replace("e.document, e.cmetadata", "count(*)"), [COLLECTION_NAME]
+    for fld, op, value in validate_where(where):
+        if op == "eq" and value is None:
+            sql += " AND e.cmetadata->>%s IS NULL"
+            params.append(fld)
+        elif op == "eq":
+            sql += " AND e.cmetadata->>%s = %s"
+            params += [fld, str(value)]
+        elif op == "in":
+            if value:
+                sql += f" AND e.cmetadata->>%s IN ({', '.join(['%s'] * len(value))})"
+                params += [fld, *(str(v) for v in value)]
+            else:
+                sql += " AND 1 = 0"
+        else:
+            sql += f" AND e.cmetadata->>%s {_COUNT_OPS[op]} %s"
+            params += [fld, str(value)]
+    return sql, params
+
+
 class PgVectorRetriever:
     name = "pgvector"
 
@@ -79,13 +108,8 @@ class PgVectorRetriever:
         return Hit(call_id=call_id, text=text, score=1.0, metadata=metadata)
 
     def count(self, where: dict | None = None) -> int:
-        """All rows, or those whose metadata equals each `where` value (eq only)."""
-        sql, params = _ROW_SQL.replace("e.document, e.cmetadata", "count(*)"), [COLLECTION_NAME]
-        for fld, op, value in validate_where(where):
-            if op != "eq":
-                raise NotImplementedError(f"pgvector count supports equality only, not {op!r}")
-            sql += " AND e.cmetadata->>%s = %s"
-            params += [fld, str(value)]
+        """All rows, or those matching the portable `where`, the same filter `search` takes."""
+        sql, params = _count_sql(where)
         with self._connect() as conn, conn.cursor() as cur:
             cur.execute(sql, params)
             return cur.fetchone()[0]

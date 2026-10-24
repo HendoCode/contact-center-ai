@@ -7,11 +7,12 @@ benchmark) should use. Backends embed with the one shared
 
 Portable `where` subset
 -----------------------
-A dict of ANDed conditions over the fields `category`, `outcome`, `date` and
-`call_id`. Each value is one of:
+A dict of ANDed conditions over the fields `category`, `outcome`, `date`, `call_id` and
+`home_branch` (the branch the caller's member banks at). Each value is one of:
 
     {"category": "fraud_dispute"}                      # equality
     {"outcome": {"in": ["resolved", "escalated"]}}     # membership
+    {"home_branch": "Westside"}                        # a fact about the member
     {"date": {"gte": "2026-08-01", "lte": "2026-08-31"}}  # range: gte, lte, lt
 
 Stored `date` is an ISO datetime ("2026-03-31T15:00:00"); bounds are ISO strings,
@@ -27,7 +28,7 @@ from datetime import date, datetime, timedelta
 from dataclasses import dataclass, field
 from typing import Literal, Protocol, runtime_checkable
 
-WHERE_FIELDS = ("category", "outcome", "date", "call_id")
+WHERE_FIELDS = ("category", "outcome", "date", "call_id", "home_branch")
 RANGE_FIELDS = ("date",)
 _OPERATORS = ("eq", "in", "gte", "lte", "lt")
 _RANGE_OPS = ("gte", "lte", "lt")

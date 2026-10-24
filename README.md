@@ -96,7 +96,7 @@ make demo
 star schema, starts the LangGraph dev server (`localhost:2024`, a dev server rather than
 a production one), and runs five scripted questions through the agent: one per route,
 one through `ask_the_analyst`, and one that interrupts to ask which "rate" you mean and
-resumes. The first run downloads a couple of GB of models and embeds 1,250 transcripts on
+resumes. The first run downloads a couple of GB of models and embeds 1,540 transcripts on
 CPU. `make down` stops everything.
 
 Compose profiles: a bare `docker compose up -d` is unchanged (`db`, `ollama`, Open WebUI

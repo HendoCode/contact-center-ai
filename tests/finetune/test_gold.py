@@ -7,8 +7,10 @@ from collections import Counter
 import pytest
 
 from models.finetune.gold import (
+    _facts_from_variant as _facts,
     build_all_gold,
     build_gold,
+    event_call_ids,
     load_calls,
     load_dialogue_templates,
     load_rules,
@@ -54,11 +56,34 @@ def test_gold_rules_cover_all_14_categories_and_every_category_occurs(calls, gol
 
 
 def test_rules_name_every_figure_each_template_speaks(rules, templates):
-    """A new {placeholder} in a dialogue must be either a metric or explicitly ignored."""
+    """A new {placeholder} in a dialogue must be either a metric or explicitly ignored, and
+    every variant of a category must speak the same figures."""
     ignored = set(rules["ignored_facts"])
-    for category, turns in templates.items():
-        spoken = {k for _, text in turns for k in re.findall(r"\{(\w+)\}", text)} - ignored
-        assert spoken == set(rules["categories"][category]["metrics"]), category
+    for category, variants in templates.items():
+        assert len(variants) >= 3, category
+        for turns in variants:
+            spoken = {k for _, text in turns for k in re.findall(r"\{(\w+)\}", text)} - ignored
+            assert spoken == set(rules["categories"][category]["metrics"]), category
+
+
+def test_calls_use_every_variant_and_gold_matches_all_of_them(calls, templates):
+    """The corpus draws all variants of a category, and each one yields the same fact keys."""
+    used = Counter()
+    for call in calls:
+        for i, template in enumerate(templates[call.category]):
+            try:
+                facts = _facts(call, template)
+            except ValueError:
+                continue
+            used[(call.category, i)] += 1
+            assert set(facts) >= set(re.findall(r"\{(\w+)\}", " ".join(t for _, t in template)))
+            break
+    assert {(c, i) for c in templates for i in range(len(templates[c]))} == set(used)
+
+
+def test_event_calls_are_not_in_the_fine_tune_corpus(data_dir, calls):
+    planted = event_call_ids(data_dir)
+    assert planted and not planted & {c.call_id for c in calls}
 
 
 def test_every_metric_name_in_the_glossary_is_used(rules):

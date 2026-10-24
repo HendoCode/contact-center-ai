@@ -97,8 +97,8 @@ def test_pgvector_counts_by_metadata_equality():
     sql, params = log[0]
     assert sql.endswith("WHERE c.name = %s AND e.cmetadata->>%s = %s")
     assert params[1:] == ["category", "fraud_dispute"]
-    with pytest.raises(NotImplementedError):
-        r.count({"date": {"gte": "2026-01-01"}})
+    with pytest.raises(ValueError):
+        r.count({"member_id": "MBR-000001"})  # outside the portable `where` subset
 
 
 def test_lancedb_counts_with_the_same_where(tmp_path):

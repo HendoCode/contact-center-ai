@@ -73,6 +73,18 @@ def upsert(cur, table, rows, columns, pk, page_size=1000):
     return len(rows)
 
 
+def prune(cur, table, rows, pk):
+    """Delete rows of `table` whose key is not in `rows`, so a regenerated corpus whose ids
+    moved leaves no stale survey or junction rows behind. Returns the number deleted."""
+    keep = {tuple(r[c] for c in pk) for r in rows}
+    cur.execute(f"SELECT {', '.join(pk)} FROM {table}")
+    stale = [key for key in cur.fetchall() if tuple(key) not in keep]
+    for key in stale:
+        cur.execute(f"DELETE FROM {table} WHERE "
+                    + " AND ".join(f"{c} = %s" for c in pk), key)
+    return len(stale)
+
+
 def table_count(cur, table):
     cur.execute(f"SELECT count(*) FROM {table}")
     return cur.fetchone()[0]
@@ -101,6 +113,7 @@ def prep_members(rows):
             "business_id": r.get("business_id"),
             "naics_code": r.get("naics_code"),
             "employee_count": r.get("employee_count"),
+            "home_branch": r.get("home_branch"),
         }
 
 
@@ -228,7 +241,13 @@ def prep_transactions(rows):
                "account_id": int(r["account_id"]),
                "posted_at": as_ts(r["posted_at"]),
                "amount": r["amount"], "txn_type": r["txn_type"],
-               "status": r["status"], "description": r["description"]}
+               "status": r["status"], "description": r["description"],
+               "fee_type": r.get("fee_type")}
+
+
+# Tables whose rows are keyed by ids that move when the corpus is regenerated (survey_id
+# follows interaction_id), so a reload must also drop the keys the new data no longer has.
+PRUNED = {"csat_survey", "interaction_account"}
 
 
 # ── table registry: (table, columns, pk, preparer, source_json) ───────────────
@@ -238,7 +257,7 @@ TABLES = [
      ["household_id"], prep_households, "households.json"),
     ("member", ["member_id", "household_id", "member_type", "legal_name", "email",
                 "phone", "joined_date", "credit_score_band", "residence_state",
-                "business_id", "naics_code", "employee_count"],
+                "business_id", "naics_code", "employee_count", "home_branch"],
      ["member_id"], prep_members, "members.json"),
     ("team", ["team_id", "team_name", "function_area"], ["team_id"],
      prep_teams, "teams.json"),
@@ -302,7 +321,7 @@ TABLES = [
                      "surveyed_at", "question_code"],
      ["survey_id"], prep_csat_surveys, "csat.json"),
     ("account_transaction", ["transaction_id", "account_id", "posted_at",
-                             "amount", "txn_type", "status", "description"],
+                             "amount", "txn_type", "status", "description", "fee_type"],
      ["transaction_id"], prep_transactions, "transactions.json"),
 ]
 
@@ -315,7 +334,8 @@ def main():
             for table, columns, pk, preparer, source in TABLES:
                 rows = list(preparer(load_json(source)))
                 n = upsert(cur, table, rows, columns, pk)
-                print(f"  {table:<24} {n:>7} rows")
+                dropped = prune(cur, table, rows, pk) if table in PRUNED else 0
+                print(f"  {table:<24} {n:>7} rows" + (f" ({dropped} stale removed)" if dropped else ""))
 
         print("\nPost-load row counts (Postgres):")
         with conn.cursor() as cur:

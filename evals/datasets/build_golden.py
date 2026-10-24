@@ -17,7 +17,8 @@ here, by code, from three sources, and never from running the agent:
   candidate has a qualifier in the question. Otherwise the agent should ask, offering
   the candidates with a qualifier in the question, or all of them when none has one.
 - The seed-42 generator's `transcripts.json`: which call ids exist, the facts of each
-  call-lookup id (picked by a predicate, lowest id first), and the categories behind
+  call-lookup id (picked by a predicate, lowest id first, among baseline calls: the
+  dated-event calls the generator adds are never picked), and the categories behind
   each open question.
 
 Run `make seed` first; the generator is deterministic, so the output is too.
@@ -169,13 +170,18 @@ def load_terms(path: Path = TERMS_PATH) -> dict[str, dict]:
 
 
 def load_calls(data_dir: Path = DATA_DIR) -> list[dict]:
-    """transcripts.json without the transcript text, in call id order."""
+    """transcripts.json without the transcript text, in call id order. `event` is True for the
+    calls the generator added for its dated events (from its ground-truth file; all False
+    when that file is absent)."""
     path = data_dir / "transcripts.json"
     if not path.exists():
         sys.exit(f"{path} not found. Run `make seed` first.")
+    truth = data_dir / "ground_truth" / "events.json"
+    planted = set(json.loads(truth.read_text())["calls"]) if truth.exists() else set()
     keep = ("call_id", "date", "duration_seconds", "category", "outcome", "member_id",
             "agent_id")
-    calls = [{k: t[k] for k in keep} for t in json.loads(path.read_text())]
+    calls = [{**{k: t[k] for k in keep}, "event": t["call_id"] in planted}
+             for t in json.loads(path.read_text())]
     return sorted(calls, key=lambda c: c["call_id"])
 
 
@@ -291,11 +297,13 @@ def _call_record(spec: dict, calls: list[dict]) -> dict:
         call = None
         how = f"first id past the corpus end ({calls[0]['call_id']}..{calls[-1]['call_id']})"
     else:
-        pool = [c for c in calls if all(c[k] == v for k, v in spec["pick"].items())]
+        pool = [c for c in calls if not c.get("event")
+                and all(c[k] == v for k, v in spec["pick"].items())]
         assert pool, f"no call matches {spec['pick']}"
         call = pool[0]
         call_id = call["call_id"]
-        how = "lowest call_id with " + " AND ".join(f"{k} = {v}" for k, v in spec["pick"].items())
+        how = ("lowest baseline call_id with "
+               + " AND ".join(f"{k} = {v}" for k, v in spec["pick"].items()))
     typed = call_id.lower() if spec.get("lowercase") else call_id
     if call is None:
         reference = (

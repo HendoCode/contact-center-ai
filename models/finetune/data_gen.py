@@ -3,7 +3,7 @@ F1 dataset builder for the summary_v1 fine-tune-or-retrieve experiment.
 
 Three steps, all writing under `data/finetune/` (gitignored):
 
-  build     offline, no API. Gold labels for all 1,250 calls (code + gold_rules.yml),
+  build     offline, no API. Gold labels for the 1,250 baseline calls (code + gold_rules.yml),
             the 800/150/300 split, test.jsonl and a manifest.
   label     the teacher (`get_llm`, e.g. claude-sonnet-5-5) labels train and dev
             through a validate / retry / resume loop. Costs API money.

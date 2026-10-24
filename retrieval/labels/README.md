@@ -16,7 +16,7 @@
 - `category`, `outcome` and `date`, from `transcripts.json`.
 - `member_id`.
 - The subject account and its product line (LOB), from `interaction_accounts.json`, `accounts.json` and `products.json`.
-- Which template placeholders the call's category speaks aloud, from `CATEGORY_DIALOGUES` in the generator.
+- What the transcript text says: a verbatim phrase, the member id, the last four digits of the subject account. Each category has three or more dialogue variants (`CATEGORY_DIALOGUES`), so these are read off each call's own text rather than assumed from its category.
 
 `derivation` records that predicate in readable form.
 
@@ -34,8 +34,8 @@ python -m retrieval.labels.build_labels --check    # exit 1 if queries.jsonl is 
 |---|---|---|---|
 | topical | 11 | Naming a call's subject in the corpus's own words. Four of these add a product facet (home-equity rate, mortgage vs card hardship, fraud on checking) that only the LOB cue words separate. | `category`, plus `lob` for the four product-facet queries |
 | filter | 10 | Structured constraints the text cannot carry (outcome and date are never spoken), passed as `where`. Two queries put every constraint in `where` (q12, q13), which tests prefiltering alone. The other eight leave the category to the text, so the backend must rank the right category first inside the filtered pool. | `category` AND the `where` |
-| exact | 10 | Verbatim strings, where lexical (FTS) search should win. Six are phrases from exactly one category's template; the builder asserts that no other category's template contains them. Four are ids spoken in the call: two member ids and two "account ending in NNNN" queries. | `category`, or the member or subject account restricted to categories whose template speaks that id |
-| paraphrase | 9 | The same intents in other words, where vectors should win. The builder asserts that each query shares at most one content word with its target template; all nine share none. | `category` |
+| exact | 10 | Verbatim strings, where lexical (FTS) search should win. Six are phrases from one category's dialogue; the builder asserts that no call in another category contains them, and only calls whose own text has the phrase are relevant. Four are ids spoken in the call: two member ids and two "account ending in NNNN" queries. | `category` AND the phrase in the call's text, or the member or subject account whose id the call's text speaks |
+| paraphrase | 9 | The same intents in other words, where vectors should win. The builder asserts that each query shares at most one content word with its target category's templates (all variants); all nine share none. | `category` |
 
 The id queries pick the two members and the two accounts with the most calls that speak the id, breaking ties on the id. That keeps the choice deterministic.
 
@@ -46,12 +46,12 @@ Notes on specific queries:
 
 ## What recall can and cannot measure here
 
-- **The corpus is templated.** With names and figures masked, the 1,250 transcripts reduce to fewer than 30 distinct texts, one to five per category (`docs/design/finetune.md`, "Corpus limits"). Within a category, calls differ only in names, ids, figures and the LOB label words. So:
+- **The corpus is templated.** Baseline calls draw one of three wordings per category, and the dated-event calls the generator adds draw from a few dozen more. With names and figures masked, the corpus reduces to a small set of distinct texts. Within a category, calls differ only in the wording variant, names, ids, figures and the LOB label words. So:
   - Topical, paraphrase and exact-phrase recall measure category discrimination: whether the top-k are from the right category. Ranking among the many equally relevant calls of one category is arbitrary, and no metric here rewards it.
   - The product-facet queries are the only test of finer distinctions, and those rest on a few label words ("drawn balance", "minimum payment", "ledger balance").
   - Id queries are the only queries with a single right answer per call, and lexical search has a structural edge on them.
 - **Outcome is never spoken.** No text-only search can find "escalated" calls. Filter queries therefore rely on `where`, and their scores measure prefiltering plus category ranking inside the filtered pool.
-- **Recall is capped.** Most relevant sets are larger than k (up to 179 calls), so recall@k is |relevant ∩ top-k| / min(k, |relevant|), BEIR's capped recall. Under it, a top-k made entirely of relevant calls scores 1.0.
+- **Recall is capped.** Most relevant sets are larger than k (up to 213 calls), so recall@k is |relevant ∩ top-k| / min(k, |relevant|), BEIR's capped recall. Under it, a top-k made entirely of relevant calls scores 1.0.
 - **The numbers do not transfer.** Real transcripts are not templated. These numbers compare backends and modes on this corpus; they say nothing about absolute quality on real calls.
 
 ## Date ranges

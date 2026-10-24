@@ -3,7 +3,7 @@ Deterministic train/dev/test split, stratified by category.
 
 Within each category, calls are ordered by `sha256("summary_v1:" + call_id)`
 and sliced into test, dev and train. The order depends only on the call_id, not on
-input order or position in the corpus. Per-split sizes are the design note's 800 / 150 / 300 of 1,250, distributed across
+input order or position in the corpus. Per-split sizes are the design note's 800 / 150 / 300 of the 1,250 baseline calls, distributed across
 categories by largest remainder so each split total is exact.
 """
 
@@ -14,7 +14,7 @@ from collections import defaultdict
 from fractions import Fraction
 
 SPLIT_NAMES = ("train", "dev", "test")
-# Design note: 800 train, 150 dev, 300 test of the 1,250 generated calls.
+# Design note: 800 train, 150 dev, 300 test of the 1,250 baseline calls (the dated-event calls are left out).
 SPLIT_SIZES = {"train": 800, "dev": 150, "test": 300}
 
 

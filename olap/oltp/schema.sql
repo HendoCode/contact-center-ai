@@ -47,6 +47,8 @@ CREATE TABLE IF NOT EXISTS member (
     business_id        BIGINT NULL,
     naics_code         TEXT NULL,
     employee_count     INT NULL,
+    -- the branch the member banks at (a fact about the member, not about any call)
+    home_branch        TEXT NULL,
     CONSTRAINT fk_member_household
         FOREIGN KEY (household_id) REFERENCES household (household_id),
     CONSTRAINT fk_member_business
@@ -351,6 +353,8 @@ CREATE TABLE IF NOT EXISTS account_transaction (
     txn_type       TEXT NOT NULL,
     status         TEXT NOT NULL,
     description    TEXT,
+    -- which fee a fee line is; NULL on every other transaction type
+    fee_type       TEXT NULL,
     CONSTRAINT fk_account_transaction_account
         FOREIGN KEY (account_id) REFERENCES account (account_id),
     CONSTRAINT chk_account_transaction_type CHECK (
@@ -358,7 +362,29 @@ CREATE TABLE IF NOT EXISTS account_transaction (
     ),
     CONSTRAINT chk_account_transaction_status CHECK (
         status IN ('posted', 'pending', 'hold')
+    ),
+    CONSTRAINT chk_account_transaction_fee_type CHECK (
+        fee_type IS NULL OR
+        fee_type IN ('overdraft', 'nsf', 'monthly_maintenance', 'atm', 'other')
     )
 );
+
+-- Databases created before these two columns existed: add them in place. Re-running is safe.
+ALTER TABLE member ADD COLUMN IF NOT EXISTS home_branch TEXT NULL;
+ALTER TABLE account_transaction ADD COLUMN IF NOT EXISTS fee_type TEXT NULL;
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conname = 'chk_account_transaction_fee_type'
+          AND conrelid = 'account_transaction'::regclass
+    ) THEN
+        ALTER TABLE account_transaction ADD CONSTRAINT chk_account_transaction_fee_type CHECK (
+            fee_type IS NULL OR
+            fee_type IN ('overdraft', 'nsf', 'monthly_maintenance', 'atm', 'other')
+        );
+    END IF;
+END
+$$;
 
 COMMIT;
