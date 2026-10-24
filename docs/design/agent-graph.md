@@ -3,9 +3,11 @@
 D0.2, 2026-10-02. Feeds M0, L1–L4 and M1. Checked against the LangGraph docs and PyPI on 2026-10-02: langgraph 1.2.12, langgraph-checkpoint-postgres 3.1.2, langgraph-cli 0.4.32, langchain 1.4.3, langchain-mcp-adapters 0.3.2, mcp 2.2.0. The repo pins langchain 1.3.4 and mcp 1.27.2.
 
 ```
-START → classify ─┬─ retrieve ───────────────────────────────────────────┐
-                  ├─ summarize_call ─────────────────────────────────────┼─→ ground → answer → END
-                  └─ resolve_metric [disambiguate → clarify? → execute] ─┘
+START → classify ─┬─ retrieve ───────────────────────────────────────────────────────────┐
+                  ├─ summarize_call ─────────────────────────────────────────────────────┤
+                  ├─ resolve_metric [disambiguate → clarify? → execute] ─────────────────┼─→ ground → answer → END
+                  └─ explain_change [frame → resolve_measure ⇄ clarify → resolve_subject ┘
+                                      → resolve_when → analyze]
 ```
 
 Routing is explicit: each node calls a named tool. Rejected: a tool-calling loop, which would make the route a model choice that no deterministic eval can check.
@@ -15,7 +17,7 @@ Routing is explicit: each node calls a named tool. Rejected: a tool-calling loop
 ```python
 class AgentState(TypedDict, total=False):
     question: str
-    route: Literal["retrieve", "resolve_metric", "summarize_call"]
+    route: Literal["retrieve", "resolve_metric", "summarize_call", "explain_change"]
     call_id: str | None
     term: str | None            # ambiguous term, e.g. "rate"
     candidates: list[str]       # metric names offered
@@ -26,15 +28,21 @@ class AgentState(TypedDict, total=False):
     citations: list[str]
     grounded: bool
     answer: str
+    change_frame: ChangeFrame | None  # explain_change: what the question names
+    change_filters: dict              # {"category": [...], "home_branch": [...]}
+    change_point: str | None          # ISO date, when the question gives one
+    change_search: dict | None        # {"start", "end"} when it gives a period
+    change: dict | None               # the tool's result; kept across runs on a thread
+    refusal: str | None               # why the question was not run
 ```
 
-The output is `{answer, route, metric_names, sql, citations, grounded}`, all JSON, so L2 reads fields instead of prose. Each run takes one question.
+The output is `{answer, route, metric_names, sql, citations, grounded, change}`, all JSON, so L2 reads fields instead of prose. Each run takes one question. `change` is `None` unless the run took the `explain_change` route, and `classify` is the one node that does not reset it, so a follow-up on the same thread can reuse that evidence.
 
 | Node | Behavior |
 |---|---|
-| `classify` | Routes to `summarize_call` on a `CALL-\d{5}` regex match. Otherwise one structured LLM call picks the route |
+| `classify` | Routes to `summarize_call` on a `CALL-\d{5}` regex match. Otherwise one structured LLM call picks the route, and is told whether a change analysis already exists on the thread |
 | `retrieve`, `summarize_call` | Call MCP `search_transcripts` and `get_call_summary` |
-| `ground` | Checks cited `call_id`s with `Retriever.get_by_id` (R1). On the metric route, requires SQL and declared metrics. No LLM, no loop |
+| `ground` | Checks cited `call_id`s with `Retriever.get_by_id` (R1). On the metric route, requires SQL and declared metrics. On the `explain_change` route, requires both window SQLs and citations that are real calls inside the windows, and rejects any agent id; a refusal claims nothing and passes. No LLM, no loop |
 | `answer` | Formats tool output, citations and SQL. Adds no facts |
 
 `resolve_metric` is the `analyst` subgraph. It shares the parent's keys and runs with the default `checkpointer=None`, so it inherits the parent's checkpointer and its interrupt surfaces in the parent. Its nodes:
@@ -42,6 +50,16 @@ The output is `{answer, route, metric_names, sql, citations, grounded}`, all JSO
 - `disambiguate` reads `agent/data/ambiguous_terms.yml`, which maps each term to candidate metrics plus qualifier words. Starter terms: `rate` (7 metrics), `balance` (10), `LCV`/`LTV` (2). It goes to `query_metric` when exactly one candidate remains, to `clarify` when several remain, and to `ask_the_analyst` when no term matched.
 - `clarify` is the only node that calls `interrupt()`. On an invalid answer an edge routes back to it, at most twice. After that, every candidate runs, matching `ask_the_analyst`, which never blends metrics into one number.
 - `execute` calls the chosen MCP tool and writes `tool_output`, `sql` and `metric_names`.
+
+`explain_change` is the `change` subgraph (`agent/subgraphs/change.py`), shared state and parent checkpointer as above. It answers "why did X change after, since or around Y" and the design is in [change-analysis.md](change-analysis.md). Its nodes:
+
+- `frame` makes one structured LLM call that sees the question and the change log and returns the measure, the calls, the time and any logged change the question names. A follow-up flag counts only when a stored `change` exists.
+- `resolve_measure` matches the measure phrase by label, then `data/change_measures.yml`, then `ambiguous_terms.yml`. It keeps the supported metrics (call volume, CSAT average score, first contact resolution rate, average handle time); several of them go to `clarify`, the analyst's node unchanged, and none ends the run with a refusal. No phrase means call volume, and the answer says so.
+- `resolve_subject` maps call types through `data/change_subjects.yml` and branches through `branches.json`. No subject leaves the filters to the tool, which keeps the call types whose volume rose.
+- `resolve_when` uses the logged change, a date, or a period from `parse_period` (`agent/changes.py`). Anything else is refused, and the refusal names the phrase.
+- `analyze` makes the one `explain_change` MCP call and writes `change`, `tool_output`, `sql` and `citations`. On a follow-up it calls the tool in `coaching` mode with the call ids of each stored driver.
+
+Every refusal sets `refusal` and ends the subgraph without a tool call.
 
 ## Interrupt contract
 
@@ -78,7 +96,7 @@ We don't use the standalone Agent Server. Its docs require Redis, `LANGSMITH_API
 - the interrupt fires on "average rate" but not on "average mortgage note rate"
 - resume with a valid choice, an invalid choice, and after a rebuild
 - every term candidate exists in `metrics.yml`
-- `agent/tools.py` lists the five real tools
+- `agent/tools.py` lists the six real tools
 
 ## Tickets
 

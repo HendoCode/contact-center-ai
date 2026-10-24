@@ -4,7 +4,7 @@ import pytest
 
 from agent_support import StubToolbox, config
 
-OUTPUT_KEYS = {"answer", "route", "metric_names", "sql", "citations", "grounded"}
+OUTPUT_KEYS = {"answer", "route", "metric_names", "sql", "citations", "grounded", "change"}
 
 
 @pytest.mark.asyncio
@@ -13,6 +13,7 @@ async def test_retrieve_route(make, toolbox):
     out = await graph.ainvoke({"question": "what do members say about fees?"}, config())
 
     assert set(out) == OUTPUT_KEYS
+    assert out["change"] is None  # only the explain_change route fills it
     assert out["route"] == "retrieve"
     assert toolbox.tool_calls("search_transcripts") == [{"query": "what do members say about fees?"}]
     assert out["citations"] == ["CALL-00001", "CALL-00002"]

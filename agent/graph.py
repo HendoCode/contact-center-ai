@@ -1,8 +1,9 @@
 """The agent graph.
 
-    START -> classify -+- retrieve -------+
-                       +- summarize_call -+-> ground -> answer -> END
-                       +- resolve_metric -+   (the `analyst` subgraph)
+    START -> classify -+- retrieve --------+
+                       +- summarize_call --+-> ground -> answer -> END
+                       +- resolve_metric --+   (the `analyst` subgraph)
+                       +- explain_change --+   (the `change` subgraph)
 
 Design: docs/design/agent-graph.md. Build with `build_graph(...)`; `make_graph()`
 is the zero-argument factory `langgraph dev` loads from agent/langgraph.json.
@@ -19,6 +20,7 @@ from agent.nodes.classify import make_classify
 from agent.nodes.ground import CallExists, make_ground, retriever_call_exists
 from agent.state import AgentInput, AgentOutput, AgentState
 from agent.subgraphs.analyst import build_analyst
+from agent.subgraphs.change import build_change
 from agent.tools import MCPToolbox, Toolbox
 
 
@@ -35,14 +37,14 @@ def build_graph(
     graph.add_node("retrieve", make_retrieve(toolbox))
     graph.add_node("summarize_call", make_summarize_call(toolbox))
     graph.add_node("resolve_metric", build_analyst(toolbox))
+    graph.add_node("explain_change", build_change(toolbox, get_llm))
     graph.add_node("ground", make_ground(call_exists))
     graph.add_node("answer", answer)
 
     graph.add_edge(START, "classify")
-    graph.add_conditional_edges(
-        "classify", lambda s: s["route"], ["retrieve", "summarize_call", "resolve_metric"]
-    )
-    for route in ("retrieve", "summarize_call", "resolve_metric"):
+    routes = ["retrieve", "summarize_call", "resolve_metric", "explain_change"]
+    graph.add_conditional_edges("classify", lambda s: s["route"], routes)
+    for route in routes:
         graph.add_edge(route, "ground")
     graph.add_edge("ground", "answer")
     graph.add_edge("answer", END)

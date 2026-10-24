@@ -1,4 +1,4 @@
-"""agent/tools.py reaches the real MCP server (stdio, no DB, no key) and sees all five tools."""
+"""agent/tools.py reaches the real MCP server (stdio, no DB, no key) and sees all six tools."""
 
 import pytest
 
@@ -10,11 +10,12 @@ EXPECTED_TOOLS = {
     "query_csat",
     "query_metric",
     "ask_the_analyst",
+    "explain_change",
 }
 
 
 @pytest.mark.asyncio
-async def test_toolbox_lists_the_five_real_tools():
+async def test_toolbox_lists_the_six_real_tools():
     tools = await MCPToolbox().tools()
     assert set(tools) == EXPECTED_TOOLS
 
@@ -35,3 +36,11 @@ def test_server_subprocess_inherits_the_callers_environment(monkeypatch):
 
     assert env["DATABASE_URL"] == "postgresql://db.example:5432/contactcenter"
     assert env["OLLAMA_BASE_URL"] == "http://ollama.example:11434"
+
+
+def test_a_tool_result_in_several_text_blocks_is_joined_with_newlines():
+    # explain_change returns the cited answer and then its JSON as two blocks.
+    from agent.tools import _text
+
+    blocks = [{"type": "text", "text": "the answer"}, {"type": "text", "text": "CHANGE RESULT"}]
+    assert _text(blocks) == "the answer\nCHANGE RESULT"

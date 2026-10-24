@@ -35,6 +35,7 @@ from mcp.types import (
     Tool,
 )
 
+from ccai_mcp.change import SUPPORTED_METRICS, explain_change_blocks
 from ccai_mcp.metrics import ask_the_analyst, query_metric
 from ccai_mcp.tools import get_call_summary, query_csat, search_transcripts
 
@@ -201,6 +202,82 @@ TOOLS = [
             "required": ["question"]
         }
     ),
+    Tool(
+        name="explain_change",
+        description=(
+            "Explain why a governed metric moved around a change. Compares the metric "
+            "before and after a change point (a date you give, the one logged change in a "
+            "period, or the largest weekly shift) with the SQL for both windows, then reads "
+            "the calls in the windows and reports the drivers it finds as 'n of M calls', "
+            "with verbatim quotes and call ids. Always states what the data could not "
+            "determine, including that it cannot show the change caused the shift. Reports "
+            "patterns across calls, never per-agent scores. mode='coaching' finds patterns "
+            "in how calls were handled inside groups of call ids from an earlier answer."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "metric": {
+                    "type": "string",
+                    "enum": list(SUPPORTED_METRICS),
+                    "description": "The metric to explain (average_handle_time needs change_point)"
+                },
+                "filters": {
+                    "type": "object",
+                    "description": "Narrow the calls; with none, the call types whose volume rose are used",
+                    "properties": {
+                        "category": {"type": "array", "items": {"type": "string"},
+                                     "description": "Call categories (e.g. fee_dispute)"},
+                        "home_branch": {"type": "array", "items": {"type": "string"},
+                                        "description": "Members' home branches"}
+                    }
+                },
+                "change_point": {
+                    "type": "string",
+                    "description": "ISO date the change happened (YYYY-MM-DD)"
+                },
+                "search_range": {
+                    "type": "object",
+                    "description": "Half-open period to look for the change in when no date is given",
+                    "properties": {
+                        "start": {"type": "string", "description": "ISO date, inclusive"},
+                        "end": {"type": "string", "description": "ISO date, exclusive"}
+                    },
+                    "required": ["start", "end"]
+                },
+                "window_days": {
+                    "type": "integer",
+                    "description": "Length of each window in days (default 42; shorter where the data ends)",
+                    "minimum": 14,
+                    "maximum": 91,
+                    "default": 42
+                },
+                "question": {
+                    "type": "string",
+                    "description": "The question being asked, to focus the reading of the calls"
+                },
+                "mode": {
+                    "type": "string",
+                    "enum": ["drivers", "coaching"],
+                    "description": "drivers (default) or coaching",
+                    "default": "drivers"
+                },
+                "groups": {
+                    "type": "array",
+                    "description": "Coaching mode only: groups of calls to look for patterns in",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "label": {"type": "string"},
+                            "call_ids": {"type": "array", "items": {"type": "string"}}
+                        },
+                        "required": ["label", "call_ids"]
+                    }
+                }
+            },
+            "required": ["metric"]
+        }
+    ),
 ]
 
 async def list_tools(
@@ -235,10 +312,12 @@ async def call_tool(ctx: ServerRequestContext, params: CallToolRequestParams) ->
         result = await _run_tool(name, arguments)
     except Exception as e:
         return _error(f"{TOOL_ERROR_PREFIX} ({name}): {type(e).__name__}: {e}")
-    return CallToolResult(content=[TextContent(type="text", text=result)])
+    blocks = [result] if isinstance(result, str) else result
+    return CallToolResult(content=[TextContent(type="text", text=text) for text in blocks])
 
 
-async def _run_tool(name: str, arguments: dict) -> str:
+async def _run_tool(name: str, arguments: dict) -> str | list[str]:
+    """The tool's text: one string, or a list when the tool returns several text blocks."""
     if name == "search_transcripts":
         result = await asyncio.to_thread(
             search_transcripts,
@@ -272,6 +351,8 @@ async def _run_tool(name: str, arguments: dict) -> str:
             question=arguments["question"],
             decimals=arguments.get("decimals"),
         )
+    elif name == "explain_change":
+        result = await asyncio.to_thread(explain_change_blocks, **arguments)
     else:
         result = f"Unknown tool: {name}"
     return result

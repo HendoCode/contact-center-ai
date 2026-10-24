@@ -6,7 +6,8 @@ the change log or in an eval dataset, that measurement is spoiled. This guard sc
 surfaces on every run.
 
 When a ticket adds a new surface that shapes a prompt or an eval, add its path (or glob) to
-GUARDED below. The change-analysis tool module is already listed and is scanned once it exists.
+GUARDED below. That covers the change-analysis tool and the agent's change route: their prompts,
+data tables, period grammar and subgraph.
 """
 
 import re
@@ -20,6 +21,8 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 GUARDED = [
     "agent/prompts/**/*",
     "agent/data/**/*",
+    "agent/changes.py",
+    "agent/subgraphs/change.py",
     "evals/datasets/*.jsonl",
     "evals/datasets/*.py",
     "ccai_mcp/change.py",
@@ -65,6 +68,9 @@ def test_the_guard_covers_the_surfaces_that_exist():
     assert "agent/data/ambiguous_terms.yml" in names
     assert {"evals/datasets/agent_golden.jsonl", "evals/datasets/agent_holdout.jsonl",
             "evals/datasets/build_golden.py", "evals/datasets/holdout_specs.py"} <= names
+    assert {"agent/prompts/frame.md", "agent/data/change_measures.yml",
+            "agent/data/change_subjects.yml", "agent/changes.py", "agent/subgraphs/change.py",
+            "ccai_mcp/change.py"} <= names
 
 
 def test_the_forbidden_list_has_the_labels_and_the_held_out_keywords(events_config):
@@ -85,6 +91,38 @@ def test_no_held_out_keyword_or_label_id_in_prompts_agent_data_or_eval_datasets(
 
 def test_no_held_out_keyword_or_label_id_in_the_generated_change_log(corpus, events_config):
     assert not hits((corpus.dir / "change_log.json").read_text(), forbidden(events_config))
+
+
+# Where drivers are discovered. Nothing here may carry any event's driver wording, golden or
+# held out: the drivers an answer reports come from reading the calls, never from a list.
+DISCOVERY = [
+    "ccai_mcp/change.py",
+    "agent/subgraphs/change.py",
+    "agent/prompts/frame.md",
+    "agent/prompts/classify.md",
+    "agent/data/change_measures.yml",
+    "agent/data/change_subjects.yml",
+]
+
+
+def driver_words(events_config) -> dict[str, re.Pattern]:
+    found = {}
+    for ev in events_config["events"]:
+        for driver in ev["drivers"]:
+            for keyword in driver["keywords"]:
+                found[f"keyword:{keyword}"] = words(keyword)
+            for pattern in driver.get("patterns", []):
+                for variant_words in pattern["keywords"].values():
+                    found.update({f"keyword:{k}": words(k) for k in variant_words})
+    return found
+
+
+def test_no_driver_wording_from_any_event_is_in_the_code_that_finds_drivers(events_config):
+    patterns = driver_words(events_config)
+    assert len(patterns) >= 15
+    for name in DISCOVERY:
+        found = hits((REPO_ROOT / name).read_text(), patterns)
+        assert not found, (name, found)
 
 
 @pytest.mark.parametrize("planted", [

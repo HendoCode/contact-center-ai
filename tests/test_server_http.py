@@ -9,7 +9,7 @@ What this guards:
   * stdio stays the default (the handshake tests cover that path; here the env/flag selection);
   * a non-loopback bind refuses to start without MCP_AUTH_TOKEN;
   * a missing or wrong bearer token is a 401 before any MCP handling;
-  * the same five tools, with the same schemas, are served over the wire.
+  * the same six tools, with the same schemas, are served over the wire.
 """
 
 import asyncio
@@ -197,7 +197,7 @@ async def _session(base: str, token: str | None):
 
 
 @pytest.mark.asyncio
-async def test_lists_the_five_tools_and_calls_one_over_http(monkeypatch):
+async def test_lists_the_six_tools_and_calls_one_over_http(monkeypatch):
     calls = []
 
     def fake_query_metric(**kwargs):
@@ -223,6 +223,28 @@ async def test_lists_the_five_tools_and_calls_one_over_http(monkeypatch):
     assert not result.is_error
     assert result.content[0].text == "average_mortgage_note_rate\n6.5"
     assert calls[0]["metrics"] == ["average_mortgage_note_rate"]
+
+
+@pytest.mark.asyncio
+async def test_explain_change_returns_the_answer_and_the_result_as_two_text_blocks(monkeypatch):
+    seen = []
+
+    def fake_blocks(**kwargs):
+        seen.append(kwargs)
+        return ["The cited answer.", 'CHANGE RESULT (JSON, v1):\n{"version": 1}']
+
+    monkeypatch.setattr(ccai_server, "explain_change_blocks", fake_blocks)
+    async with _serving(HttpSettings(token=TOKEN)) as base, _session(base, TOKEN) as session:
+        result = await session.call_tool(
+            "explain_change", {"metric": "call_volume", "filters": {"category": ["fee_dispute"]}}
+        )
+        refused = await session.call_tool("explain_change", {"metric": "nps"})
+
+    assert not result.is_error
+    assert [c.text for c in result.content] == [
+        "The cited answer.", 'CHANGE RESULT (JSON, v1):\n{"version": 1}']
+    assert seen == [{"metric": "call_volume", "filters": {"category": ["fee_dispute"]}}]
+    assert refused.is_error and "Input validation error" in refused.content[0].text
 
 
 @pytest.mark.asyncio

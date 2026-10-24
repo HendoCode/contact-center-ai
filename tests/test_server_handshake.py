@@ -26,6 +26,7 @@ EXPECTED_TOOLS = {
     "query_csat",
     "query_metric",
     "ask_the_analyst",
+    "explain_change",
 }
 
 

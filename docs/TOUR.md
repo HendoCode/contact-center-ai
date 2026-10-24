@@ -28,15 +28,16 @@ data/synthetic/generate_data.py  (seed 42)
   ├─ transcripts.json ──► retrieval/        Retriever interface: pgvector ⇄ LanceDB   (RETRIEVER_BACKEND)
   ├─ OLTP JSON ─────────► olap/dbt/         dbt star schema + MetricFlow metrics      (--target dev | snowflake | databricks)
   │                        olap/dbt/loaders/  OLTP JSON → Snowflake / Databricks raw tables
-  └─ (both) ────────────► ccai_mcp/server.py  5 MCP tools over stdio
+  └─ (both) ────────────► ccai_mcp/server.py  6 MCP tools over stdio
                              └─► agent/     LangGraph graph, tools bound via langchain.mcp
                                    └─► evals/  golden set: offline gate (make evals) + LangSmith (make evals-live)
 chat models: rag/pipeline.py get_llm()      (LLM_PROVIDER = openai | ollama | anthropic | fireworks | vllm)
 infra: docker-compose.yml (local, no bill)  ·  infra/azure/ Terraform (Azure + a Snowflake root)
 ```
 
-The five MCP tools: `search_transcripts`, `get_call_summary`, `query_csat` (data tools) and
-`query_metric`, `ask_the_analyst` (semantic-layer tools that shell out to MetricFlow's `mf`).
+The six MCP tools: `search_transcripts`, `get_call_summary`, `query_csat` (data tools),
+`query_metric`, `ask_the_analyst` (semantic-layer tools that shell out to MetricFlow's `mf`) and
+`explain_change` (a metric before and after a change, plus the calls in between).
 
 ---
 
@@ -109,11 +110,11 @@ and lists its tools through `langchain.mcp` (`MCPAdapter`), the same binding the
 uv run --group agent python -c "import asyncio; from agent.tools import MCPToolbox; print(sorted(asyncio.run(MCPToolbox().tools())))"
 ```
 ```
-['ask_the_analyst', 'get_call_summary', 'query_csat', 'query_metric', 'search_transcripts']
+['ask_the_analyst', 'explain_change', 'get_call_summary', 'query_csat', 'query_metric', 'search_transcripts']
 ```
 
 `uv run python -m ccai_mcp.server` on its own starts the server and waits for a client on stdin
-(Ctrl-C to stop); `tests/test_server_handshake.py` checks the handshake and the five names.
+(Ctrl-C to stop); `tests/test_server_handshake.py` checks the handshake and the six names.
 Calling a tool for real needs B (a database, and a chat model for the summarizing tools).
 
 **A4b. MCP over streamable HTTP (opt in).** For clients on other machines: Claude Desktop (via
@@ -122,7 +123,7 @@ refuses to start without `MCP_AUTH_TOKEN`.
 
 ```bash
 MCP_AUTH_TOKEN=demo-token uv run python -m ccai_mcp.server --http &      # http://127.0.0.1:8000/mcp
-MCP_AUTH_TOKEN=demo-token uv run python -m ccai_mcp.http_smoke           # lists the five tools
+MCP_AUTH_TOKEN=demo-token uv run python -m ccai_mcp.http_smoke           # lists the six tools
 ```
 
 `ccai_mcp/README.md` has the URL shape, the safety rules, and the registration snippets. A tool
@@ -479,10 +480,11 @@ Azure backend, under its own state key. Cross-cloud traffic is the few MB of loa
 | Warehouse targets | `olap/dbt/profiles.yml` | `dev` (Postgres), `snowflake` (key pair, no password), `databricks`; every value from env |
 | Warehouse loaders | `olap/dbt/loaders/` | `__main__.py` (CLI), `snowflake_loader.py` (PUT + `COPY INTO`), `databricks_loader.py` (volume + `COPY INTO`), `schema.py` (DDL type mapping), `plan.py` |
 | Portability guards | `tests/test_dbt_portability.py`, `tests/test_warehouse_loaders.py` | no Postgres-only SQL; loader plans checked against a fake |
-| MCP server | `ccai_mcp/server.py` | the five `Tool(...)` declarations and `call_tool` dispatch (mcp 2.x low-level server); stdio by default |
+| MCP server | `ccai_mcp/server.py` | the six `Tool(...)` declarations and `call_tool` dispatch (mcp 2.x low-level server); stdio by default |
 | MCP over HTTP | `ccai_mcp/http_transport.py`, `ccai_mcp/http_smoke.py`, `ccai_mcp/README.md` | settings and the non-loopback refusal, constant-time bearer check, `/healthz`; smoke client; client snippets |
 | Metric tools | `ccai_mcp/metrics.py` | `run_metricflow` (shells out to `mf`), `query_metric`, `resolve_metrics` + `ask_the_analyst` |
-| LangGraph graph | `agent/graph.py`, `agent/state.py`, `agent/nodes/` | `build_graph`: classify → retrieve / summarize_call / resolve_metric → ground → answer |
+| Change analysis | `ccai_mcp/change.py`, `agent/subgraphs/change.py`, `agent/changes.py`, `agent/data/change_*.yml` | `explain_change` (windows, drivers counted in code, coaching mode) and the agent route that frames, resolves and grounds it |
+| LangGraph graph | `agent/graph.py`, `agent/state.py`, `agent/nodes/` | `build_graph`: classify → retrieve / summarize_call / resolve_metric / explain_change → ground → answer |
 | Interrupt | `agent/subgraphs/analyst.py`, `agent/data/ambiguous_terms.yml` | `clarify` is the only `interrupt()`; terms and candidates are data |
 | Checkpointer | `agent/checkpoint.py` | `open_checkpointer()`: `AsyncPostgresSaver` in a `langgraph` schema |
 | LangChain MCP binding | `agent/tools.py` | `from langchain.mcp import MCPAdapter`, stdio to `python -m ccai_mcp.server` |
