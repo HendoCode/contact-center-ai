@@ -1,0 +1,123 @@
+# Dated events for the synthetic credit union, planted by generate_data.py.
+#
+# Each event adds calls on top of the 1,250 baseline calls, drawn from their own seeded
+# stream. A phase multiplies one category's baseline weekly call rate for a number of weeks
+# and lowers the CSAT score of the surveys on its calls by `csat_shift`. Drivers are the
+# reasons members call; each category's driver shares are met exactly (largest remainder),
+# so a test can count them. Dialogue for each driver is templated in dialogue_templates.py.
+#
+# Only the generator and the evaluation tools read this file. The runtime services never do:
+# the one channel by which an event reaches them is `change_log.json` (name and date).
+# Ground-truth labels are written to ground_truth/events.json, which is not committed.
+#
+#   split          golden | heldout. Held-out events have no golden eval rows, prompt
+#                  examples or fixtures; they measure generalization to unseen events.
+#   date           first day of the first phase (a weekday, so a weekend roll stays in phase)
+#   change_log_name  the only event text that leaves the generator
+#   population     categories the event adds calls to; home_branch restricts the callers
+#   default_filters  the filters of the event's default evaluation window: the question the
+#                  event is most naturally asked about, recorded in the ground truth
+#   phases         weeks: N or `end` (to the end of the data); volume: category -> multiplier
+#                  of the baseline weekly rate; csat_shift: points added to each survey
+#   drivers        share: category -> share of that category's event calls;
+#                  fee_type: the fee the call is about (a name, or a share per fee type);
+#                  keywords: words the driver's dialogue uses, for the isolation tests;
+#                  ledger: facts the OLTP ledger must back up;
+#                  patterns: a behavior spread across a share of the driver's calls
+version: 1
+branches: {Westside: 0.20, Downtown: 0.30, Northgate: 0.25, Riverside: 0.25}
+events:
+  - id: fee_schedule_change
+    split: golden
+    date: 2026-04-15
+    change_log_name: Fee schedule change
+    population: {category: [fee_dispute, account_balance], home_branch: null}
+    default_filters: {category: [fee_dispute]}
+    phases:
+      - {weeks: 6, volume: {fee_dispute: 8.0, account_balance: 1.25}, csat_shift: -1.0}
+      - {weeks: end, volume: {fee_dispute: 3.0}, csat_shift: -0.6}
+    drivers:
+      - id: unaware_of_change
+        share: {fee_dispute: 0.45, account_balance: 0.60}
+        fee_type: overdraft
+        keywords: [statement insert]
+      - id: courtesy_refund_refused
+        share: {fee_dispute: 0.25}
+        fee_type: overdraft
+        keywords: [waiver, partial refund]
+        patterns:
+          - id: inconsistent_waiver_explanation
+            share: 0.40
+            variants: [once_a_year, once_ever, partial_refund]
+            keywords:
+              once_a_year: [once a year]
+              once_ever: [one-time, once ever]
+              partial_refund: [partial refund]
+      - id: multiple_overdrafts_same_day
+        share: {fee_dispute: 0.20, account_balance: 0.40}
+        fee_type: overdraft
+        keywords: [same day]
+        ledger: {overdraft_fees: [2, 4]}
+      - id: other_fee_question
+        share: {fee_dispute: 0.10}
+        fee_type: {nsf: 0.4, monthly_maintenance: 0.4, atm: 0.2}
+        keywords: [returned item, account maintenance fee, ATM fee]
+
+  - id: card_fraud_rule_change
+    split: golden
+    date: 2026-06-15
+    change_log_name: Card fraud rule change
+    population: {category: [card_services, fraud_dispute], home_branch: null}
+    default_filters: {category: [card_services, fraud_dispute]}
+    phases:
+      - {weeks: 3, volume: {card_services: 3.0, fraud_dispute: 3.0}, csat_shift: -0.9}
+      - {weeks: 5, volume: {card_services: 1.5, fraud_dispute: 1.5}, csat_shift: -0.45}
+    drivers:
+      - id: new_merchant_decline
+        share: {card_services: 0.50, fraud_dispute: 0.50}
+        keywords: [new merchant]
+      - id: verification_text_missing_or_unclear
+        share: {card_services: 0.30, fraud_dispute: 0.30}
+        keywords: [verification text]
+      - id: subscription_decline
+        share: {card_services: 0.20, fraud_dispute: 0.20}
+        keywords: [subscription]
+
+  - id: mobile_app_v5_release
+    split: heldout
+    date: 2026-07-20
+    change_log_name: Mobile app version 5 release
+    population: {category: [online_banking_support], home_branch: null}
+    default_filters: {category: [online_banking_support]}
+    phases:
+      - {weeks: 2, volume: {online_banking_support: 5.0}, csat_shift: -0.8}
+      - {weeks: 4, volume: {online_banking_support: 1.5}, csat_shift: -0.4}
+    drivers:
+      - id: biometric_reenrollment
+        share: {online_banking_support: 0.55}
+        keywords: [re-enroll]
+      - id: passcode_not_received
+        share: {online_banking_support: 0.30}
+        keywords: [one-time passcode]
+      - id: bill_pay_payees_missing
+        share: {online_banking_support: 0.15}
+        keywords: [payees]
+
+  - id: westside_branch_closure
+    split: heldout
+    date: 2026-08-07
+    change_log_name: Westside branch closure
+    population: {category: [account_balance, account_opening, payment_assistance], home_branch: Westside}
+    default_filters: {home_branch: [Westside]}
+    phases:
+      - {weeks: 4, volume: {account_balance: 6.0, account_opening: 6.0, payment_assistance: 6.0}, csat_shift: -1.0}
+    drivers:
+      - id: cash_or_coin_deposits
+        share: {account_balance: 0.40, account_opening: 0.40, payment_assistance: 0.40}
+        keywords: [coin]
+      - id: safe_deposit_box
+        share: {account_balance: 0.35, account_opening: 0.35, payment_assistance: 0.35}
+        keywords: [safe deposit box]
+      - id: notary_or_cashiers_check
+        share: {account_balance: 0.25, account_opening: 0.25, payment_assistance: 0.25}
+        keywords: [notary, "cashier's check"]

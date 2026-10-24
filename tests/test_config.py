@@ -145,11 +145,12 @@ def test_transcripts_to_documents_carries_olap_ids(monkeypatch):
     monkeypatch.setattr(
         pipeline,
         "_load_olap_ids",
-        lambda: (
+        lambda *_: (
             {"CALL-00001": 1001},
             {1001: [42, 43]},  # subject-role account first, then referenced
         ),
     )
+    monkeypatch.setattr(pipeline, "_load_home_branches", lambda *_: {"MBR-000001": "Westside"})
 
     docs = pipeline.transcripts_to_documents(
         [
@@ -169,6 +170,7 @@ def test_transcripts_to_documents_carries_olap_ids(monkeypatch):
     assert len(docs) == 1
     meta = docs[0].metadata
     assert meta["interaction_id"] == 1001
+    assert meta["home_branch"] == "Westside"
     assert meta["account_id"] == 42
     assert meta["account_ids"] == [42, 43]
     assert docs[0].page_content == "hello world"

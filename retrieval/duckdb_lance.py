@@ -34,7 +34,7 @@ Not a full `Retriever`: no `ingest`. `search`, `get_by_id` and `count` return th
   the dataset in SQL (`WHERE ... ORDER BY array_cosine_distance`), an exact, prefiltered
   search that bypasses any vector index. `fts` and `hybrid` with a `where` fetch every
   candidate (`k = count`) and filter afterwards, which is exact but touches every
-  matching row. Fine at ~1,250 documents; it does not scale like LanceDB's prefilter.
+  matching row. Fine at ~1,540 documents; it does not scale like LanceDB's prefilter.
 * Object stores: only a local `LANCE_URI` was checked. `az://` and `s3://` are untested here.
 """
 

@@ -61,7 +61,7 @@ ccai_mcp/server.py (stdio; HTTP opt-in) → 5 tools exposed to MCP clients
 ```
 
 **Data flow across files:**
-- `data/synthetic/generate_data.py` outputs `transcripts.json` (1,250 calls with full_text), `csat.json` (survey scores 1–5), and the OLTP JSON files loaded by `olap/seed.py`.
+- `data/synthetic/generate_data.py` outputs `transcripts.json` (1,540 calls with full_text: 1,250 baseline calls plus the calls for four dated events), `csat.json` (survey scores 1–5), and the OLTP JSON files loaded by `olap/seed.py`.
 - `rag/embeddings.py` owns pgvector setup and the shared `get_embeddings()`; `retrieval/` (`get_retriever()`, `Hit`, `Retriever`) is the only entry point for search/ingest — `retrieval/pgvector_backend.py` is the sole caller of `get_vector_store()` apart from `--reset`. To swap from OpenAI embeddings to Anthropic/Gemini, only this file needs to change.
 - `rag/pipeline.py` owns ingestion (`--ingest`) and querying (`rag_query()`). Ingestion upserts by `call_id`, so re-running `--ingest` is idempotent (rows ingested before this change have UUID ids and need `--reset` first).
 - `ccai_mcp/tools.py` implements the RAG/CSAT tools (`search_transcripts`, `get_call_summary`, `query_csat`). `search_transcripts` goes through `rag_query()` and `get_call_summary` uses `get_retriever().get_by_id()`; `query_csat` reads the Postgres `f_csat` fact (falling back to the `csat_survey` source), not `csat.json`.

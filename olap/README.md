@@ -44,10 +44,10 @@ when docker isn't running, so it also works against any Postgres.
 | teams / staff | 8 / 60 |
 | products | 24 (3–5 per LOB) |
 | accounts | **1,400** (banking 530 · cards 340 · mortgage 170 · home 110 · insurance 140 · investments 110) |
-| interactions | **1,250** |
-| interaction_accounts | ~1,388 (≈80/20 single/multi-account) |
-| csat | ~945 (75%) |
-| transactions | **25,000** |
+| interactions | **1,540** (1,250 baseline calls plus four dated events) |
+| interaction_accounts | ~1,718 (≈80/20 single/multi-account) |
+| csat | ~1,147 (75%) |
+| transactions | **25,078** |
 | product_rates | 126 |
 | rate_locks | 500 |
 

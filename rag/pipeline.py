@@ -104,7 +104,10 @@ def load_synthetic_data() -> list[dict]:
         return json.load(f)
 
 
-def _load_olap_ids() -> tuple[dict[str, int | None], dict[int, list[int]]]:
+SYNTHETIC_DIR = Path(__file__).parent.parent / "data" / "synthetic"
+
+
+def _load_olap_ids(data_dir: Path = SYNTHETIC_DIR) -> tuple[dict[str, int | None], dict[int, list[int]]]:
     """
     Build OLTP id lookups so transcript metadata can carry the same ids the
     OLAP star schema uses.
@@ -113,8 +116,6 @@ def _load_olap_ids() -> tuple[dict[str, int | None], dict[int, list[int]]]:
         call_id -> interaction_id (or None if interactions.json missing)
         interaction_id -> [account_id, ...] (subject role first, then others)
     """
-    data_dir = Path(__file__).parent.parent / "data" / "synthetic"
-
     interaction_by_call: dict[str, int | None] = {}
     interactions_path = data_dir / "interactions.json"
     if interactions_path.exists():
@@ -137,14 +138,25 @@ def _load_olap_ids() -> tuple[dict[str, int | None], dict[int, list[int]]]:
     return interaction_by_call, account_ids
 
 
-def transcripts_to_documents(transcripts: list[dict]) -> list[Document]:
+def _load_home_branches(data_dir: Path = SYNTHETIC_DIR) -> dict[str, str]:
+    """member_id ("MBR-000012") -> home branch, from members.json (empty if it is missing)."""
+    path = data_dir / "members.json"
+    if not path.exists():
+        return {}
+    with open(path) as f:
+        return {f"MBR-{m['member_id']:06d}": m["home_branch"]
+                for m in json.load(f) if m.get("home_branch")}
+
+
+def transcripts_to_documents(transcripts: list[dict], data_dir: Path = SYNTHETIC_DIR) -> list[Document]:
     """Convert transcript records to LangChain Document objects.
 
     Metadata carries the OLTP ids (interaction_id + account_id) alongside the
     existing string ids so RAG answers and OLAP aggregates can cite the same
     member/account.
     """
-    interaction_by_call, account_ids = _load_olap_ids()
+    interaction_by_call, account_ids = _load_olap_ids(data_dir)
+    home_branches = _load_home_branches(data_dir)
     docs = []
     for t in transcripts:
         metadata = {
@@ -156,6 +168,9 @@ def transcripts_to_documents(transcripts: list[dict]) -> list[Document]:
             "member_id": t["member_id"],
             "agent_id": t["agent_id"],
         }
+        # A fact about the member (where they bank), so it is filterable like a category.
+        if t["member_id"] in home_branches:
+            metadata["home_branch"] = home_branches[t["member_id"]]
         interaction_id = interaction_by_call.get(t["call_id"])
         if interaction_id is not None:
             metadata["interaction_id"] = interaction_id
@@ -294,8 +309,11 @@ if __name__ == "__main__":
 
     try:
         if args.reset:
-            from rag.embeddings import get_vector_store
-            get_vector_store().delete_collection()
+            if os.getenv("RETRIEVER_BACKEND", "pgvector").lower() == "lancedb":
+                get_retriever().reset()
+            else:
+                from rag.embeddings import get_vector_store
+                get_vector_store().delete_collection()
             print("Collection deleted. Re-run --ingest to rebuild it.")
         elif args.ingest:
             ingest(source=args.source, use_cache=not args.no_cache)

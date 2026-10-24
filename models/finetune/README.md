@@ -37,7 +37,7 @@ LLM_PROVIDER=claude-code make finetune-label
 
 Output goes to `data/finetune/` (gitignored):
 
-- `gold.jsonl`: gold label for all 1,250 calls, with the split each belongs to.
+- `gold.jsonl`: gold label for all 1,250 baseline calls, with the split each belongs to. The calls the generator adds for its dated events are left out, using its `ground_truth/events.json`, so a model trained on this corpus never sees the planted drivers.
 - `splits.json`: `call_id`s per split.
 - `teacher_labels.jsonl`: one validated teacher label per `call_id`. Rerunning `label` skips
   finished calls and drops stale or duplicate rows.

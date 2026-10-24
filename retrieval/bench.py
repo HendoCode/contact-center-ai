@@ -1,7 +1,7 @@
 """
 R3 retrieval benchmark: every labeled query through every backend and search mode.
 
-    make bench                                   # both backends, all modes, 1,250 calls
+    make bench                                   # both backends, all modes, 1,540 calls
     make bench ARGS="--backends lancedb"         # no Postgres needed
     make bench ARGS="--scale 80"                 # synthetic scale-up to 100,000 rows
 

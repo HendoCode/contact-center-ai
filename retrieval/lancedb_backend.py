@@ -10,7 +10,7 @@ Storage
 -------
 One table (`COLLECTION_NAME`, default `call_transcripts`) with columns `call_id`,
 `text`, `vector` (fixed-size float32, from the shared `get_embeddings()`), the filterable
-fields `category`, `outcome` and `date`, and `metadata` (the full metadata dict as JSON).
+fields `category`, `outcome`, `date` and `home_branch`, and `metadata` (the full metadata dict as JSON).
 Ingest is `merge_insert` on `call_id` (update when matched, insert otherwise), so
 re-running it never duplicates rows.
 
@@ -20,7 +20,7 @@ Indexes
   refreshed with `optimize()` after later ones so new rows are indexed, not scanned.
 * `call_id`: BTree scalar index, which keeps the merge and `get_by_id` lookups fast.
 * `vector`: **none below `VECTOR_INDEX_MIN_ROWS` (100,000 rows)**. The synthetic corpus is
-  ~1,250 documents. A brute-force (flat) scan over that many vectors is exact and takes
+  ~1,540 documents. A brute-force (flat) scan over that many vectors is exact and takes
   milliseconds, while IVF-PQ has to train k-means centroids and a PQ codebook from the
   data (PQ training needs at least 256 rows), costs recall to quantization, and only wins
   once a scan over every vector is the bottleneck. At or above the threshold, ingest builds
@@ -151,10 +151,16 @@ class LanceDBRetriever:
                 pa.field("category", pa.string()),
                 pa.field("outcome", pa.string()),
                 pa.field("date", pa.string()),
+                pa.field("home_branch", pa.string()),
                 pa.field("metadata", pa.string()),
                 pa.field("vector", pa.list_(pa.float32(), dim)),
             ]
         )
+
+    def reset(self) -> None:
+        """Drop the table (a later ingest recreates it, with the current columns)."""
+        if self._table() is not None:
+            self.db.drop_table(self.table_name)
 
     # ── ingest ────────────────────────────────────────────────────────────────
 
@@ -178,6 +184,7 @@ class LanceDBRetriever:
                     "category": meta.get("category"),
                     "outcome": meta.get("outcome"),
                     "date": meta.get("date"),
+                    "home_branch": meta.get("home_branch"),
                     "metadata": json.dumps(meta, default=str),
                     "vector": vector,
                 }
@@ -188,6 +195,11 @@ class LanceDBRetriever:
         if table is None:
             table = self.db.create_table(self.table_name, data=data, schema=self._schema(dim))
         else:
+            if "home_branch" not in table.schema.names:
+                raise ValueError(
+                    f"Table {self.table_name!r} at {self.uri!r} predates the home_branch column. "
+                    "Rebuild it: python -m rag.pipeline --reset, then --ingest."
+                )
             existing = table.schema.field("vector").type.list_size
             if existing != dim:
                 raise ValueError(

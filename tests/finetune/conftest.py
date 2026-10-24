@@ -13,7 +13,8 @@ import pytest
 from models.finetune import data_gen
 from models.finetune.gold import DEFAULT_DATA_DIR, REPO_ROOT
 
-NEEDED = ["transcripts", "interactions", "interaction_accounts", "accounts", "products"]
+NEEDED = ["transcripts", "interactions", "interaction_accounts", "accounts", "products",
+          "ground_truth/events"]
 
 
 @pytest.fixture(scope="session")

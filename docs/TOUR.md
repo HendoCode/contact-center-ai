@@ -20,7 +20,7 @@ Contents: [What this is](#what-this-is) · [Setup](#setup-once) · [A. Run now](
 ## What this is
 
 One contact-center analytics system for a fictional credit union, on seed-42 synthetic data
-(1,250 calls, 943 CSAT responses, an OLTP ledger of 25,000 transactions). The same data feeds
+(1,540 calls, 1,147 CSAT responses, an OLTP ledger of 25,078 transactions). The same data feeds
 four layers, and each layer has a swap point set by configuration:
 
 ```
@@ -63,9 +63,9 @@ no keys). The output shown is trimmed real output.
 make seed            # = uv run python data/synthetic/generate_data.py
 ```
 ```
-interactions: 1250, interaction_accounts: 1383
-transcripts: 1250, csat: 943
-transactions: 25000
+interactions: 1540, interaction_accounts: 1718
+transcripts: 1540, csat: 1147
+transactions: 25078
 ```
 
 **A2. The CI gates.**
@@ -213,7 +213,7 @@ Makefile, `docker-compose.yml` and each module's argparse.
 **B1. The whole stack in one command.**
 
 ```bash
-make demo        # chat + embeddings on Ollama; first run pulls ~2 GB and embeds 1,250 calls on CPU
+make demo        # chat + embeddings on Ollama; first run pulls ~2 GB and embeds 1,540 calls on CPU
 make down        # stops every profile
 ```
 
@@ -262,7 +262,7 @@ embedded (no server); with Ollama running it needs no Postgres.
 
 ```bash
 RETRIEVER_BACKEND=lancedb uv run --group lance python -m rag.pipeline --ingest   # writes data/lance/
-RETRIEVER_BACKEND=lancedb uv run --group lance python -m rag.pipeline --ingest   # again: "1250 documents upserted (1250 total, lancedb)"
+RETRIEVER_BACKEND=lancedb uv run --group lance python -m rag.pipeline --ingest   # again: "1540 documents upserted (1540 total, lancedb)"
 RETRIEVER_BACKEND=lancedb uv run --group lance python -c "
 from retrieval import get_retriever
 r = get_retriever()
@@ -510,7 +510,7 @@ Azure backend, under its own state key. Cross-cloud traffic is the few MB of loa
   fused with RRF (K=60), which needs no score calibration between cosine and BM25.
 - **Filters are prefilters**, so a selective `where` still returns k hits.
 - **Index policy is a decision, not a default:** no vector index below 100,000 rows (a flat scan
-  over 1,250 vectors is exact and fast; IVF-PQ needs training data and costs recall). `make bench
+  over 1,540 vectors is exact and fast; IVF-PQ needs training data and costs recall). `make bench
   ARGS="--scale 80"` is where the index path gets measured.
 - **Idempotent ingest:** `merge_insert` on `call_id`.
 - **R3 bench:** 40 labeled queries in four types (topical, filter, exact, paraphrase) with relevance

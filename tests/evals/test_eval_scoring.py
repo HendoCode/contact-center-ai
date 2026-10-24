@@ -19,7 +19,7 @@ LOOKUP_REF = {
     **METRIC_REF, "route": "summarize_call", "metric_names": [], "expect_sql": False,
     "call_id": "CALL-00042", "expect_citations": True,
 }
-MISSING_REF = {**LOOKUP_REF, "call_id": "CALL-01251", "expect_citations": False}
+MISSING_REF = {**LOOKUP_REF, "call_id": "CALL-99999", "expect_citations": False}
 OPEN_REF = {**LOOKUP_REF, "route": "retrieve", "call_id": None}
 
 SQL = "SELECT 1"
@@ -76,9 +76,9 @@ def test_citations_present_and_real():
 
 def test_citations_for_a_call_that_does_not_exist():
     empty = {"route": "summarize_call", "citations": [],
-             "answer": "No transcript found for call ID: CALL-01251"}
+             "answer": "No transcript found for call ID: CALL-99999"}
     assert score(ev.citations, empty, MISSING_REF) is True
-    assert score(ev.citations, {**empty, "citations": ["CALL-01251"]}, MISSING_REF) is False
+    assert score(ev.citations, {**empty, "citations": ["CALL-99999"]}, MISSING_REF) is False
 
 
 def test_call_id():
@@ -86,7 +86,7 @@ def test_call_id():
     assert score(ev.call_id, hit, LOOKUP_REF) is True
     assert score(ev.call_id, {**hit, "citations": ["CALL-00001"]}, LOOKUP_REF) is False
     missing = {"route": "summarize_call", "citations": [],
-               "answer": "No transcript found for call ID: CALL-01251"}
+               "answer": "No transcript found for call ID: CALL-99999"}
     assert score(ev.call_id, missing, MISSING_REF) is True
     assert score(ev.call_id, {**missing, "answer": "nothing"}, MISSING_REF) is False
     assert score(ev.call_id, GOOD_METRIC, METRIC_REF) is None

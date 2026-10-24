@@ -4,17 +4,26 @@ Synthetic data generator for contact-center-ai portfolio project.
 Generates realistic (but entirely fake) call-center and OLTP data for
 "Meridian Valley Credit Union" (MVCU), the fictional CU:
 
-  * The two legacy RAG/MCP outputs, BYTE-COMPATIBLE with the originals:
-      - data/synthetic/transcripts.json   (now 1,250 calls, same key shape)
-      - data/synthetic/csat.json          (now ~940 surveys, same key shape)
+  * The two RAG/MCP outputs, with the same key shape as ever:
+      - data/synthetic/transcripts.json   (1,250 baseline calls plus event calls)
+      - data/synthetic/csat.json          (surveys for ~75% of those calls)
   * The OLTP foundation JSON files (one per table) loaded by olap/seed.py:
       households, members, teams, staff, products, accounts (+6 LOB child
       table files), account_owners, product_rates, rate_locks,
       interaction_categories, interactions, interaction_accounts, transactions.
+  * branches.json and change_log.json (names and dates only), which the services may read.
+  * ground_truth/events.json, the answer key for the planted events. Only evaluators read it.
+
+Dated events (events.yml): each event adds calls on top of the baseline for a few weeks,
+with a driver mix and a CSAT shift, so "why did this number move?" has a known answer. Event
+calls come from their own seeded streams; the baseline stream is untouched, so a run with
+no events reproduces the baseline calls exactly. All ids are then renumbered in time order,
+so no id marks an event.
 
 Determinism: a single seeded RNG (random.seed(42)) plus Faker.seed(42), used in
 a strictly fixed order, so TWO RUNS ARE BIT-IDENTICAL. Members are persistent
-identities (the old generator re-rolled them every call).
+identities (the old generator re-rolled them every call). Event calls and dialogue wording
+use two more seeded streams, and branch assignment hashes the member id with SHA-256.
 
 The transcripts are *numerically bound to accounts*: dialogue templates splice
 the caller's real note_rate / ledger_balance / purchase_apr / apy / etc. so the
@@ -23,22 +32,34 @@ number from different engines.
 
 Usage:
     python data/synthetic/generate_data.py
+    python data/synthetic/generate_data.py --output-dir DIR --events events.yml
 """
 
+import argparse
+import hashlib
 import json
 import random
+import sys
 import uuid
-from datetime import datetime, timedelta
+from datetime import date, datetime, time, timedelta
+from fractions import Fraction
 from pathlib import Path
 
+import yaml
 from faker import Faker
+
+# dialogue_templates.py sits next to this script; put its folder on the path so the
+# import also works when other tools load this file by path.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from dialogue_templates import CATEGORY_DIALOGUES, N_VARIANTS, compose_event_turns  # noqa: E402
 
 # ── Seeds / determinism anchors ───────────────────────────────────────────────
 
-random.seed(42)
+SEED = 42
+random.seed(SEED)
 faker = Faker()
-Faker.seed(42)
-faker.seed_instance(42)
+Faker.seed(SEED)
+faker.seed_instance(SEED)
 
 # Fixed "today" so two runs are bit-identical regardless of when they run.
 # The old generator used datetime.now(), which broke cross-run determinism.
@@ -245,6 +266,7 @@ def _member(m, member_type, household, credit, business_id):
         "business_id": business_id,
         "naics_code": None,
         "employee_count": None,
+        "home_branch": assign_home_branch(m),
     }
     if household is not None:
         row["household_id"] = households[household - 1]["household_id"]
@@ -740,8 +762,7 @@ def _splice_lob_agnostic(facts, subject):
         facts["payment_amount"] = money(c["monthly_premium"])
 
 
-def build_turns(category, facts):
-    template = CATEGORY_DIALOGUES[category]
+def build_turns(template, facts):
     turns = []
     for speaker, text in template:
         if "{" in text:
@@ -750,245 +771,193 @@ def build_turns(category, facts):
     return turns
 
 
-# Dialogue templates. Placeholders are spliced with real account figures.
-CATEGORY_DIALOGUES = {
-    "account_balance": [
-        ("member", "Hi, I'd like to check my account balance."),
-        ("agent", "Of course. Can you verify your member number for me?"),
-        ("member", "Sure, it's {member_id}."),
-        ("agent", "Thanks, {member_name}. Your account ending in {account_last4} shows a {balance_kind} of {balance}."),
-        ("member", "Is that the same number I'd see in online banking?"),
-        ("agent", "It should be — your {secondary_kind} today is {secondary_balance}."),
-    ],
-    "online_banking_support": [
-        ("member", "I can't sign in to online banking. It keeps saying my password is wrong."),
-        ("agent", "I can help reset that. Can you verify your member number and the last four of the account you're signing into?"),
-        ("member", "Sure. {member_id}, and the account ends in {account_last4}."),
-        ("agent", "Thank you, {member_name}. I've sent a secure password reset link to the email on file."),
-        ("member", "Got it. Will that take effect immediately?"),
-        ("agent", "Yes, within a minute or two. You'll then see your balance of {ledger_balance} on the dashboard."),
-    ],
-    "card_services": [
-        ("member", "I have a question about my credit card."),
-        ("agent", "I'd be happy to help. I've verified {member_id}. Which card are we looking at?"),
-        ("member", "The one ending in {account_last4}."),
-        ("agent", "Got it — that's your Visa with a {credit_limit} limit, {outstanding_balance} outstanding, and a purchase APR of {purchase_apr}."),
-        ("member", "And what's my available credit?"),
-        ("agent", "You have {available_credit} available right now."),
-    ],
-    "fraud_dispute": [
-        ("member", "I see a charge I don't recognize on my account. It's from an online retailer."),
-        ("agent", "I understand — let me look at that. On the account ending in {account_last4}, your {balance_kind} is {balance}."),
-        ("member", "I definitely didn't make that purchase."),
-        ("agent", "I've opened a dispute and issued a provisional credit, so your balance won't be affected while we investigate."),
-        ("member", "How long until the full resolution?"),
-        ("agent", "Typically 10 business days."),
-    ],
-    "payment_assistance": [
-        ("member", "I'm having trouble making a payment this month."),
-        ("agent", "I'm sorry to hear that. For the account ending in {account_last4}, your {payment_label} is {payment_amount}."),
-        ("member", "Right now that's more than I can manage."),
-        ("agent", "We have a hardship program that may defer this month's payment to the end of the term. Would you like me to submit that request?"),
-        ("member", "Yes, please."),
-        ("agent", "Done. You'll get a confirmation by email shortly."),
-    ],
-    "rate_inquiry": [
-        ("member", "I'd like to know what interest rate I'm currently paying."),
-        ("agent", "Happy to help. Let me pull up the account ending in {account_last4}."),
-        ("member", "What does it show?"),
-        ("agent", "For that account, your {rate_label} is {rate}."),
-        ("member", "Is that fixed, or can it change?"),
-        ("agent", "That depends on the product. For reference, your current {balance_kind} is {balance}."),
-    ],
-    "loan_inquiry": [
-        ("member", "I'd like to ask about your current loan rates."),
-        ("agent", "Of course. Our posted rates vary by product — can I ask what you're looking to finance?"),
-        ("member", "Something comparable to my account ending in {account_last4}."),
-        ("agent", "Understood. For a comparable product today, the {rate_label} would be {rate}, and your existing {balance_kind} is {balance}."),
-        ("member", "Thanks, that's helpful."),
-        ("agent", "Would you like me to start a pre-qualification?"),
-    ],
-    "mortgage_inquiry": [
-        ("member", "I'd like to check on my mortgage."),
-        ("agent", "Sure — the mortgage ending in {account_last4} has a note rate of {note_rate} and a current principal of {current_principal}."),
-        ("member", "What's my loan-to-value now? I saw LTV mentioned on my statement."),
-        ("agent", "Your LTV at origination was {ltv}. Your escrow balance is {escrow_balance}."),
-        ("member", "Great, that matches what I expected."),
-        ("agent", "Is there anything else about the mortgage I can look into?"),
-    ],
-    "insurance_service": [
-        ("member", "I'd like to review my auto insurance policy."),
-        ("agent", "Of course. Your policy shows an annual premium of {annual_premium}, which is {monthly_premium} a month, with a {deductible} deductible."),
-        ("member", "Can you walk through the coverage?"),
-        ("agent", "Happy to. Your current coverage includes the liability and collision components you selected."),
-        ("member", "And what would full coverage add?"),
-        ("agent", "Great question — I can quote that for your vehicle right now if you'd like."),
-    ],
-    "investment_review": [
-        ("member", "I'd like to review my investment account."),
-        ("agent", "Let's take a look. Your market value is {market_value}, with {cash_value} in settled cash."),
-        ("member", "How has it performed this year?"),
-        ("agent", "Your year-to-date return is {ytd_return}. Your cost basis sits at roughly {market_value} versus what you contributed."),
-        ("member", "That's good to know. I appreciate the review."),
-        ("agent", "My pleasure — as a long-time member, your lifetime value to the credit union is important to us, and we're glad to keep the advice coming."),
-    ],
-    "account_opening": [
-        ("member", "I'd like to open a new account."),
-        ("agent", "Wonderful! I've verified {member_id}. Were you thinking checking or savings?"),
-        ("member", "A savings account, please."),
-        ("agent", "Great choice. Our high-yield savings earns {new_account_apy} right now."),
-        ("member", "That's a good rate. Let's open it."),
-        ("agent", "I'll get that started — you'll receive the account details in a few minutes."),
-    ],
-    "fee_dispute": [
-        ("member", "I see a fee on my account I wasn't expecting."),
-        ("agent", "Let me look. On the account ending in {account_last4}, I see a monthly fee of {monthly_fee}."),
-        ("member", "I thought that was waived."),
-        ("agent", "It is waived when you keep a minimum balance of {waiver_min_balance}. I can refund this month's fee as a courtesy."),
-        ("member", "That would be great, thank you."),
-        ("agent", "Done. I've refunded it and noted your account."),
-    ],
-    "escrow_analysis": [
-        ("member", "I got a notice about my escrow account."),
-        ("agent", "Let me pull up your escrow analysis. Your escrow balance is {escrow_balance}, and your escrow payment is included in the {monthly_pi} monthly payment."),
-        ("member", "Is there a shortage?"),
-        ("agent", "It looks like your property taxes changed slightly, so there's a small adjustment. Not much, but worth reviewing."),
-    ],
-    "rate_lock_status": [
-        ("member", "I want to check on my rate lock."),
-        ("agent", "No problem. I can see an active lock on your application with a rate of {locked_rate}."),
-        ("member", "When does it expire?"),
-        ("agent", "It's locked through {expires_at}, so you're covered while we finish underwriting."),
-        ("member", "What was the loan amount again?"),
-        ("agent", "The application is for {loan_amount}."),
-    ],
+# Dialogue templates (CATEGORY_DIALOGUES, three variants per category, and the event
+# dialogue) live in dialogue_templates.py so other tools can import them without
+# running the generator.
+
+
+# ── events: config, fee schedule, branches ────────────────────────────────────
+
+CONFIG = {"branches": {}, "events": []}
+FEE_CHANGE_EVENT = "fee_schedule_change"
+
+OVERDRAFT_FEE_OLD = 29.0
+OVERDRAFT_FEE_NEW = 35.0
+NSF_FEE = 29.0
+ATM_FEE = 3.0
+MAINTENANCE_FEE_FLOOR = 5.0
+FEE_NAMES = {
+    "overdraft": "overdraft fee",
+    "nsf": "returned item (NSF) fee",
+    "monthly_maintenance": "monthly account maintenance fee",
+    "atm": "out-of-network ATM fee",
+}
+# Share of banking fee lines per fee type, by hash of the line (no random draw).
+BANKING_FEE_MIX = [("overdraft", 40), ("monthly_maintenance", 35), ("nsf", 15), ("atm", 10)]
+
+
+def load_config(path):
+    """Read events.yml. A missing file or an empty `events` list means a baseline-only run."""
+    path = Path(path)
+    cfg = yaml.safe_load(path.read_text())
+    cfg["events_yml_sha256"] = hashlib.sha256(path.read_bytes()).hexdigest()
+    cfg.setdefault("events", [])
+    return cfg
+
+
+def _sha_unit(text):
+    """A number in [0, 1) from SHA-256 of `text`; stable across processes, unlike hash()."""
+    return int.from_bytes(hashlib.sha256(text.encode()).digest()[:8], "big") / 2**64
+
+
+def assign_home_branch(member_id):
+    """Branch by SHA-256(member_id) against the configured shares."""
+    u = _sha_unit(str(member_id))
+    cum = 0.0
+    names = list(CONFIG["branches"])
+    for name in names:
+        cum += CONFIG["branches"][name]
+        if u < cum:
+            return name
+    return names[-1]
+
+
+def fee_change_date():
+    for ev in CONFIG["events"]:
+        if ev["id"] == FEE_CHANGE_EVENT:
+            return ev["date"]
+    return None
+
+
+def overdraft_price(on_date):
+    change = fee_change_date()
+    return OVERDRAFT_FEE_NEW if change is not None and on_date >= change else OVERDRAFT_FEE_OLD
+
+
+def largest_remainder(shares, total):
+    """Integer counts that sum to `total`, proportional to `shares` (ties go to earlier keys)."""
+    exact = {k: Fraction(str(v)) * total for k, v in shares.items()}
+    counts = {k: int(v) for k, v in exact.items()}
+    left = total - sum(counts.values())
+    order = sorted(exact, key=lambda k: (-(exact[k] - counts[k]), list(exact).index(k)))
+    for k in order[:left]:
+        counts[k] += 1
+    return counts
+
+
+# ── calls ─────────────────────────────────────────────────────────────────────
+
+COMMENTS_BY_SCORE = {
+    1: ["Very frustrated with the outcome.", "Problem was not resolved.",
+        "Had to call back multiple times."],
+    2: ["Not satisfied with the help I received.", "Took too long.",
+        "Agent seemed unsure of the answer."],
+    3: ["Okay experience, nothing special.", "Issue was partially resolved.",
+        "Average service."],
+    4: ["Good experience overall.", "Agent was helpful and professional.",
+        "Minor wait time but resolved quickly."],
+    5: ["Excellent service!", "Agent went above and beyond.",
+        "Very satisfied — quick and easy."],
 }
 
 
-def generate_interactions(member_accounts):
-    """Returns (interactions, transcripts, interaction_accounts, csat)."""
-    interactions = []
-    transcripts = []
-    ia_rows = []
-    csat = []
+def is_checking(account_id):
+    acct = accounts[account_id]
+    return acct["lob"] == "banking" and acct["child"]["sub_type"] == "checking"
 
-    members_by_type = {
-        "individual": list(range(1, N_INDIVIDUALS + 1)),
-        "business": list(range(N_INDIVIDUALS + 1, N_INDIVIDUALS + N_BUSINESSES + 1)),
+
+def candidate_members(category, member_accounts, branch=None, need_checking=False):
+    """Members who could plausibly place a call in `category` (ascending member id)."""
+    lobs = CATEGORY_LOBS[category]
+    if lobs:
+        pool = [m for m in range(1, N_MEMBERS + 1)
+                if any(accounts[a]["lob"] in lobs for a in member_accounts[m])]
+    else:
+        pool = list(range(1, N_INDIVIDUALS + 1))
+    if branch is not None:
+        pool = [m for m in pool if members[m - 1]["home_branch"] == branch]
+    if need_checking:
+        pool = [m for m in pool if any(is_checking(a) for a in member_accounts[m])]
+    return pool
+
+
+def draw_call(rng, category, member_accounts, *, branch=None, need_checking=False, window=None):
+    """Draw one call. With no restrictions the draw order is the original generator's, so the
+    baseline stream (the global `random` module) is unchanged by this refactor.
+
+    `window` is (first_day, last_day_exclusive) for event calls; baseline timing is the
+    six months back from REFERENCE_DATE. Weekend dates roll back to Friday either way.
+    """
+    lobs = CATEGORY_LOBS[category]
+    member_id = rng.choice(candidate_members(category, member_accounts, branch, need_checking))
+    member = members[member_id - 1]
+    caller_type = "business" if member["member_type"] == "business" else "member"
+
+    member_acct_ids = member_accounts[member_id]
+    eligible = ([a for a in member_acct_ids if accounts[a]["lob"] in lobs]
+                if lobs else member_acct_ids)
+    if need_checking:
+        eligible = [a for a in eligible if is_checking(a)]
+    if category == "rate_inquiry":
+        # rate_inquiry should land on a *meaningful* rate: skip 0% checking
+        # accounts so a mortgage note_rate / card APR / deposit APY shows up.
+        rate_eligible = [a for a in eligible
+                         if accounts[a]["lob"] != "banking"
+                         or accounts[a]["child"].get("apy", 0) > 0]
+        if rate_eligible:
+            eligible = rate_eligible
+    if not lobs:  # account_opening: brand-new account, no existing subject
+        subject_id = None
+        ref_ids = []
+    else:
+        subject_id = rng.choice(eligible) if eligible else None
+        ref_ids = []
+        if subject_id is not None and len(member_acct_ids) > 1 \
+                and rng.random() < INTERACTION_MULTI_RATIO:
+            second = [a for a in member_acct_ids if a != subject_id]
+            if second:
+                ref_ids = [rng.choice(second)]
+
+    if window is None:
+        day = REFERENCE_DATE - timedelta(days=rng.randint(0, 182))
+    else:
+        first, last = window
+        day = datetime.combine(first, REFERENCE_DATE.time()) + timedelta(
+            days=rng.randint(0, (last - first).days - 1))
+    while day.weekday() >= 5:
+        day -= timedelta(days=1)
+    started = day.replace(hour=rng.randint(8, 18), minute=rng.randint(0, 59),
+                          second=rng.randint(0, 59), microsecond=0)
+    duration = rng.randint(120, 900)
+    outcome = rng.choices(OUTCOMES, weights=[55, 15, 12, 10, 8])[0]
+    staff_id = rng.randint(1, N_STAFF)
+    channel = rng.choices(CHANNELS, weights=[82, 10, 5, 3])[0]
+    direction = rng.choices(DIRECTIONS, weights=[80, 12, 8])[0]
+    return {
+        "member_id": member_id, "caller_type": caller_type, "category": category,
+        "subject_id": subject_id, "ref_ids": ref_ids, "started": started,
+        "duration": duration, "outcome": outcome, "staff_id": staff_id,
+        "channel": channel, "direction": direction,
     }
 
-    for i in range(1, N_INTERACTIONS + 1):
-        category = random.choices(CATEGORIES, weights=CATEGORY_W)[0]
 
-        # choose a member who actually holds an account in this category's LOB
-        lobs = CATEGORY_LOBS[category]
-        if lobs:
-            candidate = [m for m in range(1, N_MEMBERS + 1)
-                         if any(accounts[a]["lob"] in lobs
-                                for a in member_accounts[m])]
-        else:
-            candidate = list(range(1, N_INDIVIDUALS + 1))
-        member_id = random.choice(candidate)
-        member = members[member_id - 1]
-        caller_type = ("business" if member["member_type"] == "business"
-                       else "member")
-
-        # subject account (and, for 20% of calls, a referenced second account)
-        member_acct_ids = member_accounts[member_id]
-        eligible = [a for a in member_acct_ids
-                    if accounts[a]["lob"] in lobs] if lobs else member_acct_ids
-        if category == "rate_inquiry":
-            # rate_inquiry should land on a *meaningful* rate: skip 0% checking
-            # accounts so a mortgage note_rate / card APR / deposit APY shows up.
-            rate_eligible = [a for a in eligible
-                             if accounts[a]["lob"] != "banking"
-                             or accounts[a]["child"].get("apy", 0) > 0]
-            if rate_eligible:
-                eligible = rate_eligible
-        if not lobs:  # account_opening: brand-new account, no existing subject
-            subject_id = None
-            ref_ids = []
-        else:
-            subject_id = random.choice(eligible) if eligible else None
-            ref_ids = []
-            if subject_id is not None and len(member_acct_ids) > 1 \
-                    and random.random() < INTERACTION_MULTI_RATIO:
-                second = [a for a in member_acct_ids if a != subject_id]
-                if second:
-                    ref_ids = [random.choice(second)]
-
-        # timing: 6 months back, weekday-weighted, business hours
-        day = REFERENCE_DATE - timedelta(days=random.randint(0, 182))
-        while day.weekday() >= 5:
-            day -= timedelta(days=1)
-        started = day.replace(hour=random.randint(8, 18), minute=random.randint(0, 59),
-                              second=random.randint(0, 59), microsecond=0)
-        duration = random.randint(120, 900)
-        outcome = random.choices(OUTCOMES, weights=[55, 15, 12, 10, 8])[0]
-        fcr = outcome == "resolved"
-        staff_id = random.randint(1, N_STAFF)
-
-        interactions.append({
-            "interaction_id": i,
-            "call_id": call_str(i),
-            "member_id": member_id,
-            "staff_id": staff_id,
-            "category_code": category,
-            "started_at": started.isoformat(),
-            "ended_at": (started + timedelta(seconds=duration)).isoformat(),
-            "duration_seconds": duration,
-            "channel": random.choices(CHANNELS, weights=[82, 10, 5, 3])[0],
-            "direction": random.choices(DIRECTIONS, weights=[80, 12, 8])[0],
-            "caller_type": caller_type,
-            "outcome": outcome,
-            "first_contact_resolved": fcr,
-        })
-
-        # interaction_account junction
-        if subject_id is not None:
-            ia_rows.append({"interaction_id": i, "account_id": subject_id,
-                            "account_role": "subject"})
-        for rid in ref_ids:
-            ia_rows.append({"interaction_id": i, "account_id": rid,
-                            "account_role": "referenced"})
-
-        # transcript (numerically bound to the account rows)
-        subject = accounts[subject_id] if subject_id is not None else None
-        refs = [accounts[r] for r in ref_ids]
-        facts = make_facts(member, subject, refs)
-        # everything the template placeholders need is present in `facts`
-        turns = build_turns(category, facts)
-        full_text = " ".join(f"{t['speaker'].upper()}: {t['text']}" for t in turns)
-        transcripts.append({
-            "call_id": call_str(i),
-            "date": started.isoformat(),
-            "duration_seconds": duration,
-            "category": category,
-            "outcome": outcome,
-            "member_id": mbr_str(member_id),
-            "member_name": member["legal_name"],
-            "agent_id": agt_str(staff_id),
-            "transcript": turns,
-            "full_text": full_text,
-        })
-
-        # csat (~75%)
-        if random.random() < CSAT_RESPONSE_RATE:
-            csat.append(generate_csat(
-                call_str(i), mbr_str(member_id), outcome, category, started))
-
-    return interactions, transcripts, ia_rows, csat
+def draw_survey(rng, call):
+    """~75% of calls get a CSAT survey; returns the row or None (same draws as before)."""
+    if rng.random() < CSAT_RESPONSE_RATE:
+        return generate_csat(rng, call_str(0), mbr_str(call["member_id"]),
+                             call["outcome"], call["category"], call["started"])
+    return None
 
 
-def generate_csat(call_id, member_id, outcome, category, started_at):
+def generate_csat(rng, call_id, member_id, outcome, category, started_at):
     if outcome == "resolved":
-        score = random.choices([4, 5], weights=[30, 70])[0]
+        score = rng.choices([4, 5], weights=[30, 70])[0]
     elif outcome == "escalated":
-        score = random.choices([2, 3, 4], weights=[20, 50, 30])[0]
+        score = rng.choices([2, 3, 4], weights=[20, 50, 30])[0]
     elif outcome == "unresolved":
-        score = random.choices([1, 2, 3], weights=[40, 40, 20])[0]
+        score = rng.choices([1, 2, 3], weights=[40, 40, 20])[0]
     else:
-        score = random.choices([3, 4, 5], weights=[30, 40, 30])[0]
+        score = rng.choices([3, 4, 5], weights=[30, 40, 30])[0]
 
     # category coupling: escrow_analysis skews negative, investment_review positive
     if category == "escrow_analysis":
@@ -996,28 +965,265 @@ def generate_csat(call_id, member_id, outcome, category, started_at):
     elif category == "investment_review":
         score = min(5, score + 1)
 
-    comments_by_score = {
-        1: ["Very frustrated with the outcome.", "Problem was not resolved.",
-            "Had to call back multiple times."],
-        2: ["Not satisfied with the help I received.", "Took too long.",
-            "Agent seemed unsure of the answer."],
-        3: ["Okay experience, nothing special.", "Issue was partially resolved.",
-            "Average service."],
-        4: ["Good experience overall.", "Agent was helpful and professional.",
-            "Minor wait time but resolved quickly."],
-        5: ["Excellent service!", "Agent went above and beyond.",
-            "Very satisfied — quick and easy."],
-    }
-
     return {
         "call_id": call_id,
         "member_id": member_id,
         "category": category,
         "score": score,
-        "comment": random.choice(comments_by_score[score]),
-        "survey_date": (started_at + timedelta(days=random.randint(0, 3))) \
-            .replace(hour=0, minute=0, second=0, microsecond=0).isoformat(),
+        "comment": rng.choice(COMMENTS_BY_SCORE[score]),
+        "survey_date": (started_at + timedelta(days=rng.randint(0, 3)))
+        .replace(hour=0, minute=0, second=0, microsecond=0).isoformat(),
     }
+
+
+def call_facts(call, extra=None):
+    member = members[call["member_id"] - 1]
+    subject = accounts[call["subject_id"]] if call["subject_id"] is not None else None
+    refs = [accounts[r] for r in call["ref_ids"]]
+    facts = make_facts(member, subject, refs)
+    if extra:
+        facts.update(extra)
+    return facts
+
+
+def baseline_calls(member_accounts, dialogue_rng):
+    """The original 1,250 calls, drawn from the global stream in the original order."""
+    calls = []
+    for _ in range(N_INTERACTIONS):
+        category = random.choices(CATEGORIES, weights=CATEGORY_W)[0]
+        call = draw_call(random, category, member_accounts)
+        call["csat"] = draw_survey(random, call)
+        variant = dialogue_rng.randrange(N_VARIANTS)
+        call["turns"] = build_turns(CATEGORY_DIALOGUES[category][variant], call_facts(call))
+        call["label"] = None
+        calls.append(call)
+    return calls
+
+
+# ── events: plan, draw, shift ─────────────────────────────────────────────────
+
+DATA_START = (REFERENCE_DATE - timedelta(days=182)).date()
+DATA_END = (REFERENCE_DATE + timedelta(days=1)).date()    # exclusive
+TOTAL_WEEKS = (DATA_END - DATA_START).days / 7
+
+
+def event_phases(ev):
+    """Phase windows [start, end) with weeks resolved; the last may run to the end of the data."""
+    out, start = [], ev["date"]
+    for idx, ph in enumerate(ev["phases"]):
+        end = DATA_END if ph["weeks"] == "end" else min(start + timedelta(weeks=ph["weeks"]),
+                                                       DATA_END)
+        out.append({"index": idx, "start": start, "end": end, "spec": ph})
+        start = end
+    return out
+
+
+def event_branch(ev):
+    return (ev.get("population") or {}).get("home_branch")
+
+
+def plan_labels(ev, baseline, ev_rng):
+    """Planned calls for one event: exact driver, pattern and fee-type quotas, then shuffled."""
+    branch = event_branch(ev)
+    phases = event_phases(ev)
+    plan = []
+    for ph in phases:
+        weeks = (ph["end"] - ph["start"]).days / 7
+        spec_labels, planned = [], {}
+        for category, mult in ph["spec"]["volume"].items():
+            in_scope = [c for c in baseline if c["category"] == category
+                        and (branch is None or members[c["member_id"] - 1]["home_branch"] == branch)]
+            rate = len(in_scope) / TOTAL_WEEKS
+            n = round((mult - 1) * rate * weeks)
+            drivers = [d for d in ev["drivers"] if category in d["share"]]
+            counts = largest_remainder({d["id"]: d["share"][category] for d in drivers}, n)
+            planned[category] = {d["id"]: counts[d["id"]] for d in drivers}
+            for d in drivers:
+                k = counts[d["id"]]
+                fee_types = d.get("fee_type")
+                if isinstance(fee_types, dict):
+                    fee_alloc = largest_remainder(fee_types, k)
+                    fee_list = [f for f, c in fee_alloc.items() for _ in range(c)]
+                else:
+                    fee_list = [fee_types] * k
+                patterns = [None] * k
+                variants = [None] * k
+                for pat in d.get("patterns", []):
+                    var_share = {v: Fraction(str(pat["share"])) / len(pat["variants"])
+                                 for v in pat["variants"]}
+                    alloc = largest_remainder({"": 1 - sum(var_share.values()),
+                                               **{v: s for v, s in var_share.items()}}, k)
+                    seq = [v for v, c in alloc.items() for _ in range(c)]
+                    patterns = [pat["id"] if v else None for v in seq]
+                    variants = [v or None for v in seq]
+                for j in range(k):
+                    spec_labels.append({
+                        "event": ev["id"], "phase": ph["index"], "category": category,
+                        "driver": d["id"], "pattern": patterns[j], "variant": variants[j],
+                        "fee_type": fee_list[j],
+                    })
+        ev_rng.shuffle(spec_labels)
+        plan.append({"phase": ph, "labels": spec_labels, "planned": planned})
+    return plan
+
+
+OVERDRAFT_DRIVERS = {"unaware_of_change", "courtesy_refund_refused", "multiple_overdrafts_same_day"}
+
+
+def draw_event_calls(ev, plan, member_accounts, ev_rng, dialogue_rng):
+    """Draw the calls of one event (and the ledger rows its drivers promise)."""
+    branch = event_branch(ev)
+    n_patterns = sum(1 for p in plan for lab in p["labels"] if lab["pattern"])
+    pattern_staff = iter(ev_rng.sample(range(1, N_STAFF + 1), n_patterns))
+    other_branches = [b for b in CONFIG["branches"] if b != branch]
+    change_date = fee_change_date()
+    calls, ledger = [], []
+    for p in plan:
+        ph = p["phase"]
+        for label in p["labels"]:
+            need_checking = label["driver"] in OVERDRAFT_DRIVERS
+            call = draw_call(ev_rng, label["category"], member_accounts, branch=branch,
+                             need_checking=need_checking, window=(ph["start"], ph["end"]))
+            if label["pattern"]:
+                call["staff_id"] = next(pattern_staff)
+            call["csat"] = draw_survey(ev_rng, call)
+            extra = {
+                "old_fee": money(OVERDRAFT_FEE_OLD), "new_fee": money(OVERDRAFT_FEE_NEW),
+                "change_date": (f"{change_date:%B} {change_date.day}" if change_date else ""),
+                "branch_a": other_branches[0] if other_branches else "",
+                "branch_b": other_branches[-1] if other_branches else "",
+            }
+            subject = accounts[call["subject_id"]] if call["subject_id"] is not None else None
+            if label["driver"] == "multiple_overdrafts_same_day":
+                count = ev_rng.randint(2, 4)
+                call_day = call["started"].date()
+                offset = ev_rng.randint(0, max(0, (call_day - ev["date"]).days - 1))
+                fee_day = ev["date"] + timedelta(days=offset)
+                hour = 7 if fee_day == call_day else 12
+                for _ in range(count):
+                    ledger.append({
+                        "account_id": call["subject_id"],
+                        "posted_at": datetime.combine(fee_day, time(hour)).isoformat(),
+                        "amount": -overdraft_price(fee_day), "txn_type": "fee",
+                        "status": "posted", "description": "Overdraft fee",
+                        "fee_type": "overdraft",
+                    })
+                extra.update({
+                    "overdraft_count": str(count),
+                    "overdraft_total": money(count * overdraft_price(fee_day)),
+                    "overdraft_day": f"{fee_day:%B} {fee_day.day}",
+                })
+            if label["driver"] == "other_fee_question":
+                kind = label["fee_type"]
+                if kind == "monthly_maintenance":
+                    fee = subject["child"]["monthly_fee"] or MAINTENANCE_FEE_FLOOR
+                else:
+                    fee = {"nsf": NSF_FEE, "atm": ATM_FEE}[kind]
+                extra.update({"fee_name": FEE_NAMES[kind], "fee_amount": money(fee)})
+            variant = dialogue_rng.randrange(N_VARIANTS)
+            template = compose_event_turns(ev["id"], label["category"], label["driver"], variant,
+                                           misstatement=label["variant"])
+            call["turns"] = build_turns(template, call_facts(call, extra))
+            call["label"] = label
+            calls.append(call)
+    return calls, ledger
+
+
+def shift_surveys(ev, calls, ev_rng):
+    """Lower each phase's event surveys by its `csat_shift`: the integer part for every
+    response, and one more point for exactly round(fraction x responses) of them."""
+    for ph in event_phases(ev):
+        rows = [c["csat"] for c in calls if c["label"]["phase"] == ph["index"] and c["csat"]]
+        shift = Fraction(str(-ph["spec"]["csat_shift"]))
+        whole, frac = int(shift), shift - int(shift)
+        extra = set(ev_rng.sample(range(len(rows)), round(frac * len(rows))))
+        for j, row in enumerate(rows):
+            drop = whole + (1 if j in extra else 0)
+            new = max(1, min(5, row["score"] - drop))
+            row["shift_applied"] = row["score"] - new
+            if new != row["score"]:
+                row["score"] = new
+                row["comment"] = ev_rng.choice(COMMENTS_BY_SCORE[new])
+
+
+# ── merge, renumber, serialize ────────────────────────────────────────────────
+
+def renumber(calls):
+    """Order by (timestamp, sha256("member_id|category|timestamp")) and assign ids 1..N."""
+    def key(c):
+        ts = c["started"].isoformat()
+        return ts, hashlib.sha256(f"{c['member_id']}|{c['category']}|{ts}".encode()).hexdigest()
+    ordered = sorted(calls, key=key)
+    for i, call in enumerate(ordered, start=1):
+        call["interaction_id"] = i
+    return ordered
+
+
+def serialize_calls(calls):
+    """Returns (interactions, transcripts, interaction_accounts, csat)."""
+    interactions, transcripts, ia_rows, csat = [], [], [], []
+    for c in calls:
+        i = c["interaction_id"]
+        member = members[c["member_id"] - 1]
+        interactions.append({
+            "interaction_id": i,
+            "call_id": call_str(i),
+            "member_id": c["member_id"],
+            "staff_id": c["staff_id"],
+            "category_code": c["category"],
+            "started_at": c["started"].isoformat(),
+            "ended_at": (c["started"] + timedelta(seconds=c["duration"])).isoformat(),
+            "duration_seconds": c["duration"],
+            "channel": c["channel"],
+            "direction": c["direction"],
+            "caller_type": c["caller_type"],
+            "outcome": c["outcome"],
+            "first_contact_resolved": c["outcome"] == "resolved",
+        })
+        if c["subject_id"] is not None:
+            ia_rows.append({"interaction_id": i, "account_id": c["subject_id"],
+                            "account_role": "subject"})
+        for rid in c["ref_ids"]:
+            ia_rows.append({"interaction_id": i, "account_id": rid,
+                            "account_role": "referenced"})
+        full_text = " ".join(f"{t['speaker'].upper()}: {t['text']}" for t in c["turns"])
+        transcripts.append({
+            "call_id": call_str(i),
+            "date": c["started"].isoformat(),
+            "duration_seconds": c["duration"],
+            "category": c["category"],
+            "outcome": c["outcome"],
+            "member_id": mbr_str(c["member_id"]),
+            "member_name": member["legal_name"],
+            "agent_id": agt_str(c["staff_id"]),
+            "transcript": c["turns"],
+            "full_text": full_text,
+        })
+        if c["csat"]:
+            row = {k: v for k, v in c["csat"].items() if not k.startswith("shift_")}
+            row["call_id"] = call_str(i)
+            csat.append(row)
+    return interactions, transcripts, ia_rows, csat
+
+
+def generate_interactions(member_accounts):
+    """Baseline calls plus event calls. Returns (interactions, transcripts,
+    interaction_accounts, csat, ledger_rows, event_calls) with ids in time order."""
+    dialogue_rng = random.Random(f"dialogue:{SEED}")
+    ev_rng = random.Random(f"events:{SEED}")
+    baseline = baseline_calls(member_accounts, dialogue_rng)
+
+    event_calls, ledger, event_plans = [], [], {}
+    for ev in CONFIG["events"]:
+        plan = plan_labels(ev, baseline, ev_rng)
+        calls, rows = draw_event_calls(ev, plan, member_accounts, ev_rng, dialogue_rng)
+        shift_surveys(ev, calls, ev_rng)
+        event_plans[ev["id"]] = plan
+        event_calls += calls
+        ledger += rows
+
+    ordered = renumber(baseline + event_calls)
+    return (*serialize_calls(ordered), ledger, ordered, event_plans)
 
 
 # ── 10. transactions ──────────────────────────────────────────────────────────
@@ -1040,6 +1246,34 @@ TXN_TYPES = {
     "car_insurance": ["premium", "fee"],
     "investments": ["deposit", "withdrawal", "transfer", "fee", "interest"],
 }
+FEE_DESCRIPTIONS = {
+    "overdraft": "Overdraft fee",
+    "monthly_maintenance": "Monthly maintenance fee",
+    "nsf": "Returned item (NSF) fee",
+    "atm": "Out-of-network ATM fee",
+}
+
+
+def price_fee(account, tid, posted):
+    """(fee_type, amount, description) for a fee line. The caller has already drawn the
+    baseline amount and description; this replaces them with the fee schedule."""
+    if account["lob"] != "banking":
+        return "other", None, None          # keep the drawn amount; description fixed below
+    u = _sha_unit(f"fee|{account['account_id']}|{posted.isoformat()}|{tid}") * 100
+    cum = 0
+    for kind, share in BANKING_FEE_MIX:
+        cum += share
+        if u < cum:
+            break
+    if kind == "overdraft":
+        amount = overdraft_price(posted.date())
+    elif kind == "nsf":
+        amount = NSF_FEE
+    elif kind == "atm":
+        amount = ATM_FEE
+    else:
+        amount = account["child"]["monthly_fee"] or MAINTENANCE_FEE_FLOOR
+    return kind, -round(amount, 2), FEE_DESCRIPTIONS[kind]
 
 
 def generate_transactions():
@@ -1064,26 +1298,166 @@ def generate_transactions():
             else:
                 amount = -amount  # debit (-)
             posted = REFERENCE_DATE - timedelta(days=random.randint(0, 182))
-            rows.append({
+            status = random.choices(["posted", "pending", "hold"], weights=[85, 10, 5])[0]
+            description = random.choice(TX_DESC[txn_type])
+            row = {
                 "transaction_id": tid,
                 "account_id": account_id,
                 "posted_at": posted.isoformat(),
                 "amount": amount,
                 "txn_type": txn_type,
-                "status": random.choices(["posted", "pending", "hold"],
-                                         weights=[85, 10, 5])[0],
-                "description": random.choice(TX_DESC[txn_type]),
-            })
+                "status": status,
+                "description": description,
+                "fee_type": None,
+            }
+            if txn_type == "fee":
+                kind, priced, desc = price_fee(accounts[account_id], tid, posted)
+                row["fee_type"] = kind
+                if priced is not None:
+                    row["amount"], row["description"] = priced, desc
+                elif description != "Late fee":
+                    row["description"] = "Service fee"   # no banking-only fee name on other lines
+            rows.append(row)
             tid += 1
     return rows
 
 
+def renumber_transactions(rows):
+    """Reassign ids in posting order so a ledger row's id says nothing about where it came from."""
+    def key(r):
+        digest = hashlib.sha256(
+            f"{r['account_id']}|{r['txn_type']}|{r['posted_at']}|{r['amount']}".encode()).hexdigest()
+        return r["posted_at"], digest, r["account_id"]
+    ordered = sorted(rows, key=key)
+    columns = ("account_id", "posted_at", "amount", "txn_type", "status", "description", "fee_type")
+    return [{"transaction_id": i, **{c: r[c] for c in columns}}
+            for i, r in enumerate(ordered, start=1)]
+
+
+# ── ground truth ──────────────────────────────────────────────────────────────
+
+def _in_window(day, window):
+    return window["start"] <= day < window["end"]
+
+
+def default_windows(ev, window_days=42):
+    cp = ev["date"]
+    length = min(window_days, (cp - DATA_START).days, (DATA_END - cp).days)
+    return ({"start": cp - timedelta(days=length), "end": cp},
+            {"start": cp, "end": cp + timedelta(days=length)})
+
+
+def event_filters(ev):
+    return ev["default_filters"]
+
+
+def _matches(call, filters):
+    branch = members[call["member_id"] - 1]["home_branch"]
+    return (call["category"] in filters.get("category", [call["category"]])
+            and branch in filters.get("home_branch", [branch]))
+
+
+def _volume(scoped, window):
+    return sum(1 for c in scoped if _in_window(c["started"].date(), window))
+
+
+def _surveys(scoped, window):
+    """Calls in scope whose survey was taken in the window (CSAT counts by `surveyed_at`)."""
+    return [c for c in scoped if c["csat"]
+            and _in_window(date.fromisoformat(c["csat"]["survey_date"][:10]), window)]
+
+
+def _mean_score(calls):
+    return round(sum(c["csat"]["score"] for c in calls) / len(calls), 4) if calls else None
+
+
+def _call_ids(scoped, event_id, window, wanted):
+    """Ids of the event's calls in the window whose label satisfies `wanted(label)`."""
+    return sorted(call_str(c["interaction_id"]) for c in scoped
+                  if c["label"] and c["label"]["event"] == event_id and wanted(c["label"])
+                  and _in_window(c["started"].date(), window))
+
+
+def _event_truth(ev, plan, ordered):
+    """One event's entry in the answer key."""
+    before, after = default_windows(ev)
+    filters = event_filters(ev)
+    scoped = [c for c in ordered if _matches(c, filters)]
+    s_before, s_after = _surveys(scoped, before), _surveys(scoped, after)
+
+    # The planted shift on the window's mean: nominal (what events.yml asks for) and realized
+    # (what the lowered scores did after clamping to 1-5). The observed after-minus-before
+    # difference also carries baseline sampling noise, so it is not recorded here.
+    own = [c for c in s_after if c["label"] and c["label"]["event"] == ev["id"]]
+    nominal = {p["index"]: p["spec"]["csat_shift"] for p in event_phases(ev)}
+    expected = realized = None
+    if s_after:
+        expected = round(sum(nominal[c["label"]["phase"]] for c in own) / len(s_after), 4)
+        realized = round(-sum(c["csat"]["shift_applied"] for c in own) / len(s_after), 4)
+
+    drivers = [{"id": d["id"],
+                "before": _call_ids(scoped, ev["id"], before, lambda lab, d=d: lab["driver"] == d["id"]),
+                "after": _call_ids(scoped, ev["id"], after, lambda lab, d=d: lab["driver"] == d["id"])}
+               for d in ev["drivers"]]
+    patterns = [{"id": pat["id"], "driver": d["id"],
+                 "variants": {v: _call_ids(scoped, ev["id"], after, lambda lab, v=v: lab["variant"] == v)
+                              for v in pat["variants"]}}
+                for d in ev["drivers"] for pat in d.get("patterns", [])]
+    return {
+        "id": ev["id"], "split": ev["split"], "date": ev["date"].isoformat(),
+        "phases": [{"start": p["phase"]["start"].isoformat(), "end": p["phase"]["end"].isoformat(),
+                    "planned": p["planned"]} for p in plan],
+        "default_window": {
+            "filters": filters,
+            "before": {k: v.isoformat() for k, v in before.items()},
+            "after": {k: v.isoformat() for k, v in after.items()},
+            "metrics": {
+                "call_volume": {"before": _volume(scoped, before), "after": _volume(scoped, after)},
+                "csat_average_score": {"before": _mean_score(s_before), "after": _mean_score(s_after)},
+                "responses": {"before": len(s_before), "after": len(s_after)},
+                "csat_shift_expected": expected,
+                "csat_shift_realized": realized,
+            },
+            "drivers": drivers,
+            "patterns": patterns,
+        },
+    }
+
+
+def build_ground_truth(cfg, ordered, plans):
+    """The answer key: per event the planned counts, the default window with its realized
+    metrics, and the call ids behind every driver and pattern."""
+    labels = {call_str(c["interaction_id"]): c["label"] for c in ordered if c["label"]}
+    calls_map = {cid: {"event": lab["event"], "phase": lab["phase"], "driver": lab["driver"],
+                       "pattern": lab["pattern"], "variant": lab["variant"]}
+                 for cid, lab in sorted(labels.items())}
+    return {
+        "version": 1, "seed": SEED, "events_yml_sha256": cfg["events_yml_sha256"],
+        "data_range": {"start": DATA_START.isoformat(), "end": DATA_END.isoformat()},
+        "events": [_event_truth(ev, plans[ev["id"]], ordered) for ev in cfg["events"]],
+        "calls": calls_map,
+    }
+
+
 # ── main ──────────────────────────────────────────────────────────────────────
 
-def main():
-    global households, members, products, accounts
+def main(argv=None):
+    global households, members, products, accounts, CONFIG
 
-    output_dir = Path(__file__).parent
+    parser = argparse.ArgumentParser(description="Generate the seed-42 synthetic data.")
+    parser.add_argument("--output-dir", type=Path, default=Path(__file__).parent,
+                        help="where the JSON files go (default: next to this script)")
+    parser.add_argument("--events", type=Path, default=Path(__file__).parent / "events.yml",
+                        help="events.yml to plant (default: data/synthetic/events.yml)")
+    args = parser.parse_args(argv)
+    output_dir = args.output_dir
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Re-seed so main() gives the same output however often it is called in one process.
+    random.seed(SEED)
+    Faker.seed(SEED)
+    faker.seed_instance(SEED)
+    CONFIG = load_config(args.events)
 
     print("Generating households...")
     households = generate_households()
@@ -1124,11 +1498,18 @@ def main():
     print("Generating interaction categories...")
     interaction_categories = generate_interaction_categories()
 
-    print(f"Generating {N_INTERACTIONS} interactions + transcripts + csat...")
-    interactions, transcripts, ia_rows, csat = generate_interactions(member_accounts)
+    print(f"Generating {N_INTERACTIONS} baseline interactions + "
+          f"{len(CONFIG['events'])} events of transcripts + csat...")
+    (interactions, transcripts, ia_rows, csat,
+     event_ledger, ordered, plans) = generate_interactions(member_accounts)
 
     print("Generating transactions...")
-    transactions = generate_transactions()
+    transactions = renumber_transactions(generate_transactions() + event_ledger)
+
+    ground_truth = build_ground_truth(CONFIG, ordered, plans)
+    change_log = sorted(({"name": ev["change_log_name"], "date": ev["date"].isoformat()}
+                         for ev in CONFIG["events"]), key=lambda r: r["date"])
+    branches = [{"name": name} for name in CONFIG["branches"]]
 
     # ── write outputs ──
     def w(name, data):
@@ -1156,6 +1537,10 @@ def main():
     w("interactions.json", interactions)
     w("interaction_accounts.json", ia_rows)
     w("transactions.json", transactions)
+    w("branches.json", branches)
+    w("change_log.json", change_log)
+    (output_dir / "ground_truth").mkdir(exist_ok=True)
+    write_json(output_dir / "ground_truth", "events.json", ground_truth)
 
     print("\nDone.")
     print(f"  households: {len(households)}")

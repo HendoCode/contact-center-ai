@@ -3,7 +3,7 @@
 D0.1, 2026-10-02. Feeds F1–F6. Checked against TRL 1.14.1, PEFT 0.21.2, vLLM 0.30.0, Fireworks' tunable-model list (2026-09-30), and generator output at `6775cb4`.
 
 **Corpus limits.**
-- Once names and figures are masked, the 1,250 transcripts reduce to fewer than 30 distinct texts (one to five per category). In-template scores will therefore sit near the ceiling.
+- Once names and figures are masked, the 1,250 baseline transcripts reduce to a few dozen distinct texts (three wordings per category, plus the calls for the dated events, which this corpus leaves out). In-template scores will therefore sit near the ceiling.
 - So this experiment measures format adherence, value extraction, latency and cost. It does not measure comprehension, and B1 says so.
 - `outcome` never appears in the text, so no label uses it.
 - Any claim about generalization rests on test-para (F1b).

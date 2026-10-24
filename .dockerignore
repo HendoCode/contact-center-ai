@@ -16,5 +16,7 @@ blogs
 results
 # generated inside the seed container, not copied from the host
 data/synthetic/*.json
+# the answer key for the planted events is not copied into any image
+data/synthetic/ground_truth/
 olap/dbt/target
 olap/dbt/logs

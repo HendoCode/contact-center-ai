@@ -5,7 +5,7 @@ Every command shown in the README quickstart and the published "Anchoring AI"
 posts must keep working. This module:
 
   * runs the seeded synthetic-data generator and asserts the corpus it emits
-    (1250 transcripts, each with a `call_id` and `full_text`) — and that it is
+    (1,540 transcripts, each with a `call_id` and `full_text`) — and that it is
     deterministic (two runs are bit-identical);
   * imports every package entry point that the published `python -m ...`
     commands dispatch to, without any network, API key, or database.
@@ -25,7 +25,7 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DATA_DIR = REPO_ROOT / "data" / "synthetic"
 
-EXPECTED_TRANSCRIPTS = 1_250
+EXPECTED_TRANSCRIPTS = 1_540  # 1,250 baseline calls + the dated-event calls
 
 # Entry points of the published commands (`python -m <module>`). The generator
 # itself is a script (not an importable package) and is exercised by the tests

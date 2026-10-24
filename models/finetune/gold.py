@@ -12,16 +12,21 @@ Where each field comes from:
   follow_up        per-category rule
 
 Figures are recovered by matching each transcript turn against its dialogue
-template (`CATEGORY_DIALOGUES` in the generator). A turn that does not match its
-template means the generator and these rules have drifted apart, and the build
+template (`CATEGORY_DIALOGUES` in `dialogue_templates.py`): a category has several variants
+that word the same facts differently, and a call must match one of them. A call that
+matches none means the generator and these rules have drifted apart, and the build
 fails loudly instead of emitting a wrong label.
+
+Only baseline calls are labeled. The generator also plants dated events, whose calls
+use other dialogue; those calls are dropped using the ground-truth file the generator
+writes (`ground_truth/events.json`), so a model fine-tuned on this corpus never sees
+the planted drivers. The corpus stays the 1,250 baseline calls.
 """
 
 from __future__ import annotations
 
 import importlib.util
 import json
-import random
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -34,7 +39,7 @@ from models.finetune.schema import CATEGORIES, METRIC_NAMES, PRODUCT_LINES, RESO
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_DATA_DIR = REPO_ROOT / "data" / "synthetic"
 GOLD_RULES_PATH = Path(__file__).with_name("gold_rules.yml")
-GENERATOR_PATH = DEFAULT_DATA_DIR / "generate_data.py"
+TEMPLATES_PATH = DEFAULT_DATA_DIR / "dialogue_templates.py"
 
 _PLACEHOLDER = re.compile(r"\{(\w+)\}")
 
@@ -67,22 +72,35 @@ def load_rules(path: Path = GOLD_RULES_PATH) -> dict[str, Any]:
     return rules
 
 
-def load_dialogue_templates(generator_path: Path = GENERATOR_PATH) -> dict[str, list[tuple[str, str]]]:
-    """Import the generator's `CATEGORY_DIALOGUES` without disturbing the caller's RNG state."""
-    state = random.getstate()
-    try:
-        spec = importlib.util.spec_from_file_location("_ccai_generate_data", generator_path)
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-    finally:
-        random.setstate(state)
+Template = list[tuple[str, str]]
+
+
+def load_dialogue_templates(templates_path: Path = TEMPLATES_PATH) -> dict[str, list[Template]]:
+    """The generator's `CATEGORY_DIALOGUES` (category -> variants), imported from its
+    template module, which runs no generation."""
+    spec = importlib.util.spec_from_file_location("_ccai_dialogue_templates", templates_path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
     return module.CATEGORY_DIALOGUES
 
 
+def event_call_ids(data_dir: Path = DEFAULT_DATA_DIR) -> set[str]:
+    """Call ids the generator planted for its dated events (everything else is baseline)."""
+    path = data_dir / "ground_truth" / "events.json"
+    if not path.exists():
+        raise FileNotFoundError(
+            f"{path} not found. Run: python data/synthetic/generate_data.py "
+            "(it writes the file that tells baseline calls from event calls)"
+        )
+    return set(json.loads(path.read_text())["calls"])
+
+
 def load_calls(data_dir: Path = DEFAULT_DATA_DIR) -> list[CallRecord]:
-    """Read the generator output and join each call to its subject account's line of business."""
+    """Read the generator output (baseline calls only) and join each call to its subject
+    account's line of business."""
     read = lambda name: json.loads((data_dir / name).read_text())  # noqa: E731
-    transcripts = read("transcripts.json")
+    events = event_call_ids(data_dir)
+    transcripts = [t for t in read("transcripts.json") if t["call_id"] not in events]
     interaction_id = {i["call_id"]: i["interaction_id"] for i in read("interactions.json")}
     product_id = {a["account_id"]: a["product_id"] for a in read("accounts.json")}
     lob_of_product = {p["product_id"]: p["lob"] for p in read("products.json")}
@@ -112,9 +130,8 @@ def _template_regex(template: str) -> re.Pattern[str]:
     return re.compile("".join(parts), re.DOTALL)
 
 
-def spoken_facts(call: CallRecord, templates: dict[str, list[tuple[str, str]]]) -> dict[str, str]:
-    """Recover the template facts spoken in the call, matched turn by turn against its template."""
-    template = templates[call.category]
+def _facts_from_variant(call: CallRecord, template: Template) -> dict[str, str]:
+    """The facts spoken in `call` under one variant, or ValueError if the call does not fit it."""
     if len(template) != len(call.turns):
         raise ValueError(f"{call.call_id}: {len(call.turns)} turns, template has {len(template)}")
     facts: dict[str, str] = {}
@@ -130,7 +147,19 @@ def spoken_facts(call: CallRecord, templates: dict[str, list[tuple[str, str]]]) 
     return facts
 
 
-def build_gold(call: CallRecord, rules: dict[str, Any], templates: dict[str, list[tuple[str, str]]]) -> dict:
+def spoken_facts(call: CallRecord, templates: dict[str, list[Template]]) -> dict[str, str]:
+    """Recover the template facts spoken in the call, matched turn by turn against any variant
+    of its category's dialogue. Raises ValueError when no variant fits."""
+    errors = []
+    for template in templates[call.category]:
+        try:
+            return _facts_from_variant(call, template)
+        except ValueError as exc:
+            errors.append(str(exc))
+    raise ValueError(errors[0] if len(errors) == 1 else f"{errors[0]} (no variant of {call.category} fits)")
+
+
+def build_gold(call: CallRecord, rules: dict[str, Any], templates: dict[str, list[Template]]) -> dict:
     """Build the summary_v1 gold label for one call."""
     rule = rules["categories"][call.category]
     facts = spoken_facts(call, templates)

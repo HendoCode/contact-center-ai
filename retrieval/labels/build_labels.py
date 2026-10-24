@@ -6,11 +6,13 @@ Derive the R3 retrieval-benchmark labels from generator metadata.
 
 Every relevant set is computed here, by code, from the seed-42 generator's own
 outputs (`transcripts.json`, `interaction_accounts.json`, `accounts.json`,
-`products.json`) and its dialogue templates (`CATEGORY_DIALOGUES`). No retriever is
+`products.json`) and its dialogue templates (`CATEGORY_DIALOGUES`, three or more
+variants per category, plus the dated-event calls the generator adds). No retriever is
 imported or run. A query's relevance is a predicate over these per-call facts:
 
     category, outcome, date (ISO datetime), member_id, subject account id,
-    subject product LOB, and which template placeholders the call's category speaks.
+    subject product LOB, and what the transcript text says (a phrase, a member id,
+    the last four digits of the subject account).
 
 The `where` attached to a filter-heavy query is the structured part of the request
 (outcome, date, sometimes category) that the transcript text cannot express. The
@@ -164,9 +166,9 @@ STOPWORDS = frozenset([
 
 # ── generator facts ───────────────────────────────────────────────────────────
 
-def load_templates() -> dict[str, list[tuple[str, str]]]:
-    """CATEGORY_DIALOGUES from the generator (importing it runs no generation)."""
-    path = DATA_DIR / "generate_data.py"
+def load_templates() -> dict[str, list[list[tuple[str, str]]]]:
+    """CATEGORY_DIALOGUES (category -> variants) from the generator's template module."""
+    path = DATA_DIR / "dialogue_templates.py"
     spec = importlib.util.spec_from_file_location("_ccai_generate_data", path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -194,6 +196,8 @@ def load_calls(data_dir: Path = DATA_DIR) -> list[dict]:
     calls = []
     for t in transcripts:
         account = subject.get(call_to_interaction[t["call_id"]])
+        text = t["full_text"]
+        last4 = str(account).zfill(4)[-4:] if account else None
         calls.append({
             "call_id": t["call_id"],
             "category": t["category"],
@@ -202,18 +206,17 @@ def load_calls(data_dir: Path = DATA_DIR) -> list[dict]:
             "member": t["member_id"],
             "account": account,
             "lob": lob_by_product[product_by_account[account]] if account else None,
+            "text": text.lower(),
+            # what the transcript says about the caller, read off the text itself
+            "speaks_member": t["member_id"] in text,
+            "speaks_account": bool(last4 and re.findall(rf"\b{last4}\b", text)),
         })
     return calls
 
 
-def speaking_categories(templates: dict, placeholder: str) -> set[str]:
-    """Categories whose dialogue template speaks `{placeholder}` aloud."""
-    token = "{" + placeholder + "}"
-    return {c for c, turns in templates.items() if any(token in text for _, text in turns)}
-
-
 def template_text(templates: dict, category: str) -> str:
-    return " ".join(text for _, text in templates[category])
+    """Every variant of a category's dialogue, as one string."""
+    return " ".join(text for variant in templates[category] for _, text in variant)
 
 
 def tokens(text: str) -> set[str]:
@@ -248,16 +251,16 @@ def describe(match: dict) -> str:
 
 # ── id-based exact queries ────────────────────────────────────────────────────
 
-def _id_spec(calls, templates, kind: str, rank: int) -> dict:
+def _id_spec(calls, kind: str, rank: int) -> dict:
     """The `rank`-th member/account with the most calls that speak its id aloud.
 
     Ties break on the id, so the choice is deterministic. Accounts are spoken as
-    their last four digits ("account ending in 0412")."""
-    placeholder = "member_id" if kind == "member" else "account_last4"
-    speaking = speaking_categories(templates, placeholder)
-    counts = Counter(c[kind] for c in calls if c["category"] in speaking and c[kind] is not None)
+    their last four digits ("account ending in 0412"). A call counts when its text
+    says the id, whatever the variant or event it came from."""
+    spoken = f"speaks_{kind}"
+    counts = Counter(c[kind] for c in calls if c[spoken] and c[kind] is not None)
     chosen = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))[rank][0]
-    match = {kind: chosen, "category": {"in": sorted(speaking)}}
+    match = {kind: chosen, spoken: True}
     if kind == "member":
         return {"type": "exact", "query": chosen, "match": match}
     last4 = str(chosen).zfill(4)[-4:]
@@ -278,30 +281,40 @@ def build(calls: list[dict] | None = None, templates: dict | None = None) -> lis
     records = []
     for n, spec in enumerate(SPECS, start=1):
         if "id_kind" in spec:
-            spec = _id_spec(calls, templates, spec["id_kind"], spec["rank"])
+            spec = _id_spec(calls, spec["id_kind"], spec["rank"])
         where = spec.get("where")
         match = {**spec.get("match", {}), **(where or {})}
-        relevant = sorted(c["call_id"] for c in calls if matches(c, match))
+        phrase = _phrase(spec)
+        relevant = sorted(c["call_id"] for c in calls if matches(c, match)
+                          and (phrase is None or phrase in c["text"]))
         assert len(relevant) >= 2, f"q{n:02d} {spec['query']!r}: only {len(relevant)} relevant"
 
-        _check_wording(spec, templates)
+        _check_wording(spec, templates, calls)
         records.append({
             "id": f"q{n:02d}",
             "type": spec["type"],
             "query": spec["query"],
             "where": where,
             "relevant": relevant,
-            "derivation": describe(match),
+            "derivation": describe(match) + (f' AND text contains "{phrase}"' if phrase else ""),
         })
     return records
 
 
-def _check_wording(spec: dict, templates: dict) -> None:
-    """Guard the query types' premises against the generator templates."""
+def _phrase(spec: dict) -> str | None:
+    """The verbatim phrase of an exact-phrase query over a category (None for id queries)."""
+    if spec["type"] == "exact" and isinstance(spec.get("match", {}).get("category"), str):
+        return spec["query"].lower()
+    return None
+
+
+def _check_wording(spec: dict, templates: dict, calls: list[dict]) -> None:
+    """Guard the query types' premises against the generated corpus."""
     category = spec.get("match", {}).get("category")
-    if spec["type"] == "exact" and isinstance(category, str):
-        holders = [c for c in templates if spec["query"].lower() in template_text(templates, c).lower()]
-        assert holders == [category], f"{spec['query']!r} is spoken by {holders}, not only {category}"
+    phrase = _phrase(spec)
+    if phrase:
+        holders = sorted({c["category"] for c in calls if phrase in c["text"]})
+        assert holders == [category], f"{spec['query']!r} is spoken in {holders}, not only {category}"
     if spec["type"] == "paraphrase":
         shared = (tokens(spec["query"]) - STOPWORDS) & tokens(template_text(templates, category))
         assert len(shared) <= 1, f"paraphrase {spec['query']!r} shares {sorted(shared)} with template"
