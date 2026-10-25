@@ -18,6 +18,12 @@ Why did a governed metric move around a change? The tool compares one metric (`c
 - the drivers found in the calls after the change, each as "n of M calls in the after window" with its count before the change and up to three verbatim quotes with call ids. A model proposes and assigns the drivers; code counts them and keeps only quotes found in the call;
 - what the data could not determine, always including that it cannot show the change caused the shift.
 
+Example call (needs the seeded database and a chat model; a CPU-only local model takes minutes):
+
+```bash
+python -m ccai_mcp.http_smoke --call explain_change '{"metric": "csat_average_score", "filters": {"category": ["fee_dispute"]}, "change_point": "2026-04-15", "window_days": 14, "question": "Why did satisfaction on fee calls drop after the fee schedule change?"}'
+```
+
 It never reports a per-agent score. `mode="coaching"` takes `groups` (call ids from an earlier answer) and reports patterns in how those calls were handled. The result is two text blocks: the cited answer, then `CHANGE RESULT (JSON, v1):` and the result as JSON. `change_log.json` and `branches.json` are read from `data/synthetic/` (see `agent/changes.py`); the windows are half-open ISO dates. Code: `change.py`; the agent's route is described in [agent/README.md](../agent/README.md).
 
 ## Streamable HTTP

@@ -126,6 +126,8 @@ MCP_AUTH_TOKEN=demo-token uv run python -m ccai_mcp.server --http &      # http:
 MCP_AUTH_TOKEN=demo-token uv run python -m ccai_mcp.http_smoke           # lists the six tools
 ```
 
+To see the sixth tool answer, call it with `--call explain_change '{"metric": "csat_average_score", "filters": {"category": ["fee_dispute"]}, "change_point": "2026-04-15", "window_days": 14}'`.
+
 `ccai_mcp/README.md` has the URL shape, the safety rules, and the registration snippets. A tool
 that reads Postgres needs B; the listing does not.
 
