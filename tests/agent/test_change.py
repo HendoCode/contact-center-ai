@@ -90,6 +90,31 @@ async def test_a_card_subject_maps_to_both_card_categories(make, toolbox):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("named", [
+    "Fee schedule change (2026-04-15)",  # the line as the frame prompt lists it
+    "- Fee schedule change (2026-04-15)",
+    '"Fee schedule change"',
+    "fee schedule change ( 2026-04-15 )",
+])
+async def test_a_logged_change_named_as_the_prompt_lists_it_is_found(make, toolbox, named):
+    graph, _ = make("explain_change", frame={**FEE_FRAME, "logged_change": named})
+    out = await graph.ainvoke({"question": "Why did satisfaction on fee calls drop after the fee schedule change?"}, config())
+
+    (call,) = explain_calls(toolbox)
+    assert call["change_point"] == "2026-04-15"
+    assert "is not in the change log" not in out["answer"]
+
+
+@pytest.mark.asyncio
+async def test_a_logged_change_with_another_date_is_refused(make, toolbox):
+    graph, _ = make("explain_change", frame={**FEE_FRAME, "logged_change": "Fee schedule change (2026-05-01)"})
+    out = await graph.ainvoke({"question": "Why did satisfaction on fee calls drop?"}, config())
+
+    assert toolbox.calls == []
+    assert "is not in the change log" in out["answer"]
+
+
+@pytest.mark.asyncio
 async def test_no_subject_leaves_the_filters_to_the_tool(make, toolbox):
     graph, _ = make("explain_change", frame={"measure": "calls", "logged_change": "Card fraud rule change"})
     await graph.ainvoke({"question": "What changed for members after the rule change?"}, config())
