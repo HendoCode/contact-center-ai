@@ -6,7 +6,7 @@
 # `evals` is the L2 agent golden set offline (a CI gate); `evals-live` is the same set
 # against real models, uploaded to LangSmith.
 
-.PHONY: up down seed ingest test lint check-public demo bench evals evals-live evals-compare evals-export evals-retrieval-experiment finetune-data finetune-label load-snowflake load-databricks load-dry-run dbt-build dbt-build-dev dev-data lance-azure-check parity
+.PHONY: up down seed ingest test lint check-public demo demo-change bench evals evals-live evals-compare evals-export evals-retrieval-experiment finetune-data finetune-label load-snowflake load-databricks load-dry-run dbt-build dbt-build-dev dev-data lance-azure-check parity
 
 PYTHON := uv run python
 # RETRIEVER_BACKEND=lancedb needs the lance dependency group wherever the store is read or written.
@@ -33,6 +33,16 @@ demo:
 	@echo
 	@echo "Stack is still up. LangGraph dev server: http://localhost:2024 (API docs at /docs)."
 	@echo "Stop it with: make down"
+
+# The change-analysis demo on the host: a preflight (data, Postgres, vector index, semantic
+# layer, chat and embedding models; each miss prints its fix), then six timed questions about why
+# a metric moved (agent/demo_change.py). Build the data first with `make up dev-data`; the
+# default path is keyless, chat and embeddings on Ollama (override the chat provider with
+# DEMO_LLM_PROVIDER). ARGS="--strict" fails the run when a step comes out differently from the
+# script; ARGS="--preflight-only" checks the setup and stops.
+demo-change:
+	LLM_PROVIDER=$(DEMO_LLM_PROVIDER) EMBEDDING_PROVIDER=ollama \
+	uv run --group agent --group dbt $(LANCE_GROUP) python -m agent.demo_change $(ARGS)
 
 # ── Local data pipeline ───────────────────────────────────────────────────────
 

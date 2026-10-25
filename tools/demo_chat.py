@@ -13,6 +13,9 @@ Every number, SQL string and call id in the output is read from the running syst
   model); the catalog lookup, the MetricFlow query and the SQL are real.
 - The clarify turn is the real agent graph with a scripted classifier (as `make evals` does) and
   the real MCP tools; the interrupt payload and the resumed answer are what the graph returned.
+- `explain_change` is called through the MCP server as well. Its numbers, windows and SQL come
+  from MetricFlow; its driver labels and quotes come from the chat model in `LLM_PROVIDER`
+  (the quotes are checked against the transcripts), so they vary with the model.
 - `get_call_summary` and `search_transcripts` need a chat model (and embeddings): this script
   captures the metadata lookup that `get_call_summary` starts with and marks the model-written
   answers as illustrative in the output.
@@ -42,6 +45,7 @@ from agent.nodes.answer import split_sql
 from agent.terms import load_terms
 from agent.tools import MCPToolbox
 from ccai_mcp import metrics
+from ccai_mcp.change import render_change, split_change
 from evals.offline import ScriptedClassifier
 from rag.embeddings import CONNECTION_STRING
 from retrieval import get_retriever
@@ -54,6 +58,15 @@ CALL_BALANCE = "CALL-00260"  # the call-center agent reads out a balance
 RATE_QUESTION = "what is our average interest rate?"
 CLARIFY_QUESTION = "What is our average interest rate?"
 CLARIFY_CHOICES = ["average_mortgage_note_rate", "weighted_mortgage_portfolio_rate"]
+FEE_QUESTION = "What do we make on fees?"
+FEE_CHOICES = ["overdraft_fee_revenue"]
+CHANGE_QUESTION = "Why did satisfaction on fee calls drop after the fee schedule change?"
+CHANGE_ARGS = {
+    "metric": "csat_average_score",
+    "filters": {"category": ["fee_dispute"]},
+    "change_point": "2026-04-15",
+    "question": CHANGE_QUESTION,
+}
 BALANCE_METRICS = [
     "banking_available_balance", "banking_ledger_balance",
     "credit_card_outstanding", "net_member_liquidity",
@@ -107,13 +120,14 @@ def _member(hit) -> dict:
     }
 
 
-async def _clarify_turn(toolbox: MCPToolbox) -> dict:
-    classifier = ScriptedClassifier({CLARIFY_QUESTION: "resolve_metric"})
+async def _clarify_turn(toolbox: MCPToolbox, question: str = CLARIFY_QUESTION,
+                        choices: list[str] = CLARIFY_CHOICES) -> dict:
+    classifier = ScriptedClassifier({question: "resolve_metric"})
     graph = build_graph(get_llm=lambda: classifier, toolbox=toolbox, checkpointer=InMemorySaver())
     config = {"configurable": {"thread_id": "demo-chat"}}
-    paused = await graph.ainvoke({"question": CLARIFY_QUESTION}, config)
+    paused = await graph.ainvoke({"question": question}, config)
     payload = paused["__interrupt__"][0].value
-    result = await graph.ainvoke(Command(resume={"choices": CLARIFY_CHOICES}), config)
+    result = await graph.ainvoke(Command(resume={"choices": choices}), config)
     return {"payload": payload, "result": result}
 
 
@@ -136,6 +150,8 @@ async def capture() -> dict:
     cap["analyst"] = metrics.ask_the_analyst(RATE_QUESTION, decimals=4)
 
     cap["clarify"] = await _clarify_turn(toolbox)
+    cap["fee_clarify"] = await _clarify_turn(toolbox, FEE_QUESTION, FEE_CHOICES)
+    cap["change"] = await toolbox.call("explain_change", CHANGE_ARGS)
     cap["balance"] = await toolbox.call(
         "query_metric", {"metrics": BALANCE_METRICS, "decimals": 2})
     cap["lcv"] = await toolbox.call("query_metric", {"metrics": LCV_METRICS, "decimals": 4})
@@ -232,6 +248,13 @@ def render(cap: dict) -> str:
     n_low, _, dist_low = _csat_numbers(cap["csat_low"])
     analyst_vals = values(cap["analyst"])
     clarify = cap["clarify"]
+    fee_clarify = cap["fee_clarify"]
+    change_result = split_change(cap["change"])[1]
+    change_text = render_change(change_result, with_sql=False)
+    change_sql = "\n\n".join(
+        f"-- window [{change_result['windows'][side]['start']}, "
+        f"{change_result['windows'][side]['end']})\n{change_result['windows'][side]['sql']}"
+        for side in ("before", "after"))
     answer_body = clarify["result"]["answer"].split("\n\nSQL:\n")[0]
     assert LCV_EXPR in split_sql(cap["lcv"])[1], "member_lifetime_value SQL changed; update LCV_EXPR"
     low_note = ", so it is one of those low scores" if (member["csat_loan_call"] or 9) <= 2 else ""
@@ -239,12 +262,13 @@ def render(cap: dict) -> str:
     rate_in_call = f"{member['note_rate']}%" in rates_call.text
     principal_in_call = f"${_money(member['principal'])}" in rates_call.text
 
-    parts = [f"""# Demo chat: a supervisor, five tools, four ambiguous words
+    parts = [f"""# Demo chat: a supervisor, six tools, five ambiguous words
 
 A sample conversation between a call-center supervisor and the MCP server, to show what each
 tool returns and how the semantic layer settles words like "rate", "balance" and "LTV". It
 follows one member, **{member['name']}** (`MBR-{member['member_id']:06d}`, seed-42 synthetic
-data), through that member's calls.
+data), through that member's calls (turns 1 to 7), then widens to the whole call center: why a
+metric moved after a change, and which fee "fees" means (turns 8 and 9).
 
 Generated {env['date']} from commit `{env['sha']}` by `tools/demo_chat.py`, against Postgres
 {env['postgres']}, {env['calls']:,} calls and {env['csat']} CSAT responses, marts built by `dbt build`,
@@ -477,14 +501,68 @@ once in the metric instead of re-invented per dashboard. It is in the SQL below.
 For scale, {member['name']}'s mortgage was written at `ltv_at_origination`
 {member['ltv']} (direct SQL, not a tool), against the portfolio average above.
 
+## Turn 8: why did the number move?
+
+**User:** {CHANGE_QUESTION}
+
+**Tool call:** `explain_change`. The agent route reads the question into these inputs (the
+metric from "satisfaction", the category from "fee calls", the date from the change log); here
+they are scripted.
+
+{_json(CHANGE_ARGS)}
+
+**Tool result / Answer:** the tool's own text. Values, windows and counts come from MetricFlow
+and the vector store's `count`; the driver labels and quotes are written by the chat model, and
+the tool keeps a quote only if it appears verbatim in the call it cites.
+
+{_fence(change_text)}
+
+{_fold("SQL generated by MetricFlow, both windows", change_sql)}
+
+The tool's result carries a second block, `CHANGE RESULT (JSON, v1)`, which the agent reads
+instead of parsing the text. It lists the call ids behind each driver, so a client can open any
+cited call with `get_call_summary`.
+
+## Turn 9: "What do we make on fees?"
+
+**User:** {FEE_QUESTION}
+
+"fee" is an ambiguous term in `agent/data/ambiguous_terms.yml`: the catalog declares one revenue
+metric per fee type, and a total. The graph pauses at its only `interrupt()` instead of summing
+across them.
+
+**Scripted step:** the classifier returns the `resolve_metric` route. The interrupt below is
+what the graph returned.
+
+**Interrupt payload** (`clarify_metric`, version 1):
+
+{_json(fee_clarify['payload'])}
+
+**User:** (picks overdraft fees)
+
+**Resume:** `Command(resume=...)` on the same `thread_id`, with this value:
+
+{_json({"choices": FEE_CHOICES})}
+
+**Answer** (graph output, `route` = `{fee_clarify['result']['route']}`, `grounded` =
+`{str(fee_clarify['result']['grounded']).lower()}`, metrics `{', '.join(fee_clarify['result']['metric_names'])}`):
+
+{_fence(fee_clarify['result']['answer'].split("\n\nSQL:\n")[0])}
+
+{_fold("SQL attached to the answer", fee_clarify['result']['sql'])}
+
 ---
 
 ## What was and was not captured
 
 - **Captured:** the lookups and every metric, CSAT and SQL figure above, the clarify interrupt
-  payload and the graph's resumed answer, and the cross-check SQL.
-- **Scripted:** the user's messages, which tool is called, the classifier's route, and the metric
-  names `ask_the_analyst` resolves to.
+  payloads and the graph's resumed answers, the `explain_change` result of turn 8, and the
+  cross-check SQL.
+- **Scripted:** the user's messages, which tool is called, the classifier's route, the metric
+  names `ask_the_analyst` resolves to, and the inputs turn 8 passes to `explain_change`.
+- **Model-written, captured:** the driver labels and the choice of quotes in turn 8. They come
+  from the chat model that ran (`LLM_PROVIDER`), so another model words them differently; the
+  counts, windows and SQL do not depend on it.
 - **Not captured:** `search_transcripts` and the written summary in `get_call_summary`, which
   need a chat model and real embeddings. Each says so where it appears.
 """]
