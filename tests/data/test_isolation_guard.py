@@ -27,6 +27,10 @@ GUARDED = [
     "tools/demo_chat.py",
     "evals/datasets/*.jsonl",
     "evals/datasets/*.py",
+    "evals/*.py",
+    "evals/known_failures.json",
+    "evals/README.md",
+    "evals/prompts/**/*",
     "ccai_mcp/change.py",
 ]
 # File types the guard reads (images and caches are skipped).
@@ -74,6 +78,11 @@ def test_the_guard_covers_the_surfaces_that_exist():
             "agent/data/change_subjects.yml", "agent/changes.py", "agent/subgraphs/change.py",
             "ccai_mcp/change.py", "agent/demo_change.py",
             "tools/demo_chat.py"} <= names
+    assert {"evals/datasets/change_golden.jsonl", "evals/datasets/change_holdout.jsonl",
+            "evals/datasets/change_specs.py", "evals/datasets/change_holdout_specs.py",
+            "evals/datasets/build_change.py", "evals/change_corpus.py", "evals/evaluators.py",
+            "evals/offline.py", "evals/run.py", "evals/known_failures.json",
+            "evals/README.md"} <= names
 
 
 def test_the_forbidden_list_has_the_labels_and_the_held_out_keywords(events_config):

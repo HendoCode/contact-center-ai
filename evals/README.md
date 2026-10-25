@@ -1,6 +1,6 @@
 # Agent evals (L2)
 
-A golden set of 52 questions for the LangGraph agent (`agent/`), the evaluators that score it, and two runners: offline in CI and live in LangSmith.
+A golden set of 52 questions for the LangGraph agent (`agent/`), two change-analysis sets (six golden and four held-out "why did this number move?" questions), the evaluators that score them, and two runners: offline in CI and live in LangSmith.
 
 ```bash
 make evals                                          # offline: no keys, no DB, no network
@@ -11,6 +11,9 @@ make evals-live DRY=1                               # the live plan and cost est
 make evals-compare A=<run name>                     # before/after table: that run against the latest
 make evals-export EXP=<LangSmith experiment>       # per-item results of an older run, read-only
 make evals-live ARGS="--dataset holdout"            # the held-out set (16 questions)
+python -m evals.datasets.build_change --check       # exit 1 if a change-analysis set is stale
+make evals-live ARGS="--dataset change"             # the change-analysis golden events (6 questions)
+make evals-live ARGS="--dataset change-holdout"     # the held-out change events (4 questions)
 LLM_MODEL=<openrouter id> make evals-live ARGS="--group open --run open-<model>"   # one group, another agent model
 ```
 
@@ -81,6 +84,37 @@ The run itself still refuses to start when the agent and judge models match. It 
 `datasets/agent_holdout.jsonl` holds 16 questions the golden set does not have (ambiguous 4, metric 5, call_lookup 3, open 4), in the golden schema with ids `h01`..`h16`. They were written once, on 2026-10-05, from the synthetic data and the semantic layer only (metric labels, the ambiguous terms, the transcript categories and outcomes), before any score on them was seen; the questions are in `datasets/holdout_specs.py` and every expectation is derived by the same code as the golden set (`python -m evals.datasets.build_golden --dataset holdout [--check]`).
 
 **The file is held out.** Its questions are not edited after scores are seen. A factual error in a question may be fixed; each fix is recorded in `holdout_specs.py` with its date and reason. It has its own content hash and its own LangSmith dataset (`ccai-agent-holdout-<sha8>`). `make evals-live ARGS="--dataset holdout"` runs it; the default run is the golden set, unchanged. `make evals-compare` refuses to compare a golden run with a holdout run (no score there is a before/after) unless `--allow-different-datasets`.
+
+## Change-analysis sets
+
+A supervisor asking why a number moved needs a governed metric over two windows and cited evidence from the calls between them (`explain_change`, `docs/design/change-analysis.md`). These sets score that route against the dated events the generator plants, whose answers are known from `data/synthetic/ground_truth/events.json` (written by `make seed`, never committed).
+
+| file | ids | events | what it measures |
+|---|---|---|---|
+| `datasets/change_golden.jsonl` | G1–G6 | the two golden events (fee schedule change, card fraud rule change) | the route on the event types it is built and checked against |
+| `datasets/change_holdout.jsonl` | H1–H4 | the two held-out events | generalization to event types never tuned on |
+
+The questions and their contracts (metric, filters, how the change point is found, which checks apply) are the question contract table of the design note, copied into `datasets/change_specs.py` and `datasets/change_holdout_specs.py`. `datasets/build_change.py` derives the rest from the ground truth: the change point, the reference for the judge (both governed values over the event's default windows, and the planted drivers with their call counts) and its derivation. It refuses a golden spec about a held-out event and the reverse. G3 is a follow-up: it is asked on G1's thread (`prior_question`) and takes G1's contract.
+
+**Held-out events stay out of everything that shapes or scores the agent.** They have no golden rows, prompt examples or fixtures, and nothing is tuned against them. Their rows name the event by its change-log name and give driver counts only; held-out driver wording and every answer-key id stay out of the committed sets, which the keyword guard (`tests/data/test_isolation_guard.py`) checks along with the prompts, the agent's data and these eval files. A fix prompted by a held-out failure must apply unchanged to the golden events and be justified by golden or unit evidence; a failing held-out row is reported, not patched.
+
+**Evaluators.** `evaluators.py` recomputes every expectation for the windows and filters the answer reports, from the generated files and the semantic layer's time rules (`change_corpus.py`: calls by `started_at`, CSAT by `surveyed_at`, half-open windows, ISO weeks, and the tool's sample of the 200 lowest SHA-256 call ids above 200 calls). Drivers and patterns are matched to planted calls by call id, never by wording. Each row lists the checks that apply in `evaluators`; the rest score n/a.
+
+| key | passes when |
+|---|---|
+| `no_agent_ids` | neither the answer nor its evidence holds an agent id |
+| `change_point` | the date equals the event's when the change log or the question gives it; a detected one is within 4 days (less than the 7-day snap) |
+| `before_after` | both windows' values equal the recomputation at two decimals, with the same `n`, on the contract's filters |
+| `weekly` | the after window's weekly values (whole ISO weeks) equal the recomputation |
+| `driver_recall` | every planted driver with at least 5 calls in the calls read is found: one reported driver holds at least half of its calls, at 60% precision or better |
+| `driver_share` | each found driver's share of the calls read is within 10 points of the planted share |
+| `pattern_recall` | the `driver_recall` rule, applied to coaching patterns and the calls planted with them |
+
+`route`, `interrupt`, `metric`, `sql` and `citations` apply as for the golden set, and the live run adds the judge.
+
+**Offline**, `make evals` scores both sets after the golden set, each in its own table (`change_golden`, `change_heldout`), under the same `known_failures.json` gate. The scripted classifier also scripts the change route's `frame` from the spec. `explain_change` runs the real tool code over doubles built from the generated corpus: a semantic layer and a retriever that answer from the same tables as the evaluators, and a driver model that labels each call with its planted driver or pattern from the answer key. So offline checks the change point, windows, sampling, counting, quotes, grounding and answer format, and driver recall is the ceiling a perfect labeler reaches; it does not measure a model. Offline the numbers come from the same recomputation that scores them; `tests/evals/test_change_evals.py` checks that recomputation against the generator's own answer key for every event's default window.
+
+**Live**, `make evals-live ARGS="--dataset change"` and `ARGS="--dataset change-holdout"` run each set through the real graph, MCP tools and models, with every check above plus the judge. Each writes its own results file (§4.3 of `docs/AGENT_HANDOFF.md`), whose `metrics` hold the set's group (`change_golden` or `change_heldout`) next to `all`, so golden and held-out scores are never pooled; each item keeps its `change` evidence for diagnosis. They sync to the LangSmith datasets `ccai-change-golden-<sha8>` and `ccai-change-holdout-<sha8>`. No live run of either set has been recorded yet.
 
 ## Trying another agent model
 
