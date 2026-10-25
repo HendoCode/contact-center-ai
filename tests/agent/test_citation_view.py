@@ -73,9 +73,10 @@ def test_no_full_account_number_reaches_the_rendered_answer():
 
 
 def test_every_transcript_renders_with_no_unmasked_account():
-    calls = json.loads((REPO_ROOT / "data" / "synthetic" / "transcripts.json").read_text())
-    if not calls:
-        pytest.skip("transcripts.json is empty")
+    path = REPO_ROOT / "data" / "synthetic" / "transcripts.json"
+    if not path.exists():  # generated, not committed: `make seed`
+        pytest.skip("transcripts.json is not generated")
+    calls = json.loads(path.read_text())
     for call in calls:
         turn = split_turns(call["full_text"])[0]
         view = render_citation(call["call_id"], turn.split(": ", 1)[1][:30], call, call["full_text"])
