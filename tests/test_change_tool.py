@@ -14,6 +14,7 @@ from change_support import (
     NOTICE,
     REFUND,
     START,
+    TEXTS,
     FakeModel,
     FakeRetriever,
     FakeSemanticLayer,
@@ -22,6 +23,7 @@ from change_support import (
     in_window,
 )
 
+TEXTS_NOTICE, TEXTS_OTHER = TEXTS["notice"], TEXTS["other"]
 LOG = [{"name": "Logged alpha change", "date": CHANGE.isoformat()}]
 FILTERS = {"category": [HOT]}
 
@@ -71,7 +73,7 @@ def test_the_windows_are_half_open_around_the_change_point_and_hold_governed_num
     assert "2026-02-23" in windows["before"]["sql"] and "2026-05-18" in windows["after"]["sql"]
     assert result["change_point"] == {"date": "2026-04-06", "source": "argument",
                                       "logged_change": "Logged alpha change", "score": None,
-                                      "reason": None}
+                                      "direction": None, "reason": None}
     assert result["filters"] == FILTERS and result["mode"] == "drivers" and result["version"] == 1
 
 
@@ -180,6 +182,50 @@ def test_without_a_change_log_a_detected_change_says_it_could_not_be_named(monke
     assert not any(note in item for item in given["limits"])  # a date needs no log
 
 
+@pytest.mark.parametrize("metric, direction", [("call_volume", "rise"), ("csat_average_score", "fall")])
+def test_a_detected_change_reports_whether_the_metric_rose_or_fell(monkeypatch, metric, direction):
+    env = Env(monkeypatch, log=[])
+    result = env.explain(metric=metric, filters=FILTERS)
+
+    assert result["change_point"]["direction"] == direction
+    assert f"a {direction}, shift score" in change.render_change(result)
+
+
+def test_a_change_point_that_was_given_has_no_detected_direction(env):
+    assert env.explain(filters=FILTERS, change_point="2026-04-06")["change_point"]["direction"] is None
+
+
+def test_a_detected_fall_is_not_hidden_by_a_larger_rise_elsewhere(monkeypatch):
+    # Survey scores fall at the change; a later rise the other way scores higher, and is reported
+    # as a rise rather than filtered out. Without a change named, the largest shift wins.
+    env = Env(monkeypatch, log=[])
+    for call in env.calls:
+        if call.category == HOT and call.score is not None and call.day >= CHANGE + timedelta(days=56):
+            call.score = 5
+    cp = env.explain(metric="csat_average_score", filters=FILTERS)["change_point"]
+    assert cp["direction"] == "rise" and cp["date"] > "2026-05-01"
+
+
+def test_a_detected_shift_with_no_driver_in_the_calls_is_not_enough_evidence(monkeypatch):
+    model = FakeModel()
+    model.reasons = []  # the calls after the shift group into no reason
+    env = Env(monkeypatch, log=[], model=model)
+    result = env.explain(metric="call_volume", filters=FILTERS)
+
+    assert result["change_point"]["source"] == "detected" and result["drivers"] == []
+    assert result["limits"][0].startswith("Not enough evidence")
+    assert "Not enough evidence" in change.render_change(result).split("What the data could not")[0]
+
+
+def test_a_given_change_point_with_no_driver_is_not_called_unsupported(monkeypatch):
+    model = FakeModel()
+    model.reasons = []
+    env = Env(monkeypatch, model=model)
+    result = env.explain(metric="call_volume", filters=FILTERS, change_point="2026-04-06")
+
+    assert not any(item.startswith("Not enough evidence") for item in result["limits"])
+
+
 def test_a_detected_change_snaps_to_a_logged_change_within_seven_days(monkeypatch):
     env = Env(monkeypatch, log=[{"name": "Near", "date": "2026-04-10"},
                                 {"name": "Far", "date": "2026-02-02"}])
@@ -262,6 +308,39 @@ def test_drivers_are_counted_by_code_from_the_models_assignments(env):
         (d["after"]["n"] for d in result["drivers"]), reverse=True)
     assert result["unassigned"]["after"] == len(after) - notice["after"]["n"] - refund["after"]["n"]
     assert result["population"]["after"] == len(after) == result["coverage"]["read_after"]
+
+
+def test_a_driver_that_falls_after_the_change_is_reported_as_down(monkeypatch):
+    env = Env(monkeypatch)
+    after_notices = 0
+    for call in env.calls:
+        if call.category != HOT:
+            continue
+        if call.day < CHANGE:  # before the change every alpha call is a notice call
+            call.kind, call.text = "notice", TEXTS_NOTICE
+        elif call.kind == "notice":  # after it, keep only a handful
+            after_notices += 1
+            if after_notices > 5:
+                call.kind, call.text = "other", TEXTS_OTHER
+    result = env.explain(filters=FILTERS, change_point="2026-04-06")
+
+    drivers = {d["label"]: d for d in result["drivers"]}
+    notice, refund = drivers["Members were not told in advance"], drivers["Refund requests were turned down"]
+    assert notice["before"]["n"] > notice["after"]["n"] == 5 and notice["direction"] == "down"
+    assert refund["before"]["n"] == 0 and refund["direction"] == "up"
+    text = change.render_change(result)
+    assert "(fewer than before)" in text and "(more than before)" in text
+
+
+def test_a_driver_with_the_same_number_of_calls_in_both_windows_is_flat(monkeypatch):
+    env = Env(monkeypatch, event=False)
+    for call in env.calls:
+        if call.category == HOT and call.day.weekday() == 0:
+            call.kind, call.text = "notice", TEXTS_NOTICE
+    result = env.explain(filters=FILTERS, change_point="2026-04-06")
+
+    (notice,) = [d for d in result["drivers"] if d["label"] == "Members were not told in advance"]
+    assert notice["before"]["n"] == notice["after"]["n"] and notice["direction"] == "flat"
 
 
 def hash_order_calls(calls):

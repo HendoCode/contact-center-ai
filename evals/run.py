@@ -191,7 +191,12 @@ def format_table(table: dict[str, dict], keys: list[str]) -> str:
 async def run_offline(items: list[dict], evaluators: list | None = None) -> list[dict]:
     """Every item through the real graph on the offline doubles; deterministic scores."""
     from agent.graph import build_graph
-    from evals.offline import OfflineToolbox, ScriptedClassifier, corpus_call_exists
+    from evals.offline import (
+        OfflineToolbox,
+        ScriptedClassifier,
+        corpus_call_date,
+        corpus_call_exists,
+    )
 
     evaluators = evaluators or DETERMINISTIC
     calls = build_golden.load_calls()
@@ -201,6 +206,7 @@ async def run_offline(items: list[dict], evaluators: list | None = None) -> list
         get_llm=lambda: llm,
         toolbox=OfflineToolbox(items, calls),
         call_exists=corpus_call_exists({c["call_id"] for c in calls}),
+        call_date=corpus_call_date(calls),
         checkpointer=InMemorySaver(),
     )
     rows = []

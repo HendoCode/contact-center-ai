@@ -154,6 +154,45 @@ async def test_a_date_is_the_change_point(make, toolbox, when, expected):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("when, expected", [
+    ("2026-06-14", "2026-06-15"), ("June 18", "2026-06-15"), ("2026-04-12", "2026-04-15"),
+])
+async def test_a_date_near_a_logged_change_is_moved_to_it_and_the_answer_says_so(
+    make, toolbox, when, expected
+):
+    graph, _ = make("explain_change", frame={"measure": "calls", "when": when})
+    out = await graph.ainvoke({"question": f"Why did calls jump on {when}?"}, config())
+
+    (call,) = explain_calls(toolbox)
+    assert call["change_point"] == expected
+    assert "Note: you gave" in out["answer"]
+    assert f"so the analysis uses {expected}" in out["answer"]
+    assert "within 3 days of the logged change" in out["answer"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("when", ["2026-06-19", "2026-06-11", "2026-05-20"])
+async def test_a_date_beyond_the_tolerance_is_kept_as_stated(make, toolbox, when):
+    graph, _ = make("explain_change", frame={"measure": "calls", "when": when})
+    out = await graph.ainvoke({"question": f"Why did calls jump on {when}?"}, config())
+
+    (call,) = explain_calls(toolbox)
+    assert call["change_point"] == when
+    assert "logged change" not in out["answer"].split("Change analysis")[0]
+
+
+@pytest.mark.asyncio
+async def test_the_snap_note_does_not_carry_into_the_next_question(make, toolbox):
+    graph, llm = make("explain_change", frame={"measure": "calls", "when": "2026-06-14"})
+    first = await graph.ainvoke({"question": "Why did calls jump on 2026-06-14?"}, config())
+    assert "so the analysis uses 2026-06-15" in first["answer"]
+
+    llm.frame.update(when="2026-06-15")
+    second = await graph.ainvoke({"question": "And on 2026-06-15?"}, config())
+    assert "so the analysis uses" not in second["answer"]
+
+
+@pytest.mark.asyncio
 async def test_with_no_measure_named_call_volume_is_used_and_said_so(make, toolbox):
     graph, _ = make("explain_change", frame={"subject": "fee calls",
                                              "logged_change": "Fee schedule change"})
@@ -352,14 +391,43 @@ async def run_with(make, result) -> dict:
 
 
 @pytest.mark.asyncio
-async def test_a_citation_outside_the_windows_is_dropped_and_not_grounded(make):
+async def test_a_citation_inside_the_windows_is_kept_whichever_driver_list_holds_it(make):
     in_a_window = with_citation("CALL-00042")
     in_a_window["drivers"][0]["before"]["call_ids"] = ["CALL-00042"]
     assert (await run_with(make, in_a_window))["grounded"] is True
 
-    result = with_citation("CALL-00001")
-    result["drivers"][0]["after"]["call_ids"] = ["CALL-00002"]  # CALL-00001 is in no window
+
+@pytest.mark.asyncio
+async def test_a_citation_is_checked_against_the_call_date_not_the_tools_id_lists(make):
+    # CALL-00042 is dated 2026-04-01, inside the before window [2026-03-04, 2026-04-15).
+    result = with_citation("CALL-00042")
+    result["drivers"][0]["before"]["call_ids"] = ["CALL-00042"]
     out = await run_with(make, result)
+    assert out["citations"] == ["CALL-00042"] and out["grounded"] is True
+
+    # The same call, now dated before the windows begin, is dropped although the tool's own
+    # id list still names it.
+    from agent_support import CALL_DATES
+    original = CALL_DATES["CALL-00042"]
+    CALL_DATES["CALL-00042"] = "2026-02-27T11:00:00"
+    try:
+        out = await run_with(make, result)
+    finally:
+        CALL_DATES["CALL-00042"] = original
+    assert out["citations"] == [] and out["grounded"] is False
+
+
+@pytest.mark.asyncio
+async def test_a_citation_dated_on_the_after_window_end_is_outside(make):
+    # Windows are half-open: [after.start, after.end) excludes the end date.
+    from agent_support import CALL_DATES
+    result = with_citation("CALL-00001")
+    original = CALL_DATES["CALL-00001"]
+    CALL_DATES["CALL-00001"] = "2026-05-27T00:00:00"
+    try:
+        out = await run_with(make, result)
+    finally:
+        CALL_DATES["CALL-00001"] = original
     assert out["citations"] == [] and out["grounded"] is False
 
 

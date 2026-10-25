@@ -292,3 +292,13 @@ def corpus_call_exists(call_ids: set[str]):
         return call_id in call_ids
 
     return call_exists
+
+
+def corpus_call_date(calls: list[dict]):
+    """The stored date of each call, as the retriever's metadata lookup would give it."""
+    dates = {c["call_id"]: c["date"] for c in calls}
+
+    async def call_date(call_id: str) -> str | None:
+        return dates.get(call_id)
+
+    return call_date
