@@ -33,6 +33,7 @@ _MONTHS = {
 _MONTH = "|".join(sorted(_MONTHS, key=len, reverse=True))
 _LEAD = r"(?:(?:in|during|since|after|around|on|from)\s+)?(?:the\s+)?"
 _ISO_RE = re.compile(r"^\s*(\d{4})-(\d{2})-(\d{2})\s*$")
+_DATED_RE = re.compile(r"^(.*?)\s*\(\s*(\d{4}-\d{2}-\d{2})\s*\)$")
 _POINT_RE = re.compile(
     rf"^\s*{_LEAD}({_MONTH})\.?\s+(\d{{1,2}})(?:st|nd|rd|th)?\s*$", re.IGNORECASE
 )
@@ -67,11 +68,26 @@ def load_branches(directory: Path | None = None) -> list[str]:
 
 
 def match_logged_change(name: str | None, log: list[dict]) -> dict | None:
-    """The log entry a name refers to: an exact name, ignoring case and surrounding space."""
+    """The log entry a name refers to: an exact name, ignoring case and surrounding space.
+
+    The frame prompt lists each change as "name (date)", so a name that comes back with that
+    date, a list bullet or quotes around it still names the same entry. The date has to be the
+    entry's own.
+    """
     if not name:
         return None
-    wanted = " ".join(name.lower().split())
-    return next((e for e in log if " ".join(e["name"].lower().split()) == wanted), None)
+    wanted = _normal(name)
+    dated = _DATED_RE.match(wanted)
+    for entry in log:
+        if _normal(entry["name"]) == wanted:
+            return entry
+        if dated and dated[1] == _normal(entry["name"]) and dated[2] == entry["date"]:
+            return entry
+    return None
+
+
+def _normal(text: str) -> str:
+    return " ".join(text.lower().strip(" \t\n-*\"'`").split())
 
 
 def snap_point(day: date, log: list[dict]) -> dict | None:
