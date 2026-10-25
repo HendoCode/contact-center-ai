@@ -3,10 +3,14 @@ Run the agent golden set through the graph and score it.
 
     python -m evals.run                 # offline: fake LLM, stub tools, no keys (`make evals`)
     python -m evals.run --live          # real models and tools, uploads to LangSmith (`make evals-live`)
+    python -m evals.run --live --dataset change          # the change-analysis golden set
+    python -m evals.run --live --dataset change-holdout  # the held-out change events
 
 Offline runs the deterministic evaluators against the doubles in `evals/offline.py` and
 gates on `evals/known_failures.json`: the run fails on a failure that is not listed there,
 and on a listed failure that now passes (so the list only ever shrinks by hand). CI runs it.
+It scores the golden set and both change-analysis sets (change_golden.jsonl for the golden
+events, change_holdout.jsonl for the held-out ones), each reported in its own table.
 
 Live needs the full stack (`make up seed ingest`, `dbt build`), the agent's provider keys,
 LANGSMITH_API_KEY, and a judge model that differs from the agent's (EVAL_JUDGE_PROVIDER,
@@ -34,16 +38,30 @@ from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.types import Command
 
 from evals.datasets import build_golden
+from evals.datasets import build_change
+from evals.datasets.build_change import CHANGE_GOLDEN_PATH, CHANGE_HOLDOUT_PATH
 from evals.datasets.build_golden import DATA_DIR, GOLDEN_PATH, HOLDOUT_PATH, KINDS, REPO_ROOT
-from evals.evaluators import DETERMINISTIC, DETERMINISTIC_KEYS, JUDGE_PROMPT_VERSION
+from evals.evaluators import (
+    CHANGE_DETERMINISTIC,
+    CHANGE_KEYS,
+    DETERMINISTIC,
+    DETERMINISTIC_KEYS,
+    JUDGE_PROMPT_VERSION,
+)
 
 KNOWN_FAILURES_PATH = Path(__file__).resolve().parent / "known_failures.json"
 OUTPUT_KEYS = ("answer", "route", "metric_names", "sql", "citations", "grounded")
-INPUT_KEYS = ("question", "clarify_with")
+CHANGE_OUTPUT_KEYS = (*OUTPUT_KEYS, "change")  # a change answer's evidence, for its evaluators
+# prior_question: a change follow-up is asked on the thread of the question it follows.
+INPUT_KEYS = ("question", "clarify_with", "prior_question")
 MAX_INTERRUPTS = 4  # more than any golden question can raise; stops a runaway re-ask loop
 DATASET_PREFIX = "ccai-agent-golden"
 # --dataset NAME -> (file, LangSmith dataset prefix). The golden set is the default.
-DATASETS = {"golden": (GOLDEN_PATH, DATASET_PREFIX), "holdout": (HOLDOUT_PATH, "ccai-agent-holdout")}
+DATASETS = {"golden": (GOLDEN_PATH, DATASET_PREFIX), "holdout": (HOLDOUT_PATH, "ccai-agent-holdout"),
+            "change": (CHANGE_GOLDEN_PATH, "ccai-change-golden"),
+            "change-holdout": (CHANGE_HOLDOUT_PATH, "ccai-change-holdout")}
+# Change sets report under their own group, so golden and held-out events never pool.
+CHANGE_GROUPS = {"change": "change_golden", "change-holdout": "change_heldout"}
 DEFAULT_JUDGE_MODEL = "claude-opus-5-5"
 RESULTS_DIR = REPO_ROOT / "results" / "evals"
 LATEST_PATH = RESULTS_DIR / "LATEST"
@@ -55,10 +73,26 @@ def load_golden(path: Path = GOLDEN_PATH) -> list[dict]:
     return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
 
 
+def load_dataset(name: str) -> list[dict]:
+    """A named dataset's items. Change items gain `group` (change_golden or change_heldout)
+    and, for a follow-up, `prior_question`: the question it follows on the same thread."""
+    items = load_golden(DATASETS[name][0])
+    if name in CHANGE_GROUPS:
+        questions = {item["id"]: item["question"] for item in items}
+        for item in items:
+            item["group"] = CHANGE_GROUPS[name]
+            item["prior_question"] = questions.get(item["follow_up_of"])
+    return items
+
+
+def evaluators_for(name: str) -> tuple[list, list[str]]:
+    return (CHANGE_DETERMINISTIC, CHANGE_KEYS) if name in CHANGE_GROUPS else (DETERMINISTIC, DETERMINISTIC_KEYS)
+
+
 def split(item: dict) -> tuple[dict, dict]:
     """(inputs, reference_outputs): what the agent sees, and what it is scored against."""
-    inputs = {k: item[k] for k in INPUT_KEYS}
-    reference = {k: v for k, v in item.items() if k not in (*INPUT_KEYS, "id", "kind")}
+    inputs = {k: item[k] for k in INPUT_KEYS if k in item}
+    reference = {k: v for k, v in item.items() if k not in (*INPUT_KEYS, "id", "kind", "group")}
     return inputs, reference
 
 
@@ -71,12 +105,20 @@ def ensure_corpus() -> None:
 
 # ── the target ────────────────────────────────────────────────────────────────
 
-async def run_question(graph, question: str, clarify_with: list[str] | None = None) -> dict:
+async def run_question(graph, question: str, clarify_with: list[str] | None = None,
+                       prior_question: str | None = None) -> dict:
     """One golden question through the graph, answering any clarify interrupt the way
     the golden user would: with the metrics they mean among the options offered, or the
     first option when none of them is offered. Returns the graph's output fields plus
-    `interrupts`, one {term, options} per interrupt raised."""
+    `interrupts`, one {term, options} per interrupt raised. With `prior_question`, that
+    question is asked first on the same thread and only the follow-up is returned."""
     config = {"configurable": {"thread_id": str(uuid.uuid4())}}
+    if prior_question:
+        await _ask(graph, prior_question, None, config)
+    return await _ask(graph, question, clarify_with, config)
+
+
+async def _ask(graph, question: str, clarify_with: list[str] | None, config: dict) -> dict:
     result = await graph.ainvoke({"question": question}, config)
     interrupts = []
     while result.get("__interrupt__") and len(interrupts) < MAX_INTERRUPTS:
@@ -85,7 +127,7 @@ async def run_question(graph, question: str, clarify_with: list[str] | None = No
         interrupts.append({"term": payload["term"], "options": options})
         meant = [m for m in clarify_with or [] if m in options]
         result = await graph.ainvoke(Command(resume={"choices": meant or options[:1]}), config)
-    return {**{k: result.get(k) for k in OUTPUT_KEYS}, "interrupts": interrupts}
+    return {**{k: result.get(k) for k in CHANGE_OUTPUT_KEYS}, "interrupts": interrupts}
 
 
 # ── scoring ───────────────────────────────────────────────────────────────────
@@ -95,9 +137,9 @@ def summarize(rows: list[dict], keys: list[str]) -> dict[str, dict]:
     groups: dict[str, list[dict]] = defaultdict(list)
     for row in rows:
         groups["all"].append(row)
-        groups[row["kind"]].append(row)
+        groups[row.get("group") or row["kind"]].append(row)
     table = {}
-    for group in ("all", *KINDS):
+    for group in ("all", *KINDS, *CHANGE_GROUPS.values()):
         members = groups.get(group, [])
         if not members:
             continue
@@ -146,13 +188,15 @@ def format_table(table: dict[str, dict], keys: list[str]) -> str:
 
 # ── offline ───────────────────────────────────────────────────────────────────
 
-async def run_offline(items: list[dict]) -> list[dict]:
+async def run_offline(items: list[dict], evaluators: list | None = None) -> list[dict]:
     """Every item through the real graph on the offline doubles; deterministic scores."""
     from agent.graph import build_graph
     from evals.offline import OfflineToolbox, ScriptedClassifier, corpus_call_exists
 
+    evaluators = evaluators or DETERMINISTIC
     calls = build_golden.load_calls()
-    llm = ScriptedClassifier({item["question"]: item["route"] for item in items})
+    llm = ScriptedClassifier({item["question"]: item["route"] for item in items},
+                             build_change.frames())
     graph = build_graph(
         get_llm=lambda: llm,
         toolbox=OfflineToolbox(items, calls),
@@ -162,11 +206,17 @@ async def run_offline(items: list[dict]) -> list[dict]:
     rows = []
     for item in items:
         inputs, reference = split(item)
-        outputs = await run_question(graph, inputs["question"], inputs["clarify_with"])
-        results = {r["key"]: r for r in (ev(inputs, outputs, reference) for ev in DETERMINISTIC)}
-        rows.append({"id": item["id"], "kind": item["kind"], "outputs": outputs,
-                     "results": results})
+        outputs = await run_question(graph, inputs["question"], inputs.get("clarify_with"),
+                                     inputs.get("prior_question"))
+        results = {r["key"]: r for r in (ev(inputs, outputs, reference) for ev in evaluators)}
+        rows.append({"id": item["id"], "kind": item["kind"], "group": item.get("group"),
+                     "outputs": outputs, "results": results})
     return rows
+
+
+def run_change_offline(name: str) -> list[dict]:
+    """One change set offline; `name` is "change" or "change-holdout"."""
+    return asyncio.run(run_offline(load_dataset(name), CHANGE_DETERMINISTIC))
 
 
 def offline_main() -> int:
@@ -180,9 +230,20 @@ def offline_main() -> int:
               file=sys.stderr)
         return 1
 
+    if build_change.main(["--check"]) != 0:
+        return 1
+
     rows = asyncio.run(run_offline(items))
     print(f"agent golden set, offline (scripted classifier, stub tools): {len(rows)} items\n")
     print(format_table(summarize(rows, DETERMINISTIC_KEYS), DETERMINISTIC_KEYS))
+    for name in CHANGE_GROUPS:
+        change_rows = run_change_offline(name)
+        table = summarize(change_rows, CHANGE_KEYS)
+        table.pop("all")
+        print(f"\n{name} set, offline (scripted classifier and frame, explain_change over the "
+              f"corpus with an answer-key driver model): {len(change_rows)} items\n")
+        print(format_table(table, CHANGE_KEYS))
+        rows += change_rows
 
     found = failures(rows)
     known = json.loads(KNOWN_FAILURES_PATH.read_text())["failures"]
@@ -250,7 +311,8 @@ def sync_dataset(client, items: list[dict], name: str, path: Path = GOLDEN_PATH)
         for item in missing:
             inputs, reference = split(item)
             examples.append({"inputs": inputs, "outputs": reference,
-                             "metadata": {"golden_id": item["id"], "kind": item["kind"]}})
+                             "metadata": {"golden_id": item["id"], "kind": item["kind"],
+                                     **({"group": item["group"]} if item.get("group") else {})}})
         client.create_examples(dataset_name=name, examples=examples)
 
 
@@ -285,17 +347,18 @@ def redact_home(value):
     return value
 
 
-def _row(result_row: dict) -> dict:
+def _row(result_row: dict, output_keys: tuple = OUTPUT_KEYS) -> dict:
     example = result_row["example"]
     results = {
         r.key: {"key": r.key, "score": r.score, "comment": r.comment or ""}
         for r in result_row["evaluation_results"]["results"]
     }
     outputs = getattr(result_row["run"], "outputs", None) or {}
+    group = {"group": example.metadata["group"]} if example.metadata.get("group") else {}
     return redact_home({"id": example.metadata["golden_id"], "kind": example.metadata["kind"],
-                        "error": result_row["run"].error, "results": results,
+                        **group, "error": result_row["run"].error, "results": results,
                         "tool_error": tool_error(outputs.get("answer")),
-                        "outputs": {k: outputs.get(k) for k in OUTPUT_KEYS}})
+                        "outputs": {k: outputs.get(k) for k in output_keys}})
 
 
 def result_path(run: str, sha: str, now: datetime | None = None, out_dir: Path | None = None) -> Path:
@@ -351,7 +414,8 @@ async def run_live(limit: int | None, max_concurrency: int, run_name: str | None
     check_judge_differs(agent_model, judge_model)
 
     path, prefix = DATASETS[dataset_name]
-    items = load_golden(path)
+    items = load_dataset(dataset_name)
+    evaluators, keys = evaluators_for(dataset_name)
     client = Client()
     dataset = f"{prefix}-{golden_sha(path)[:8]}"
     sync_dataset(client, items, dataset, path)
@@ -359,7 +423,8 @@ async def run_live(limit: int | None, max_concurrency: int, run_name: str | None
     graph = build_graph(get_llm=get_llm, toolbox=MCPToolbox(), checkpointer=InMemorySaver())
 
     async def target(inputs: dict) -> dict:
-        return await run_question(graph, inputs["question"], inputs.get("clarify_with"))
+        return await run_question(graph, inputs["question"], inputs.get("clarify_with"),
+                                  inputs.get("prior_question"))
 
     if groups:
         data = select_examples(client.list_examples(dataset_name=dataset), groups, limit)
@@ -378,12 +443,14 @@ async def run_live(limit: int | None, max_concurrency: int, run_name: str | None
     }
     results = await aevaluate(
         target, data=data,
-        evaluators=[*DETERMINISTIC, make_judge(judge_llm)],
-        experiment_prefix=f"agent-golden-{provider}",
+        evaluators=[*evaluators, make_judge(judge_llm)],
+        experiment_prefix=f"agent-{dataset_name}-{provider}" if dataset_name in CHANGE_GROUPS
+        else f"agent-golden-{provider}",
         metadata=params, max_concurrency=max_concurrency, client=client,
     )
-    rows = [_row(r) async for r in results]
-    keys = [*DETERMINISTIC_KEYS, "judge"]
+    output_keys = CHANGE_OUTPUT_KEYS if dataset_name in CHANGE_GROUPS else OUTPUT_KEYS
+    rows = [_row(r, output_keys) async for r in results]
+    keys = [*keys, "judge"]
     table = summarize(rows, keys)
     print(format_table(table, keys))
 
@@ -424,7 +491,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--run", help="live only: run name in the results file "
                                       "(default agent-<dataset>-<LLM_PROVIDER>)")
     parser.add_argument("--dataset", choices=sorted(DATASETS), default="golden",
-                        help="live only: golden (default, 52 questions) or holdout (agent_holdout.jsonl)")
+                        help="live only: golden (default, 52 questions), holdout (agent_holdout.jsonl), "
+                             "change (change_golden.jsonl) or change-holdout (change_holdout.jsonl)")
     parser.add_argument("--group", help=f"live only: score only these groups, comma-separated ({', '.join(KINDS)})")
     args = parser.parse_args(argv)
     groups = [g.strip() for g in args.group.split(",") if g.strip()] if args.group else None

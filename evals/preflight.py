@@ -18,7 +18,8 @@ check prints one clear message and the run stops at the first failure:
 
 The estimate prices the agent and judge models from OpenRouter's public model list
 (https://openrouter.ai/api/v1/models, no key needed), using the token assumptions in
-ASSUMPTIONS below. It is a range, not a quote.
+ASSUMPTIONS below (CHANGE_ASSUMPTIONS for the change-analysis sets). It is a range, not a
+quote.
 """
 
 from __future__ import annotations
@@ -56,6 +57,15 @@ ASSUMPTIONS = {
     "agent": Usage(calls=(3, 6), input_tokens=(1_500, 4_000), output_tokens=(150, 400)),
     "judge": Usage(calls=(1, 1), input_tokens=(1_500, 3_000), output_tokens=(100, 300)),
 }
+# Assumed tokens per change-analysis question. Besides classify, frame and the answer, the
+# explain_change tool asks the model to propose drivers from up to 30 calls and to assign
+# every call in both windows to one, 20 calls per request; the answer the judge reads is longer.
+CHANGE_ASSUMPTIONS = {
+    "agent": Usage(calls=(6, 20), input_tokens=(2_000, 8_000), output_tokens=(200, 1_500)),
+    "judge": Usage(calls=(1, 1), input_tokens=(2_500, 5_000), output_tokens=(150, 400)),
+}
+DATASET_FILES = {"golden": "agent_golden.jsonl", "holdout": "agent_holdout.jsonl",
+                 "change": "change_golden.jsonl", "change-holdout": "change_holdout.jsonl"}
 
 
 def golden_count(path: Path = GOLDEN_PATH, groups: list[str] | None = None) -> int:
@@ -286,27 +296,32 @@ def run_checks(env: os._Environ | dict = os.environ) -> Iterator[str]:
 
 
 def print_estimate(limit: int | None, dataset: str = "golden", groups: list[str] | None = None) -> None:
-    path = GOLDEN_PATH.parent / f"agent_{dataset}.jsonl"
+    path = GOLDEN_PATH.parent / DATASET_FILES[dataset]
     total = golden_count(path, groups)
     n = min(limit, total) if limit else total
+    assumptions = ASSUMPTIONS
+    if dataset.startswith("change"):
+        assumptions = CHANGE_ASSUMPTIONS
+        rows = [json.loads(line) for line in path.read_text().splitlines() if line.strip()][:n]
+        n += sum(1 for r in rows if r.get("follow_up_of"))  # a follow-up asks its base question first
     models = priced_models()
     try:
         prices = fetch_prices()
     except (OSError, ValueError) as exc:
         print(f"==> Cost estimate unavailable: OpenRouter's model list did not load ({exc})")
         return
-    low, high, lines = estimate(prices, models, n)
+    low, high, lines = estimate(prices, models, n, assumptions)
     print(f"==> Estimated cost for {n} question(s): ${low:.2f} to ${high:.2f}")
     for line in lines:
         print(f"    {line}")
-    print(f"    {assumption_text()}")
+    print(f"    {assumption_text(assumptions)}")
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Checks and a cost estimate before make evals-live.")
     parser.add_argument("--limit", type=int, help="questions the run will score (default all)")
     parser.add_argument("--estimate-only", action="store_true", help="print the estimate, skip the checks")
-    parser.add_argument("--dataset", choices=("golden", "holdout"), default="golden", help="question set to count")
+    parser.add_argument("--dataset", choices=sorted(DATASET_FILES), default="golden", help="question set to count")
     parser.add_argument("--group", help="comma-separated groups the run scores (default all)")
     args = parser.parse_args(argv)
     if not args.estimate_only:
