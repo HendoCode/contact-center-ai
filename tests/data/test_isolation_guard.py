@@ -26,6 +26,9 @@ GUARDED = [
     "agent/subgraphs/change.py",
     "agent/state.py",
     "agent/demo_change.py",
+    "agent/citation_view.py",
+    "ccai_mcp/masking.py",
+    "results/demo/*.json",
     "tools/demo_chat.py",
     "evals/datasets/*.jsonl",
     "evals/datasets/*.py",
@@ -79,6 +82,7 @@ def test_the_guard_covers_the_surfaces_that_exist():
     assert {"agent/prompts/frame.md", "agent/data/change_measures.yml",
             "agent/data/change_subjects.yml", "agent/changes.py", "agent/subgraphs/change.py",
             "ccai_mcp/change.py", "agent/demo_change.py",
+            "agent/citation_view.py", "ccai_mcp/masking.py",
             "tools/demo_chat.py"} <= names
     assert {"evals/datasets/change_golden.jsonl", "evals/datasets/change_holdout.jsonl",
             "evals/datasets/change_specs.py", "evals/datasets/change_holdout_specs.py",

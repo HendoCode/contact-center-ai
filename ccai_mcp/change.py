@@ -38,6 +38,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
+from ccai_mcp.masking import mask_accounts
 from ccai_mcp.metrics import query_metric_raw
 from rag.pipeline import get_llm
 from retrieval import get_retriever
@@ -348,6 +349,8 @@ def _verbatim(quote, text: str) -> str | None:
         return None
     quote = _norm(quote).strip("\"'“” ")
     if not MIN_QUOTE <= len(quote) <= MAX_QUOTE or _ID_RE.search(quote):
+        return None
+    if mask_accounts(quote) != quote:  # a quote never carries a full account number
         return None
     return quote if quote in _norm(text) else None
 
@@ -884,7 +887,7 @@ def render_change(result: dict, *, with_sql: bool = True) -> str:
         for p in result["patterns"]:
             lines += ["", f'- {p["label"]}: {p["n"]} of {p["of"]} calls in "{p["driver"]}". '
                           f'{p["definition"]}']
-            lines += [f'    {c["call_id"]}: "{c["quote"]}"' for c in p["citations"]]
+            lines += [f'    {c["call_id"]}: "{mask_accounts(c["quote"])}"' for c in p["citations"]]
         if not result["patterns"]:
             lines += ["", "No pattern in how the calls were handled was found."]
     else:
@@ -929,7 +932,7 @@ def render_change(result: dict, *, with_sql: bool = True) -> str:
                     lines.append(f"- {d['label']}: {share}; {d['before']['n']} in the "
                                  f"before window" + (f" ({moved})" if moved else "")
                                  + f". {d['definition']}")
-                    lines += [f'    {c["call_id"]}: "{c["quote"]}"' for c in d["citations"]]
+                    lines += [f'    {c["call_id"]}: "{mask_accounts(c["quote"])}"' for c in d["citations"]]
                 if not result["drivers"]:
                     lines.append("- none found")
                 if result["unassigned"] and result["unassigned"]["after"]:

@@ -103,8 +103,8 @@ async def test_all_six_steps_run_as_scripted_and_each_is_timed(capsys, monkeypat
     assert out.count("  time:     ") == 6
     assert "INTERRUPT:" in out and "overdraft_fee_revenue" in out
     assert "Coaching patterns across calls" in out
-    assert "citation: CALL-00001" in out and f">> MEMBER: {QUOTE}" in out
-    assert "masked to its last four digits" in out
+    assert "citation  CALL-00001" in out and f">> MEMBER: {QUOTE}" in out
+    assert "2026-04-20 (Mon)" in out and "masked to the last four digits" in out
     assert "same numbers as step 1" in out
     assert "MISMATCH" not in out
     coaching = [a for a in toolbox.tool_calls("explain_change") if a.get("mode") == "coaching"]
@@ -118,8 +118,10 @@ async def test_an_unmasked_account_number_is_reported(capsys):
     outcomes, _ = await run_steps(_graph(toolbox), toolbox, leaky, STEPS)
 
     assert outcomes[4].mismatches == [
-        "an account number is not masked to its last four digits: 123456789"]
-    assert "$1,234,567.89" not in demo_change.UNMASKED_ACCOUNT.findall("$1,234,567.89 ending 0531")
+        "an account number in the stored transcript is not masked to its last four digits "
+        "(the view above masks it)"]
+    out = capsys.readouterr().out
+    assert "123456789" not in out and "****6789" in out
 
 
 @pytest.mark.asyncio
@@ -239,3 +241,39 @@ def test_a_stale_index_is_caught_by_its_count(monkeypatch):
     check = demo_change.check_index(1540)
 
     assert not check.ok and "1,250" in check.detail and "--reset" in check.fix
+
+
+# ── record and replay ────────────────────────────────────────────────────────
+
+def test_replay_prints_the_recorded_run_under_a_banner_with_date_and_sha(tmp_path, capsys):
+    path = tmp_path / "run.json"
+    demo_change.write_record("== 1/6  a step ==\n  answer: fees rose\n", path)
+
+    assert demo_change.replay(path) == 0
+    out = capsys.readouterr().out
+    record = __import__("json").loads(path.read_text())
+
+    assert out.count("RECORDED RUN - NOT LIVE") == 2  # top and bottom
+    assert record["recorded_at"] in out and record["git_sha"] in out
+    assert "answer: fees rose" in out
+
+
+def test_a_recorded_account_number_is_masked(tmp_path):
+    path = tmp_path / "run.json"
+    demo_change.write_record("MEMBER: my account 123456789\n", path)
+    assert "123456789" not in path.read_text()
+
+
+def test_replay_without_a_record_says_how_to_make_one(tmp_path, capsys):
+    path = demo_change.REPO_ROOT / "results" / "demo" / "does-not-exist.json"
+
+    assert demo_change.replay(path) == 1
+    assert "make demo-change" in capsys.readouterr().err
+
+
+def test_replay_of_a_damaged_record_fails_cleanly(tmp_path, capsys):
+    path = tmp_path / "run.json"
+    path.write_text("{not json")
+
+    assert demo_change.replay(path) == 1
+    assert "cannot be read" in capsys.readouterr().err
