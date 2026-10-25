@@ -9,6 +9,7 @@ from agent.nodes.classify import CALL_ID_RE
 from agent.state import AgentState
 
 CallExists = Callable[[str], Awaitable[bool]]
+CallDate = Callable[[str], Awaitable[str | None]]  # the call's ISO date, or None if no such call
 AGENT_ID_RE = re.compile(r"\bAGT-\d+\b")  # a change answer reports patterns, never an agent
 
 
@@ -19,10 +20,21 @@ async def retriever_call_exists(call_id: str) -> bool:
     return await asyncio.to_thread(get_retriever().get_by_id, call_id) is not None
 
 
-def _window_call_ids(change: dict) -> set[str]:
-    """Every call the analysis attributes to a window or a coaching pattern."""
-    ids = {c for d in change.get("drivers", []) for w in ("before", "after") for c in d[w]["call_ids"]}
-    return ids | {c for p in change.get("patterns", []) for c in p["call_ids"]}
+async def retriever_call_date(call_id: str) -> str | None:
+    """The stored date of a call (the same metadata lookup), or None when there is no such call."""
+    from retrieval import get_retriever
+
+    hit = await asyncio.to_thread(get_retriever().get_by_id, call_id)
+    return (str(hit.metadata.get("date") or "") or None) if hit else None
+
+
+def _in_windows(day: str | None, change: dict) -> bool:
+    """Whether a call's date falls in [before.start, after.end): the dates the answer states,
+    compared with the call's own date rather than the tool's lists of call ids."""
+    windows = change.get("windows")
+    if not day or not windows:
+        return False
+    return windows["before"]["start"] <= day[:10] < windows["after"]["end"]
 
 
 def _windows_have_sql(change: dict) -> bool:
@@ -33,7 +45,7 @@ def _windows_have_sql(change: dict) -> bool:
     return bool((change.get("series") or {}).get("sql"))
 
 
-async def _ground_change(state: AgentState, call_exists: CallExists) -> dict:
+async def _ground_change(state: AgentState, call_date: CallDate) -> dict:
     """An explain_change answer counts only with both window SQLs, citations that are real calls
     inside the windows, and no agent id. A refusal says what could not be resolved and claims
     nothing, so there is nothing to check."""
@@ -41,10 +53,13 @@ async def _ground_change(state: AgentState, call_exists: CallExists) -> dict:
         return {"citations": [], "grounded": True}
     change = state.get("change") or {}
     cited = state.get("citations", [])
-    inside = _window_call_ids(change)
-    real = [c for c in cited if c in inside and await call_exists(c)]
+    real = [c for c in cited if _in_windows(await call_date(c), change)]
     shown = state.get("tool_output", "") + json.dumps(change)
-    found_change_point = change.get("change_point", {}).get("source") != "none"
+    # A detected shift with no driver in the calls is reported as unsupported: it claims nothing.
+    point = change.get("change_point", {})
+    found_change_point = point.get("source") != "none" and not (
+        point.get("source") == "detected" and not change.get("drivers") and not change.get("patterns")
+    )
     grounded = (
         bool(change)
         and bool(state.get("sql"))
@@ -56,10 +71,10 @@ async def _ground_change(state: AgentState, call_exists: CallExists) -> dict:
     return {"citations": real, "grounded": grounded}
 
 
-def make_ground(call_exists: CallExists):
+def make_ground(call_exists: CallExists, call_date: CallDate = retriever_call_date):
     async def ground(state: AgentState) -> dict:
         if state["route"] == "explain_change":
-            return await _ground_change(state, call_exists)
+            return await _ground_change(state, call_date)
         if state["route"] == "resolve_metric":
             # A metric answer counts only with declared metrics and the SQL that produced it.
             return {"grounded": bool(state.get("sql")) and bool(state.get("metric_names"))}

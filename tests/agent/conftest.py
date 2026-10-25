@@ -6,7 +6,7 @@ pytest.importorskip(
     "fastmcp", reason="install the agent group: uv sync --extra dev --group agent"
 )
 
-from agent_support import BRANCHES, CHANGE_LOG, FakeLLM, StubToolbox, call_exists  # noqa: E402
+from agent_support import BRANCHES, CHANGE_LOG, FakeLLM, StubToolbox, call_date, call_exists  # noqa: E402
 from langgraph.checkpoint.memory import InMemorySaver  # noqa: E402
 
 from agent.graph import build_graph  # noqa: E402
@@ -40,6 +40,7 @@ def make(toolbox, saver):
             get_llm=lambda: llm,
             toolbox=tools or toolbox,
             call_exists=call_exists,
+            call_date=call_date,
             checkpointer=checkpointer or saver,
         )
         return graph, llm

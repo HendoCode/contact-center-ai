@@ -15,6 +15,7 @@ from pathlib import Path
 
 SYNTHETIC_DIR = Path(__file__).resolve().parent.parent / "data" / "synthetic"
 PAD_DAYS = 3  # a period is widened by this many days on each side before it is searched
+POINT_SNAP_DAYS = 3  # a stated date this close to a logged change is taken to mean that change
 
 _MONTHS = {
     name: number
@@ -71,6 +72,14 @@ def match_logged_change(name: str | None, log: list[dict]) -> dict | None:
         return None
     wanted = " ".join(name.lower().split())
     return next((e for e in log if " ".join(e["name"].lower().split()) == wanted), None)
+
+
+def snap_point(day: date, log: list[dict]) -> dict | None:
+    """The logged change within POINT_SNAP_DAYS of a stated date (the nearest, the earlier on a
+    tie), or None. A stated date on the change's own day is also returned, so callers can name it."""
+    near = [(abs((date.fromisoformat(e["date"]) - day).days), e["date"], e) for e in log
+            if abs((date.fromisoformat(e["date"]) - day).days) <= POINT_SNAP_DAYS]
+    return min(near, key=lambda t: t[:2])[2] if near else None
 
 
 # ── periods ──────────────────────────────────────────────────────────────────

@@ -141,5 +141,14 @@ async def call_exists(call_id: str) -> bool:
     return call_id in EXISTING_CALLS
 
 
+# CALL-00042 falls in the before window of `change_result`, the others in its after window.
+CALL_DATES = {"CALL-00001": "2026-04-20T09:30:00", "CALL-00002": "2026-05-04T14:05:00",
+              "CALL-00042": "2026-04-01T11:00:00"}
+
+
+async def call_date(call_id: str) -> str | None:
+    return CALL_DATES.get(call_id)
+
+
 def config(thread_id: str = "t1") -> dict:
     return {"configurable": {"thread_id": thread_id}}

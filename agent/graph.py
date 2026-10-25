@@ -17,7 +17,7 @@ from langgraph.graph import END, START, StateGraph
 from agent.nodes.answer import answer
 from agent.nodes.calls import make_retrieve, make_summarize_call
 from agent.nodes.classify import make_classify
-from agent.nodes.ground import CallExists, make_ground, retriever_call_exists
+from agent.nodes.ground import CallDate, CallExists, make_ground, retriever_call_date, retriever_call_exists
 from agent.state import AgentInput, AgentOutput, AgentState
 from agent.subgraphs.analyst import build_analyst
 from agent.subgraphs.change import build_change
@@ -29,6 +29,7 @@ def build_graph(
     get_llm: Callable[[], object],
     toolbox: Toolbox,
     call_exists: CallExists = retriever_call_exists,
+    call_date: CallDate = retriever_call_date,
     checkpointer=None,
 ):
     """Compile the graph. `get_llm` is called when classify runs, never at build time."""
@@ -38,7 +39,7 @@ def build_graph(
     graph.add_node("summarize_call", make_summarize_call(toolbox))
     graph.add_node("resolve_metric", build_analyst(toolbox))
     graph.add_node("explain_change", build_change(toolbox, get_llm))
-    graph.add_node("ground", make_ground(call_exists))
+    graph.add_node("ground", make_ground(call_exists, call_date))
     graph.add_node("answer", answer)
 
     graph.add_edge(START, "classify")

@@ -6,6 +6,7 @@ from agent_support import (
     NO_FRAME,
     FakeLLM,
     StubToolbox,
+    call_date,
     call_exists,
     change_result,
     coaching_result,
@@ -62,7 +63,7 @@ class DemoToolbox(StubToolbox):
 
 def _graph(toolbox):
     return build_graph(get_llm=lambda: ScriptedModel(), toolbox=toolbox, call_exists=call_exists,
-                       checkpointer=InMemorySaver())
+                       call_date=call_date, checkpointer=InMemorySaver())
 
 
 def _fetch(text: str = f"MEMBER: Hello. AGENT: Hi. MEMBER: {QUOTE} AGENT: Sorry."):

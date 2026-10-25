@@ -13,6 +13,7 @@ from agent.changes import (
     match_logged_change,
     parse_period,
     parse_point,
+    snap_point,
 )
 
 DATA = {"start": "2026-03-03", "end": "2026-09-02"}
@@ -101,3 +102,21 @@ def test_a_logged_change_matches_by_exact_name_only():
     assert match_logged_change("  fee SCHEDULE change ", log) == log[0]
     assert match_logged_change("fee change", log) is None
     assert match_logged_change(None, log) is None
+
+
+LOG = [{"name": "Fee change", "date": "2026-04-15"}, {"name": "Rule change", "date": "2026-04-19"}]
+
+
+@pytest.mark.parametrize("day, expected", [
+    (date(2026, 4, 15), "Fee change"), (date(2026, 4, 12), "Fee change"),
+    (date(2026, 4, 18), "Rule change"),  # the nearer of two
+    (date(2026, 4, 17), "Fee change"),  # equally near: the earlier
+    (date(2026, 4, 9), None), (date(2026, 4, 23), None),
+])
+def test_snap_point_takes_the_nearest_logged_change_within_three_days(day, expected):
+    found = snap_point(day, LOG)
+    assert (found["name"] if found else None) == expected
+
+
+def test_snap_point_with_no_log_finds_nothing():
+    assert snap_point(date(2026, 4, 15), []) is None
