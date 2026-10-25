@@ -80,7 +80,9 @@ def test_the_script_is_the_six_acceptance_questions_in_order():
     assert len({STEPS[i].thread for i in (0, 1, 3)}) == 3
 
 
-def test_the_mcp_step_sends_the_logged_date_and_the_question():
+def test_the_mcp_step_sends_the_logged_date_and_the_question(monkeypatch):
+    monkeypatch.setattr(demo_change, "load_change_log",
+                        lambda: [{"name": demo_change.FEE_CHANGE, "date": "2026-04-15"}])
     arguments = demo_change._mcp_arguments()
     assert arguments["change_point"] == "2026-04-15"
     assert arguments["metric"] == "csat_average_score"
@@ -88,7 +90,9 @@ def test_the_mcp_step_sends_the_logged_date_and_the_question():
 
 
 @pytest.mark.asyncio
-async def test_all_six_steps_run_as_scripted_and_each_is_timed(capsys):
+async def test_all_six_steps_run_as_scripted_and_each_is_timed(capsys, monkeypatch):
+    monkeypatch.setattr(demo_change, "load_change_log",
+                        lambda: [{"name": demo_change.FEE_CHANGE, "date": "2026-04-15"}])
     toolbox = DemoToolbox()
     outcomes, failures = await run_steps(_graph(toolbox), toolbox, _fetch(), STEPS)
 
@@ -202,7 +206,7 @@ def test_a_down_database_skips_the_checks_that_need_it(monkeypatch):
                         lambda url: Check("postgres", False, "refused", "make up"))
     for name in ("check_oltp", "check_marts", "check_index"):
         monkeypatch.setattr(demo_change, name, lambda *a, _n=name: seen.append(_n))
-    monkeypatch.setattr(demo_change.json, "loads", lambda text: [{}])
+    monkeypatch.setattr(demo_change, "_generated_calls", lambda: 1)
 
     checks = demo_change.preflight()
 

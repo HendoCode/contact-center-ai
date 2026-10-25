@@ -80,7 +80,7 @@ def check_data() -> Check:
     if missing:
         return Check("data", False, f"missing {', '.join(missing)} in data/synthetic/",
                      "make seed")
-    count = len(json.loads((SYNTHETIC_DIR / "transcripts.json").read_text()))
+    count = _generated_calls()
     return Check("data", True, f"{count:,} synthetic calls and a change log of "
                  f"{len(load_change_log())} changes")
 
@@ -197,13 +197,16 @@ def _first_line(exc: Exception) -> str:
     return (str(exc).strip().splitlines() or [type(exc).__name__])[0]
 
 
+def _generated_calls() -> int:
+    return len(json.loads((SYNTHETIC_DIR / "transcripts.json").read_text()))
+
+
 def preflight() -> list[Check]:
     """Every check, in the order the pieces are built. Later ones are skipped when an earlier
     one they depend on failed, so a missing database prints one fix, not five."""
     url = _env("DATABASE_URL", DEFAULT_DATABASE_URL)
     checks = [check_data()]
-    expected = (len(json.loads((SYNTHETIC_DIR / "transcripts.json").read_text()))
-                if checks[0].ok else 0)
+    expected = _generated_calls() if checks[0].ok else 0
     checks += check_models()
     postgres = check_postgres(url)
     checks.append(postgres)
