@@ -1,6 +1,11 @@
 """Change-analysis demo: six timed questions, behind a preflight that names the fix.
 
     python -m agent.demo_change [--strict] [--preflight-only] [--skip-preflight]
+    python -m agent.demo_change --replay
+
+`--replay` prints the transcript of the last verified live run under a RECORDED banner, with its
+date and git SHA, for when a provider or the network is down. A live run that finishes with every
+step as scripted writes that record (`results/demo/`).
 
 Supervisors ask why a number moved. The six steps put that to the real graph and the real MCP
 tools, in order, printing each answer with its timing:
@@ -9,7 +14,8 @@ tools, in order, printing each answer with its timing:
 2. "What do we make on fees?": the agent asks which fee, then answers after the choice
 3. a follow-up on step 1's thread: what to coach on, as patterns across calls
 4. the same kind of question for a change type the route was never tuned on
-5. opening one citation from step 1: the cited call, account numbers masked
+5. opening one citation from step 1: the call id, date and cited turn with a little context,
+   account numbers masked to their last four digits
 6. step 1's question as an MCP client asks it, through the `explain_change` tool
 
 The preflight runs first and checks the data files, Postgres, the vector index, the semantic
@@ -24,22 +30,26 @@ printed as a mismatch and does not fail the run unless `--strict` is given. An e
 
 import argparse
 import asyncio
+import io
 import json
 import os
-import re
+import subprocess
 import sys
 import time
 import urllib.request
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from pathlib import Path
 
 import psycopg2
 
+from agent.citation_view import render_citation
 from agent.demo import _clip, _indent
 from agent.tools import MCPToolbox
 from ccai_mcp.change import RESULT_MARKER, load_change_log
+from ccai_mcp.masking import mask_accounts
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SYNTHETIC_DIR = REPO_ROOT / "data" / "synthetic"
@@ -52,8 +62,7 @@ FEE_QUESTION = "Why did satisfaction on fee calls drop after the fee schedule ch
 FEE_CHANGE = "Fee schedule change"
 FEE_CATEGORY = "fee_dispute"
 FEE_CHOICE = "overdraft_fee_revenue"
-# An account number is a run of digits longer than four that is not part of an amount.
-UNMASKED_ACCOUNT = re.compile(r"(?<![\d$.,])\d{5,}(?![\d,])")
+RECORD_PATH = REPO_ROOT / "results" / "demo" / "change-demo-last-verified-run.json"
 
 
 # ── preflight ────────────────────────────────────────────────────────────────
@@ -358,31 +367,22 @@ def _first_citation(change: dict | None) -> dict | None:
 
 
 async def run_citation(ctx: Context, fetch: Callable[[str], object | None]) -> list[str]:
-    """Open the first citation of step 1: the cited call, with the quoted passage marked."""
+    """Open the first citation of step 1: the call id, date and cited turn, accounts masked."""
     citation = _first_citation(ctx.fee_change)
     if citation is None:
         return ["step 1 left no citation to open"]
     call_id, quote = citation["call_id"], citation["quote"]
     hit = fetch(call_id)
-    print(f"  citation: {call_id}")
     if hit is None:
+        print(f"  citation  {call_id}")
         return [f"{call_id} is not in the vector store"]
-    meta = hit.metadata
-    print(f"  call:     {meta.get('date', '?')}  {meta.get('category', '?')}  "
-          f"outcome {meta.get('outcome', '?')}")
-    print(f"  quote:    \"{quote}\"")
-    print("  transcript:")
-    text = re.sub(r"\s+(MEMBER|AGENT):", r"\n\1:", hit.text.strip())
-    for line in text.splitlines():
-        print(_indent(f"{'>> ' if quote in line else '   '}{line}"))
+    print(_indent(render_citation(call_id, quote, hit.metadata, hit.text)))
     problems = []
     if quote not in hit.text:
         problems.append("the quote is not in the stored transcript")
-    unmasked = UNMASKED_ACCOUNT.findall(hit.text)
-    if unmasked:
-        problems.append(f"an account number is not masked to its last four digits: {unmasked[0]}")
-    else:
-        print("  accounts: any account number is masked to its last four digits")
+    if mask_accounts(hit.text) != hit.text:
+        problems.append("an account number in the stored transcript is not masked to its last "
+                        "four digits (the view above masks it)")
     return problems
 
 
@@ -460,6 +460,77 @@ def print_summary(outcomes: list[Outcome]) -> int:
     return matched
 
 
+# ── record and replay ────────────────────────────────────────────────────────
+
+class _Tee(io.TextIOBase):
+    """Passes writes through to the real stdout and keeps a copy for the record."""
+
+    def __init__(self, stream):
+        self.stream, self.kept = stream, io.StringIO()
+
+    def write(self, text: str) -> int:
+        self.kept.write(text)
+        return self.stream.write(text)
+
+    def flush(self) -> None:
+        self.stream.flush()
+
+
+def _git_state() -> tuple[str, bool]:
+    def git(*args: str) -> str:
+        return subprocess.run(["git", *args], cwd=REPO_ROOT, capture_output=True, text=True,
+                              check=True).stdout.strip()
+
+    try:
+        return git("rev-parse", "--short", "HEAD"), bool(git("status", "--porcelain"))
+    except (OSError, subprocess.CalledProcessError):
+        return "unknown", False
+
+
+def write_record(transcript: str, path: Path = RECORD_PATH, *, steps: int = len(STEPS)) -> Path:
+    """Store a verified run's transcript with its date and git SHA, for `--replay`."""
+    sha, dirty = _git_state()
+    record = {
+        "version": 1,
+        "recorded_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "git_sha": sha + ("-dirty" if dirty else ""),
+        "chat_provider": _provider("LLM_PROVIDER"),
+        "steps": steps,
+        "transcript": mask_accounts(transcript),
+    }
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(json.dumps(record, indent=2) + "\n")
+    tmp.replace(path)
+    return path
+
+
+def replay(path: Path = RECORD_PATH) -> int:
+    """Print the recorded run under a banner that cannot be mistaken for a live one."""
+    try:
+        record = json.loads(path.read_text())
+    except FileNotFoundError:
+        print(f"No recorded run at {path.relative_to(REPO_ROOT)}. A live `make demo-change` that "
+              "finishes with every step as scripted writes one.", file=sys.stderr)
+        return 1
+    except ValueError as exc:
+        print(f"The recorded run at {path.name} cannot be read: {exc}", file=sys.stderr)
+        return 1
+    bar = "#" * 72
+    banner = "\n".join([
+        bar,
+        "#  RECORDED RUN - NOT LIVE",
+        f"#  recorded {record['recorded_at']}   git {record['git_sha']}   "
+        f"chat provider {record['chat_provider']}",
+        "#  Nothing below was computed just now: this replays the last verified live run.",
+        bar,
+    ])
+    print(banner)
+    print(record["transcript"].rstrip("\n"))
+    print(banner)
+    return 0
+
+
 async def main(strict: bool, skip_preflight: bool, preflight_only: bool) -> int:
     from dotenv import load_dotenv
 
@@ -475,13 +546,21 @@ async def main(strict: bool, skip_preflight: bool, preflight_only: bool) -> int:
     from retrieval import get_retriever
 
     toolbox = MCPToolbox()
-    async with open_checkpointer() as saver:
-        graph = build_graph(get_llm=get_llm, toolbox=toolbox, checkpointer=saver)
-        outcomes, failures = await run_steps(graph, toolbox, get_retriever().get_by_id, STEPS)
-
-    matched = print_summary(outcomes)
+    tee = _Tee(sys.stdout)
+    sys.stdout = tee
+    try:
+        async with open_checkpointer() as saver:
+            graph = build_graph(get_llm=get_llm, toolbox=toolbox, checkpointer=saver)
+            outcomes, failures = await run_steps(graph, toolbox, get_retriever().get_by_id, STEPS)
+        matched = print_summary(outcomes)
+    finally:
+        sys.stdout = tee.stream
     for failure in failures:
         print(f"FAILED {failure}", file=sys.stderr)
+    if not failures and matched == len(STEPS):
+        print(f"recorded this run for --replay: {write_record(tee.kept.getvalue()).relative_to(REPO_ROOT)}")
+    else:
+        print("not recorded: only a run with every step as scripted replaces the record.")
     return 1 if failures or (strict and matched < len(STEPS)) else 0
 
 
@@ -491,5 +570,9 @@ if __name__ == "__main__":
                         help="exit non-zero when a step comes out differently from the script")
     parser.add_argument("--skip-preflight", action="store_true", help="do not check the setup first")
     parser.add_argument("--preflight-only", action="store_true", help="check the setup and stop")
+    parser.add_argument("--replay", action="store_true",
+                        help="print the last verified run, labeled as recorded; asks nothing")
     args = parser.parse_args()
+    if args.replay:
+        sys.exit(replay())
     sys.exit(asyncio.run(main(args.strict, args.skip_preflight, args.preflight_only)))

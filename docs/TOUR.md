@@ -232,7 +232,11 @@ rate?", which interrupts with the seven rate metrics and resumes with
 models (each miss prints its fix), then six timed questions about why a metric moved, from "why
 did fee-call satisfaction fall after the fee schedule change?" to opening one cited call. On CPU
 with a 3B local model the first question takes about half an hour; `make demo-change
-ARGS=--preflight-only` checks the setup and stops.
+ARGS=--preflight-only` checks the setup and stops. A run that ends with every step as scripted
+saves its transcript to `results/demo/change-demo-last-verified-run.json`; `make demo-change-replay`
+prints it under a RECORDED banner with its date and git SHA, with no database, model or network.
+The opened citation shows the call id, date and the cited turn with context, account numbers
+masked to their last four digits.
 
 **B2. Step by step on the host** (for screen-sharing one layer at a time).
 

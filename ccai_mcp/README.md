@@ -80,9 +80,40 @@ Replace `<host>` and `<token>`. Prefer an environment variable over pasting the 
 
 ### Claude Desktop
 
-Claude Desktop's `claude_desktop_config.json` only starts local (stdio) servers; it does not take a remote URL directly. Two routes:
+`claude_desktop_config.json` is at `~/Library/Application Support/Claude/` (macOS) or `%APPDATA%\Claude\` (Windows); restart Claude Desktop after editing it. It only starts local (stdio) servers and does not take a remote URL directly, so there are three routes. Route 0 is the one to use for `explain_change` on the same machine as the repo.
 
-**1. The `mcp-remote` bridge, for a LAN or localhost server.** It runs locally, speaks stdio to Claude Desktop and HTTP to the server. Needs Node.js. Edit `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows), then restart Claude Desktop:
+**0. stdio, the server on the same machine.** Claude Desktop starts `python -m ccai_mcp.server` itself. Replace `/path/to/contact-center-ai`. The database must be seeded and the dbt marts built (`make up dev-data`), and the chat and embedding models must be reachable, because `explain_change` asks a model to label the drivers. `uv` must be on the PATH Claude Desktop sees; if it is not, put the full path to `uv` in `command`.
+
+```json
+{
+  "mcpServers": {
+    "contact-center": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--directory",
+        "/path/to/contact-center-ai",
+        "--group",
+        "dbt",
+        "python",
+        "-m",
+        "ccai_mcp.server"
+      ],
+      "env": {
+        "DATABASE_URL": "postgresql://postgres:postgres@localhost:5432/contactcenter",
+        "LLM_PROVIDER": "ollama",
+        "EMBEDDING_PROVIDER": "ollama"
+      }
+    }
+  }
+}
+```
+
+Then ask Claude Desktop: "Use explain_change on csat_average_score for fee_dispute calls, change point 2026-04-15, and tell me why satisfaction moved." The first text block is the cited answer.
+
+Two more routes cover a server on another machine:
+
+**1. The `mcp-remote` bridge, for a LAN or localhost server.** It runs locally, speaks stdio to Claude Desktop and HTTP to the server. Needs Node.js. Add this to the same file:
 
 ```json
 {
@@ -147,6 +178,8 @@ The request comes from the Open WebUI **backend**, not your browser. If Open Web
 |---|---|
 | Real MCP client (`mcp` 2.2.0) over HTTP | tested in `tests/test_server_http.py`: handshake, six tools, a call, 401s |
 | `mcp-remote` 0.14.3 (the Claude Desktop route 1 bridge) | run by hand against this server with the header form above: `tools/list` returned the five tools it had then. Claude Desktop itself was not run |
+| Claude Code CLI 2.1.310 as the client, stdio server, one `explain_change` call (2026-10-25, on `2df810a` plus the replay change) | ran: the CLI started `python -m ccai_mcp.server` over stdio, called `explain_change` for `csat_average_score` on `fee_dispute` calls at 2026-04-15, and returned the cited answer (both windows, SQL-backed values, a driver with three verbatim quotes). The database, MetricFlow and the tool were real; the chat and embedding models were deterministic stand-ins, so the driver label is not a model's reading |
+| Claude Desktop, stdio config above | **not run.** The config follows Claude Desktop's documented `mcpServers` format |
 | Claude Desktop custom connector, Cursor, Open WebUI | **not run.** The snippets follow each product's current docs (Anthropic's custom-connector help page, Cursor's MCP docs, Open WebUI's MCP docs, read 2026-10-02). The `mcp-server` service name from inside the `open-webui` container is also untested |
 
 ## Tests

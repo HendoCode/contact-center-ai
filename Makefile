@@ -6,7 +6,7 @@
 # `evals` is the L2 agent golden set offline (a CI gate); `evals-live` is the same set
 # against real models, uploaded to LangSmith.
 
-.PHONY: up down seed ingest test lint check-public demo demo-change bench evals evals-live evals-compare evals-export evals-retrieval-experiment finetune-data finetune-label load-snowflake load-databricks load-dry-run dbt-build dbt-build-dev dev-data lance-azure-check parity
+.PHONY: up down seed ingest test lint check-public demo demo-change demo-change-replay bench evals evals-live evals-compare evals-export evals-retrieval-experiment finetune-data finetune-label load-snowflake load-databricks load-dry-run dbt-build dbt-build-dev dev-data lance-azure-check parity
 
 PYTHON := uv run python
 # RETRIEVER_BACKEND=lancedb needs the lance dependency group wherever the store is read or written.
@@ -43,6 +43,11 @@ demo:
 demo-change:
 	LLM_PROVIDER=$(DEMO_LLM_PROVIDER) EMBEDDING_PROVIDER=ollama \
 	uv run --group agent --group dbt $(LANCE_GROUP) python -m agent.demo_change $(ARGS)
+
+# The last verified `make demo-change` run, labeled RECORDED with its date and git SHA. Needs no
+# database, model or network: use it when a provider fails.
+demo-change-replay:
+	uv run --group agent python -m agent.demo_change --replay
 
 # ── Local data pipeline ───────────────────────────────────────────────────────
 
