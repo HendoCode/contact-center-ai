@@ -23,6 +23,7 @@ from langgraph.graph import END, START, StateGraph
 from pydantic import BaseModel
 
 from agent.changes import (
+    POINT_SNAP_DAYS,
     contains_phrase,
     is_iso_date,
     load_branches,
@@ -30,6 +31,7 @@ from agent.changes import (
     match_logged_change,
     parse_period,
     parse_point,
+    snap_point,
 )
 from agent.nodes.answer import split_sql
 from agent.state import AgentState
@@ -99,7 +101,7 @@ def make_frame(get_llm: Callable[[], object]):
         parts = decision.model_dump()
         # A follow-up needs an analysis to build on; without one it is a new question.
         parts["follow_up"] = bool(parts["follow_up"]) and bool(prior)
-        return {"change_frame": parts}
+        return {"change_frame": parts, "change_note": None}
 
     return frame
 
@@ -246,6 +248,12 @@ def make_resolve_when(toolbox: Toolbox):
             )
         point = parse_point(when, known or ANY_DATE)
         if point:
+            logged = snap_point(point, log)
+            if logged and logged["date"] != point.isoformat():
+                note = (f'Note: you gave {point.isoformat()}, which is within {POINT_SNAP_DAYS} days of '
+                        f'the logged change "{logged["name"]}" ({logged["date"]}), so the analysis '
+                        f'uses {logged["date"]}.')
+                return {"change_point": logged["date"], "change_search": None, "change_note": note}
             return {"change_point": point.isoformat(), "change_search": None}
         period = parse_period(when, known or ANY_DATE)
         if period:
@@ -321,6 +329,8 @@ def make_analyze(toolbox: Toolbox):
             _, sql = split_sql(text)
             if not frame.get("measure"):
                 text = "Note: the question names no measure, so this uses call volume.\n\n" + text
+            if state.get("change_note"):
+                text = state["change_note"] + "\n\n" + text
         return {
             "change": result, "tool_output": text, "sql": sql, "citations": citations,
             "metric_names": [result["metric"]],

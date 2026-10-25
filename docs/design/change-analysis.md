@@ -211,12 +211,13 @@ Any other metric returns `TOOL ERROR` with a message that lists these.
 ```json
 {"version": 1, "mode": "drivers", "metric": "csat_average_score", "filters": {"category": ["fee_dispute"]},
  "change_point": {"date": "2026-04-15", "source": "argument|detected|none", "logged_change": "Fee schedule change",
-                  "score": null, "reason": null},
+                  "score": null, "direction": null, "reason": null},
  "windows": {"before": {"start": "…", "end": "…", "value": 0.0, "n": 0, "sql": "…"},
              "after": {"start": "…", "end": "…", "value": 0.0, "n": 0, "sql": "…",
                        "weekly": [{"week": "2026-04-13", "value": 0.0, "n": 0}]}},
  "population": {"before": 0, "after": 0}, "coverage": {"read_before": 0, "read_after": 0},
  "drivers": [{"label": "…", "definition": "…", "before": {"n": 0, "call_ids": []}, "after": {"n": 0, "call_ids": []},
+              "direction": "up|down|flat",
               "citations": [{"call_id": "CALL-…", "quote": "verbatim transcript text"}]}],
  "patterns": [], "unassigned": {"before": 0, "after": 0}, "limits": ["…"]}
 ```
@@ -231,6 +232,8 @@ Any other metric returns `TOOL ERROR` with a message that lists these.
 
 The year is the one in which that month falls inside the data range. A period is padded by 3 days on each side. Anything else is refused.
 
+**A stated point snaps to a logged change.** When the question gives a single date and a logged change falls within 3 days of it (`POINT_SNAP_DAYS`, the same distance as the period padding), the logged change's date is the change point. The nearest wins, the earlier on a tie. The answer opens with a note that says which date was given, which logged change it was moved to, and the tolerance. A date with no logged change within 3 days is used as stated.
+
 **Resolving the change point:**
 
 1. If the padded period holds exactly one logged change, its date is the change point (`source: argument`, as for a stated date).
@@ -244,6 +247,11 @@ The year is the one in which that month falls inside the data range. A period is
 4. **Score.** It is a standardized shift. For counts: |r_a − r_b| ÷ √(r_a/w_a + r_b/w_b), with r the weekly rate and w the number of weeks. For means and ratios: |Δ| ÷ (σ·√(1/n_a + 1/n_b)).
 5. **Choice.** The highest score wins; on a tie, the earliest. A score below 2 gives `source: none`, with a reason, no drivers, and a request for a date.
 6. **Snap.** A logged change within 7 days replaces *t*.
+7. **Direction.** Candidates are scored in either direction, and the winner's direction is reported in `change_point.direction` (`rise` or `fall`: after against before, in calls a week for counts and in the pooled value otherwise) and in the answer text. It is `null` when the change point was given, because the windows' values show the movement.
+
+**Detection alone is not evidence.** When the change point was detected (not given) and the calls after it hold no driver, the answer opens with "Not enough evidence", gives no cause, and `limits` starts with the same sentence. Weekly noise in a call type nothing happened to can pass the score threshold; the calls are the check. `ground` treats such an answer as claiming nothing, so it needs no citation.
+
+**Driver direction.** Each driver's `direction` compares its calls in the two windows, scaled to the window populations when a window was sampled: `up` when more calls after the change, `down` when fewer, `flat` when equal. The answer says "more than before", "fewer than before" or "about the same as before" beside the before count.
 
 **Windows.** They are [cp − L, cp) and [cp, cp + L), with L = min(`window_days`, the days available on each side).
 

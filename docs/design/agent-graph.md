@@ -43,7 +43,7 @@ The output is `{answer, route, metric_names, sql, citations, grounded, change}`,
 |---|---|
 | `classify` | Routes to `summarize_call` on a `CALL-\d{5}` regex match. Otherwise one structured LLM call picks the route, and is told whether a change analysis already exists on the thread |
 | `retrieve`, `summarize_call` | Call MCP `search_transcripts` and `get_call_summary` |
-| `ground` | Checks cited `call_id`s with `Retriever.get_by_id` (R1). On the metric route, requires SQL and declared metrics. On the `explain_change` route, requires both window SQLs and citations that are real calls inside the windows, and rejects any agent id; a refusal claims nothing and passes. No LLM, no loop |
+| `ground` | Checks cited `call_id`s with `Retriever.get_by_id` (R1). On the metric route, requires SQL and declared metrics. On the `explain_change` route, requires both window SQLs and citations that are real calls inside the windows (the call's own stored date falls in `[before.start, after.end)`; the tool's call-id lists are not trusted for this), and rejects any agent id; a refusal claims nothing and passes. No LLM, no loop |
 | `answer` | Formats tool output, citations and SQL. Adds no facts |
 
 `resolve_metric` is the `analyst` subgraph. It shares the parent's keys and runs with the default `checkpointer=None`, so it inherits the parent's checkpointer and its interrupt surfaces in the parent. Its nodes:

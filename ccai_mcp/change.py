@@ -232,6 +232,16 @@ def _side(weeks: dict, kind: str, start: date, end: date, data: tuple[date, date
     return pooled / total, total, days / 7
 
 
+def _rate(kind: str, side: tuple) -> float:
+    """What a side is compared on: calls a week for counts, the pooled value otherwise."""
+    value, n, weeks = side
+    return n / weeks if kind == "count" else value
+
+
+def _direction(after: float, before: float, *, up: str = "rise", down: str = "fall") -> str | None:
+    return up if after > before else down if after < before else None
+
+
 def _shift_score(kind: str, before: tuple, after: tuple) -> float:
     """Standardized shift between two sides: Poisson rates for counts, a fixed spread for
     scores, binomial for rates, and a pooled spread for other ratios."""
@@ -248,10 +258,11 @@ def _shift_score(kind: str, before: tuple, after: tuple) -> float:
 
 
 def _detect(metric: str, weeks: dict, data: tuple[date, date], search: tuple[date, date] | None):
-    """The Monday with the largest standardized shift: (date, score) or (None, best score)."""
+    """The Monday with the largest standardized shift, in either direction:
+    (date, score, direction) with direction "rise" or "fall", or (None, best score, None)."""
     kind = METRICS[metric]["kind"]
     first, last = search or (data[0], data[1])
-    best_day, best_score = None, 0.0
+    best_day, best_score, best_direction = None, 0.0, None
     day = _monday(max(first, data[0]))
     if day < first:
         day += timedelta(days=7)
@@ -262,8 +273,9 @@ def _detect(metric: str, weeks: dict, data: tuple[date, date], search: tuple[dat
             score = _shift_score(kind, before, after)
             if score > best_score + 1e-9:
                 best_day, best_score = day, score
+                best_direction = _direction(_rate(kind, after), _rate(kind, before))
         day += timedelta(days=7)
-    return best_day, best_score
+    return best_day, best_score, best_direction
 
 
 def _logged_within(log: list[dict], day: date, days: int) -> dict | None:
@@ -453,6 +465,22 @@ def _tally(assigned: dict, sample: list[tuple[str, str]], count: int) -> list[di
     return tallies
 
 
+def _scaled(n: int, read: dict) -> float:
+    """Calls assigned in a window, scaled up from the sample read to the window's population."""
+    return n * read["population"] / len(read["calls"]) if read["calls"] else 0.0
+
+
+_UNSUPPORTED = (
+    "Not enough evidence: the shift was found by detection alone, and no reason for it showed up "
+    "in the calls after it. It may be ordinary week-to-week variation, so no cause is given."
+)
+
+
+def _unsupported(cp: dict, drivers: list, read_after: dict) -> bool:
+    """A change found only by searching the weekly values, with calls read and no driver among them."""
+    return cp["source"] == "detected" and not drivers and bool(read_after["calls"])
+
+
 def _find_drivers(after: dict, before: dict, question: str | None) -> tuple[list, dict, list]:
     """Drivers from the after-window calls, counted in both windows. Returns
     (drivers, unassigned, limits)."""
@@ -476,6 +504,9 @@ def _find_drivers(after: dict, before: dict, question: str | None) -> tuple[list
             continue
         drivers.append({
             "label": item["label"], "definition": item["definition"],
+            "direction": _direction(_scaled(len(a["call_ids"]), after),
+                                    _scaled(len(b["call_ids"]), before), up="up", down="down")
+                         or "flat",
             "before": {"n": len(b["call_ids"]), "call_ids": b["call_ids"]},
             "after": {"n": len(a["call_ids"]), "call_ids": a["call_ids"]},
             "citations": a["quotes"][:MAX_CITATIONS],
@@ -568,19 +599,21 @@ def _resolve_change_point(
             f"{metric} needs an explicit change point (a date, or the name of a logged change): "
             "its weekly values are too thin to search for one."
         )
-    day, score = _detect(metric, weeks, data, search)
+    day, score, direction = _detect(metric, weeks, data, search)
     where = f"between {search[0]} and {search[1]}" if search else "across all the data"
     if day is None or score < MIN_SCORE:
         return {"date": None, "source": "none", "logged_change": None, "score": round(score, 2),
+                "direction": None,
                 "reason": f"no week {where} stands out from the weeks around it "
                           f"(largest shift score {score:.1f}, below {MIN_SCORE:g})"}
     logged = _logged_within(log, day, SNAP_DAYS)
     if logged:
         return {"date": _day(logged["date"]), "source": "detected", "logged_change": logged["name"],
-                "score": round(score, 2),
+                "score": round(score, 2), "direction": direction,
                 "reason": f"the largest weekly shift {where} began the week of {day}, "
                           f"within {SNAP_DAYS} days of the logged change"}
     return {"date": day, "source": "detected", "logged_change": None, "score": round(score, 2),
+            "direction": direction,
             "reason": f"the largest weekly shift {where} began the week of {day}"}
 
 
@@ -647,7 +680,7 @@ def _coaching(metric, filters, change_day, question, groups) -> dict:
         "change_point": {
             "date": change_day.isoformat() if change_day else None,
             "source": "argument" if change_day else "none",
-            "logged_change": None, "score": None, "reason": None,
+            "logged_change": None, "score": None, "direction": None, "reason": None,
         },
         "windows": None, "population": None, "coverage": None, "drivers": [],
         "patterns": patterns, "unassigned": None, "series": None,
@@ -729,6 +762,8 @@ def _drivers(metric, filters, change_day, search, window_days, question) -> dict
         limits.extend(notes)
     except RuntimeError as exc:
         limits.append(f"The calls could not be grouped into drivers ({exc}).")
+    if _unsupported(cp, drivers, read_after):
+        limits.insert(0, _UNSUPPORTED)
     for name, read in (("before", read_before), ("after", read_after)):
         if read["fetched"] < read["population"]:
             limits.append(
@@ -771,7 +806,8 @@ def _result(metric, filters, cp, before_v, after_v, reads, series, limits,
         "version": RESULT_VERSION, "mode": "drivers", "metric": metric, "filters": filters,
         "change_point": {
             "date": cp["date"].isoformat() if cp["date"] else None, "source": cp["source"],
-            "logged_change": cp["logged_change"], "score": cp["score"], "reason": cp["reason"],
+            "logged_change": cp["logged_change"], "score": cp["score"],
+            "direction": cp.get("direction"), "reason": cp["reason"],
         },
         "windows": {"before": before_v, "after": after_v} if before_v else None,
         "population": {"before": reads[0]["population"], "after": reads[1]["population"]}
@@ -826,7 +862,9 @@ def _how_found(cp: dict) -> str:
     if source == "argument":
         return "from the question" + (f" ({cp['reason']})" if cp.get("reason") else "")
     if source == "detected":
-        found = f"no date or logged change was given, so found by detection ({cp['reason']}; shift score {cp['score']})"
+        way = f"a {cp['direction']}, " if cp.get("direction") else ""
+        found = (f"no date or logged change was given, so found by detection ({cp['reason']}; "
+                 f"{way}shift score {cp['score']})")
         return found + (f', matching the logged change "{cp["logged_change"]}"'
                         if cp["logged_change"] else "")
     return f"no clear change point: {cp['reason']}"
@@ -852,6 +890,8 @@ def render_change(result: dict, *, with_sql: bool = True) -> str:
     else:
         lines.append(f"Change analysis: {METRICS[metric]['label']} ({filters})")
         lines.append(f"Change point: {cp['date'] or 'none'}, {_how_found(cp)}.")
+        if _UNSUPPORTED in result["limits"]:
+            lines.append(_UNSUPPORTED)
         series = result.get("series")
         if series and cp["source"] != "argument":
             weeks, label = series["weeks"], "Weekly values searched"
@@ -884,8 +924,11 @@ def render_change(result: dict, *, with_sql: bool = True) -> str:
                     n = d["after"]["n"]
                     share = (f"{n} of {cov['read_after']} calls sampled" if sampled
                              else f"{n} of {pop['after']} calls in the after window")
+                    moved = {"up": "more than before", "down": "fewer than before",
+                             "flat": "about the same as before"}.get(d.get("direction"))
                     lines.append(f"- {d['label']}: {share}; {d['before']['n']} in the "
-                                 f"before window. {d['definition']}")
+                                 f"before window" + (f" ({moved})" if moved else "")
+                                 + f". {d['definition']}")
                     lines += [f'    {c["call_id"]}: "{c["quote"]}"' for c in d["citations"]]
                 if not result["drivers"]:
                     lines.append("- none found")
