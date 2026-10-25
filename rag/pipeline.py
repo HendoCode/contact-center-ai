@@ -52,6 +52,8 @@ def get_llm(provider: str | None = None):
         llm = ChatOllama(
             model=os.getenv("OLLAMA_MODEL", "llama3.2"),
             base_url=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"),
+            # A small local model can loop without ever emitting a stop token; cap the output.
+            num_predict=int(os.getenv("OLLAMA_NUM_PREDICT", "2048")),
         )
         ensure_ready(llm)  # pulls the model if the server lacks it
         return llm

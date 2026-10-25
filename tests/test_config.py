@@ -62,6 +62,17 @@ def test_get_llm_ollama_provider(monkeypatch):
     assert llm.model == "llama3.2"
 
 
+def test_ollama_chat_output_is_capped_and_the_cap_is_configurable(monkeypatch):
+    monkeypatch.setattr("rag.ollama_models.ensure_ready", lambda model: None)
+    monkeypatch.setenv("LLM_PROVIDER", "ollama")
+    monkeypatch.delenv("OLLAMA_NUM_PREDICT", raising=False)
+
+    assert get_llm().num_predict == 2048
+
+    monkeypatch.setenv("OLLAMA_NUM_PREDICT", "512")
+    assert get_llm().num_predict == 512
+
+
 # ── Embeddings ────────────────────────────────────────────────────────────────
 
 def test_get_embeddings_defaults_openai_compatible(monkeypatch):
