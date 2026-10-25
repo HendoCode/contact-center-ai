@@ -227,6 +227,13 @@ rate?", which interrupts with the seven rate metrics and resumes with
 `average_mortgage_note_rate`. `make demo DEMO_LLM_PROVIDER=openai` swaps chat to OpenRouter (needs
 `OPENAI_API_KEY`, costs a little).
 
+`make demo-change` runs the change-analysis questions (`agent/demo_change.py`) on the host after
+`make up dev-data`: a preflight that checks the data, Postgres, vector index, semantic layer and
+models (each miss prints its fix), then six timed questions about why a metric moved, from "why
+did fee-call satisfaction fall after the fee schedule change?" to opening one cited call. On CPU
+with a 3B local model the first question takes about half an hour; `make demo-change
+ARGS=--preflight-only` checks the setup and stops.
+
 **B2. Step by step on the host** (for screen-sharing one layer at a time).
 
 ```bash

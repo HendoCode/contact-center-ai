@@ -1,13 +1,14 @@
-# Demo chat: a supervisor, five tools, four ambiguous words
+# Demo chat: a supervisor, six tools, five ambiguous words
 
 A sample conversation between a call-center supervisor and the MCP server, to show what each
 tool returns and how the semantic layer settles words like "rate", "balance" and "LTV". It
-follows one member, **Allison Hill** (`MBR-000001`, seed-42 synthetic
-data), through that member's calls.
+follows one member, **Mary Miller** (`MBR-000124`, seed-42 synthetic
+data), through that member's calls (turns 1 to 7), then widens to the whole call center: why a
+metric moved after a change, and which fee "fees" means (turns 8 and 9).
 
-Generated 2026-10-02 from commit `d5ac893` by `tools/demo_chat.py`, against Postgres
-16.2, 1,250 calls and 943 CSAT responses, marts built by `dbt build`,
-Python 3.12.15, dbt-core 1.12.5, dbt-postgres 1.11.0, dbt-metricflow 0.15.0, langgraph 1.2.12.
+Generated 2026-10-25 from commit `facad57 (+ uncommitted changes)` by `tools/demo_chat.py`, against Postgres
+16.15 (Debian 16.15-1.pgdg12+2), 1,540 calls and 1147 CSAT responses, marts built by `dbt build`,
+Python 3.12.14, dbt-core 1.12.5, dbt-postgres 1.11.0, dbt-metricflow 0.15.0, langgraph 1.2.12.
 
 ## How to read it
 
@@ -82,20 +83,21 @@ OLAP star schema uses.
 {
   "call_id": "CALL-00421",
   "metadata": {
-    "date": "2026-07-16T15:27:58",
+    "date": "2026-04-30T13:19:14",
     "call_id": "CALL-00421",
-    "outcome": "unresolved",
-    "agent_id": "AGT-021",
-    "category": "loan_inquiry",
-    "member_id": "MBR-000001",
-    "account_id": 531,
+    "outcome": "resolved",
+    "agent_id": "AGT-012",
+    "category": "mortgage_inquiry",
+    "member_id": "MBR-000124",
+    "account_id": 654,
     "account_ids": [
-      531
+      654
     ],
+    "home_branch": "Downtown",
     "interaction_id": 421,
-    "duration_seconds": 412
+    "duration_seconds": 662
   },
-  "text": "MEMBER: I'd like to ask about your current loan rates. AGENT: Of course. Our posted rates vary by product — can I ask what you're looking to finance? MEMBER: Something comparable to my account ending in 0531. AGENT: Understood. For a comparable product today, the note rate would be 6.308%, and your existing current principal balance is $612,338.25. MEMBER: Thanks, that's helpful. AGENT: Would you like me to start a pre-qualification?"
+  "text": "MEMBER: Can you give me an update on my mortgage? AGENT: Of course — the mortgage ending in 0654 carries a note rate of 6.587% with a current principal of $303,195.09. MEMBER: And the loan-to-value? My statement shows an LTV figure. AGENT: The LTV at origination was 88.87%, and your escrow balance is $984.60. MEMBER: That lines up with what I thought. AGENT: Anything else on the mortgage I can check for you?"
 }
 ```
 
@@ -104,11 +106,11 @@ OLAP star schema uses.
 > **ILLUSTRATIVE, not captured output.** Written by hand to show the shape of the answer from what the transcript says; the wording and the retrieved set depend on the chat and embedding models. To capture it, run:
 > `uv run python -c "from ccai_mcp.tools import get_call_summary; print(get_call_summary('CALL-00421'))"`
 >
-> A member asked about current loan rates for something comparable to an account ending 0531. The agent quoted a note rate of 6.308% and the existing principal balance of $612,338.25, then offered a pre-qualification. Outcome: unresolved.
+> A member asked about current loan rates for something comparable to an account ending 0531. The agent quoted a note rate of 6.587% and the existing principal balance of $303,195.09, then offered a pre-qualification. Outcome: unresolved.
 
 Cross-check, direct SQL on the marts (not a tool): `marts.d_member` says member
-1 is Allison Hill; the member's mortgage snapshot has `mortgage_note_rate`
-6.308 and `mortgage_principal_balance` 612,338.25. The rate
+124 is Mary Miller; the member's mortgage snapshot has `mortgage_note_rate`
+6.587 and `mortgage_principal_balance` 303,195.09. The rate
 is in the transcript above, and so
 is the principal.
 
@@ -129,11 +131,11 @@ CSAT Summary (72 responses)
 Average score: 3.97/5
 Score distribution: {1: 4, 2: 3, 3: 16, 4: 17, 5: 32}
 Sample comments:
-  - Okay experience, nothing special.
-  - Okay experience, nothing special.
-  - Issue was partially resolved.
-  - Okay experience, nothing special.
-  - Excellent service!
+  - Good experience overall.
+  - Average service.
+  - Agent went above and beyond.
+  - Good experience overall.
+  - Minor wait time but resolved quickly.
 ```
 
 **Tool call:** `query_csat`
@@ -151,16 +153,16 @@ Average score: 1.43/5
 Score distribution: {1: 4, 2: 3, 3: 0, 4: 0, 5: 0}
 Sample comments:
   - Problem was not resolved.
-  - Very frustrated with the outcome.
-  - Not satisfied with the help I received.
   - Problem was not resolved.
+  - Not satisfied with the help I received.
   - Took too long.
+  - Very frustrated with the outcome.
 ```
 
 **Answer:** 72 loan-inquiry survey responses average 3.97 out of 5.
 7 of them scored 2 or lower (4 ones, 3 twos).
-Allison Hill's CALL-00421 scored 2 (`marts.f_csat`, interaction
-421), so it is one of those low scores.
+Mary Miller's CALL-00421 scored 5 (`marts.f_csat`, interaction
+421).
 `query_csat` returns the aggregate and a handful of comments, not per-call rows; it reads the
 Postgres `f_csat` fact, and CSAT is not in the vector store, so this cannot be combined with a
 semantic transcript search.
@@ -491,13 +493,13 @@ declared metric and its SQL are both present.
 
 ## Turn 6: "balance", and net liquidity
 
-**User:** The call-center agent read Allison Hill a balance of $11,549.52 on
+**User:** The call-center agent read Mary Miller a balance of $214,081.25 on
 CALL-00260. Which balance is that, and what is our net member liquidity?
 
 The transcript, from the same metadata lookup as turn 2:
 
 ```
-MEMBER: I can't sign in to online banking. It keeps saying my password is wrong. AGENT: I can help reset that. Can you verify your member number and the last four of the account you're signing into? MEMBER: Sure. MBR-000001, and the account ends in 0001. AGENT: Thank you, Allison Hill. I've sent a secure password reset link to the email on file. MEMBER: Got it. Will that take effect immediately? AGENT: Yes, within a minute or two. You'll then see your balance of $11,549.52 on the dashboard.
+MEMBER: Hello, could you tell me what my account balance is right now? AGENT: Certainly. May I have your member number so I can verify you? MEMBER: It's MBR-000207. AGENT: Thank you, Ryan Smith. The account ending in 1157 has a outstanding balance of $568.29. MEMBER: Does online banking show the same figure? AGENT: It should. Your available credit at the moment is $233.42.
 ```
 
 **Tool call:** `query_metric`
@@ -628,9 +630,9 @@ CROSS JOIN (
 
 </details>
 
-Cross-check, direct SQL on the marts (not a tool): Allison Hill's banking account has
-`banking_ledger_balance` 11,549.52 and `banking_available_balance`
-11,481.25. The $11,549.52 the call-center agent read out in CALL-00260 is the **ledger** balance, not the available one: two declared metrics, $68.27 apart on this account.
+Cross-check, direct SQL on the marts (not a tool): Mary Miller's banking account has
+`banking_ledger_balance` 214,081.25 and `banking_available_balance`
+214,028.01. The call-center agent's figure in CALL-00260 does not match this account's ledger balance ($214,081.25).
 
 ## Turn 7: LCV or LTV?
 
@@ -651,7 +653,7 @@ Cross-check, direct SQL on the marts (not a tool): Allison Hill's banking accoun
 ```
 MetricFlow result (2 metric(s)):
   loan_to_value: 77.6274
-  member_lifetime_value: 760635.2454
+  member_lifetime_value: 638890.6175
 ```
 
 **Answer:** The two words are different metrics with different meanings.
@@ -659,7 +661,7 @@ MetricFlow result (2 metric(s)):
 | Metric | Value | What it is |
 |---|---|---|
 | `loan_to_value` | 77.6274 | Loan-to-value at origination (underwriting RISK) — a fact stored on the mortgage account, averaged. |
-| `member_lifetime_value` | 760635.2454 | Lifetime customer value (marketing) — a DERIVED, PARAMETERIZED CONVENTION, not a fact. |
+| `member_lifetime_value` | 638890.6175 | Lifetime customer value (marketing) — a DERIVED, PARAMETERIZED CONVENTION, not a fact. |
 
 The 24 in `relationship_revenue * 24 / active_members` is the declared convention (the catalog description explains it), stated
 once in the metric instead of re-invented per dashboard. It is in the SQL below.
@@ -722,16 +724,207 @@ CROSS JOIN (
 
 </details>
 
-For scale, Allison Hill's mortgage was written at `ltv_at_origination`
-60.42 (direct SQL, not a tool), against the portfolio average above.
+For scale, Mary Miller's mortgage was written at `ltv_at_origination`
+88.87 (direct SQL, not a tool), against the portfolio average above.
+
+## Turn 8: why did the number move?
+
+**User:** Why did satisfaction on fee calls drop after the fee schedule change?
+
+**Tool call:** `explain_change`. The agent route reads the question into these inputs (the
+metric from "satisfaction", the category from "fee calls", the date from the change log); here
+they are scripted.
+
+```json
+{
+  "metric": "csat_average_score",
+  "filters": {
+    "category": [
+      "fee_dispute"
+    ]
+  },
+  "change_point": "2026-04-15",
+  "question": "Why did satisfaction on fee calls drop after the fee schedule change?"
+}
+```
+
+**Tool result / Answer:** the tool's own text. Values, windows and counts come from MetricFlow
+and the vector store's `count`; the driver labels and quotes are written by the chat model, and
+the tool keeps a quote only if it appears verbatim in the call it cites.
+
+```
+Change analysis: CSAT Average Score (category = fee_dispute)
+Change point: 2026-04-15, from the question: the logged change "Fee schedule change".
+
+Before [2026-03-04, 2026-04-15): 3.80 (n=10 responses)
+After [2026-04-15, 2026-05-27): 3.13 (n=45 responses)
+Change: -0.67 points
+Weekly after the change: 2026-04-13: 3.60 (n=5); 2026-04-20: 2.90 (n=10); 2026-04-27: 3.14 (n=7); 2026-05-04: 3.67 (n=3); 2026-05-11: 3.00 (n=7); 2026-05-18: 3.00 (n=9); 2026-05-25: 3.00 (n=8)
+
+Drivers in the calls after the change (63 calls in the after window):
+- Difficulty in understanding or verifying the fee change: 1 of 63 calls in the after window; 1 in the before window. Members reported difficulty in understanding or verifying the fee change, including confusion about the notice process and the application of the new fee.
+    CALL-00387: "It is waived when you keep a minimum balance of $4,643.14."
+- not matched to a driver: 62
+
+What the data could not determine:
+- csat_average_score counts the 45 survey responses, which cover only some of the 63 calls after the change; drivers describe all those calls.
+- Driver labels come from a language model that reads the calls; the counts are exact for its assignments, and quotes are checked against the call text.
+- Weekly values are whole ISO weeks, so the week holding the change point also holds days before it.
+- The timing fits the change, but the data cannot show that the change caused the shift.
+```
+
+<details>
+<summary>SQL generated by MetricFlow, both windows</summary>
+
+```sql
+-- window [2026-03-04, 2026-04-15)
+SELECT
+  AVG(csat_average_score) AS csat_average_score
+  , SUM(responses) AS responses
+FROM (
+  SELECT
+    interactions_src_10000.category_code AS interaction__category_code
+    , subq_4.__csat_average_score AS csat_average_score
+    , subq_4.__responses AS responses
+  FROM (
+    SELECT
+      interaction_id AS interaction
+      , score AS __csat_average_score
+      , 1 AS __responses
+    FROM "contactcenter"."marts"."f_csat" csat_surveys_src_10000
+    WHERE DATE_TRUNC('day', surveyed_at) BETWEEN '2026-03-04' AND '2026-04-14'
+  ) subq_4
+  LEFT OUTER JOIN
+    "contactcenter"."marts"."f_interaction" interactions_src_10000
+  ON
+    subq_4.interaction = interactions_src_10000.interaction_id
+) subq_9
+WHERE interaction__category_code IN ('fee_dispute')
+
+-- window [2026-04-15, 2026-05-27)
+SELECT
+  AVG(csat_average_score) AS csat_average_score
+  , SUM(responses) AS responses
+FROM (
+  SELECT
+    interactions_src_10000.category_code AS interaction__category_code
+    , subq_4.__csat_average_score AS csat_average_score
+    , subq_4.__responses AS responses
+  FROM (
+    SELECT
+      interaction_id AS interaction
+      , score AS __csat_average_score
+      , 1 AS __responses
+    FROM "contactcenter"."marts"."f_csat" csat_surveys_src_10000
+    WHERE DATE_TRUNC('day', surveyed_at) BETWEEN '2026-04-15' AND '2026-05-26'
+  ) subq_4
+  LEFT OUTER JOIN
+    "contactcenter"."marts"."f_interaction" interactions_src_10000
+  ON
+    subq_4.interaction = interactions_src_10000.interaction_id
+) subq_9
+WHERE interaction__category_code IN ('fee_dispute')
+```
+
+</details>
+
+The tool's result carries a second block, `CHANGE RESULT (JSON, v1)`, which the agent reads
+instead of parsing the text. It lists the call ids behind each driver, so a client can open any
+cited call with `get_call_summary`.
+
+## Turn 9: "What do we make on fees?"
+
+**User:** What do we make on fees?
+
+"fee" is an ambiguous term in `agent/data/ambiguous_terms.yml`: the catalog declares one revenue
+metric per fee type, and a total. The graph pauses at its only `interrupt()` instead of summing
+across them.
+
+**Scripted step:** the classifier returns the `resolve_metric` route. The interrupt below is
+what the graph returned.
+
+**Interrupt payload** (`clarify_metric`, version 1):
+
+```json
+{
+  "kind": "clarify_metric",
+  "version": 1,
+  "term": "fee",
+  "prompt": "\"fee\" matches 5 declared metrics. Which do you mean?",
+  "options": [
+    {
+      "id": "overdraft_fee_revenue",
+      "label": "Overdraft Fee Revenue"
+    },
+    {
+      "id": "nsf_fee_revenue",
+      "label": "Nsf Fee Revenue"
+    },
+    {
+      "id": "monthly_maintenance_fee_revenue",
+      "label": "Monthly Maintenance Fee Revenue"
+    },
+    {
+      "id": "atm_fee_revenue",
+      "label": "Atm Fee Revenue"
+    },
+    {
+      "id": "total_fee_revenue",
+      "label": "Total Fee Revenue"
+    }
+  ],
+  "multi_select": true
+}
+```
+
+**User:** (picks overdraft fees)
+
+**Resume:** `Command(resume=...)` on the same `thread_id`, with this value:
+
+```json
+{
+  "choices": [
+    "overdraft_fee_revenue"
+  ]
+}
+```
+
+**Answer** (graph output, `route` = `resolve_metric`, `grounded` =
+`true`, metrics `overdraft_fee_revenue`):
+
+```
+MetricFlow result (1 metric(s)):
+overdraft_fee_revenue: 32358.0
+```
+
+<details>
+<summary>SQL attached to the answer</summary>
+
+```sql
+SELECT
+  SUM(overdraft_fee_revenue) AS overdraft_fee_revenue
+FROM (
+  SELECT
+    fee_type AS transaction__fee_type
+    , fee_revenue_amount AS overdraft_fee_revenue
+  FROM "contactcenter"."marts"."f_transaction" transactions_src_10000
+) subq_2
+WHERE transaction__fee_type = 'overdraft'
+```
+
+</details>
 
 ---
 
 ## What was and was not captured
 
 - **Captured:** the lookups and every metric, CSAT and SQL figure above, the clarify interrupt
-  payload and the graph's resumed answer, and the cross-check SQL.
-- **Scripted:** the user's messages, which tool is called, the classifier's route, and the metric
-  names `ask_the_analyst` resolves to.
+  payloads and the graph's resumed answers, the `explain_change` result of turn 8, and the
+  cross-check SQL.
+- **Scripted:** the user's messages, which tool is called, the classifier's route, the metric
+  names `ask_the_analyst` resolves to, and the inputs turn 8 passes to `explain_change`.
+- **Model-written, captured:** the driver labels and the choice of quotes in turn 8. They come
+  from the chat model that ran (`LLM_PROVIDER`), so another model words them differently; the
+  counts, windows and SQL do not depend on it.
 - **Not captured:** `search_transcripts` and the written summary in `get_call_summary`, which
   need a chat model and real embeddings. Each says so where it appears.

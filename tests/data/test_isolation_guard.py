@@ -23,6 +23,8 @@ GUARDED = [
     "agent/data/**/*",
     "agent/changes.py",
     "agent/subgraphs/change.py",
+    "agent/demo_change.py",
+    "tools/demo_chat.py",
     "evals/datasets/*.jsonl",
     "evals/datasets/*.py",
     "ccai_mcp/change.py",
@@ -70,7 +72,8 @@ def test_the_guard_covers_the_surfaces_that_exist():
             "evals/datasets/build_golden.py", "evals/datasets/holdout_specs.py"} <= names
     assert {"agent/prompts/frame.md", "agent/data/change_measures.yml",
             "agent/data/change_subjects.yml", "agent/changes.py", "agent/subgraphs/change.py",
-            "ccai_mcp/change.py"} <= names
+            "ccai_mcp/change.py", "agent/demo_change.py",
+            "tools/demo_chat.py"} <= names
 
 
 def test_the_forbidden_list_has_the_labels_and_the_held_out_keywords(events_config):
