@@ -113,7 +113,7 @@ def test_golden_and_held_out_change_rows_report_in_separate_groups(offline_rows)
 
 
 def test_a_driver_model_that_finds_nothing_fails_driver_recall_everywhere(corpus, monkeypatch):
-    def nothing(self, schema):
+    def nothing(self, schema, **_):
         empty = {"reasons": []} if "reasons" in schema.model_fields else {"assignments": []}
         return RunnableLambda(lambda prompt: schema(**empty))
 

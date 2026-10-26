@@ -49,7 +49,7 @@ class ScriptedClassifier:
         self.frames = frames or {}
         self.prompts: list[str] = []
 
-    def with_structured_output(self, schema):
+    def with_structured_output(self, schema, **_):
         def respond(prompt: str):
             self.prompts.append(prompt)
             question = prompt.rsplit("Question: ", 1)[-1].strip()
@@ -260,7 +260,7 @@ class AnswerKeyModel:
     def __init__(self, corpus):
         self.corpus = corpus
 
-    def with_structured_output(self, schema):
+    def with_structured_output(self, schema, **_):
         def respond(prompt: str):
             key = "pattern" if ("AGENT handled" in prompt or "agent pattern" in prompt) else "driver"
             blocks = prompt.split("CALLS:\n", 1)[1].split("\n\n[")

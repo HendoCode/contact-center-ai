@@ -204,7 +204,7 @@ class FakeModel:
                         ("Refund requests were turned down", "The member asked for money back.", "refund")]
         self.patterns = [("Rule described differently", "The agent describes a rule in different ways.", "once a year")]
 
-    def with_structured_output(self, schema):
+    def with_structured_output(self, schema, **_):
         def respond(prompt: str):
             self.prompts.append(prompt)
             if self.fail:

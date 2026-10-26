@@ -89,6 +89,8 @@ def get_llm(provider: str | None = None):
         model=os.getenv("LLM_MODEL", "z-ai/glm-5.3-flash"),
         api_key=os.getenv("OPENAI_API_KEY"),
         base_url=os.getenv("LLM_BASE_URL", "https://openrouter.ai/api/v1"),
+        # A hosted model can write far past what a supervisor reads; cap the output.
+        max_tokens=int(os.getenv("LLM_MAX_TOKENS", "2048")),
     )
 
 

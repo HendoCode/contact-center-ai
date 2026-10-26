@@ -27,7 +27,7 @@ QUOTE = "Nobody told me the fee went up."
 class ScriptedModel(FakeLLM):
     """Routes and frames each demo question the way a good model would."""
 
-    def with_structured_output(self, schema):
+    def with_structured_output(self, schema, **_):
         from langchain_core.runnables import RunnableLambda
 
         def respond(prompt):
@@ -127,7 +127,7 @@ async def test_an_unmasked_account_number_is_reported(capsys):
 @pytest.mark.asyncio
 async def test_a_misrouted_step_is_a_mismatch_not_an_error(capsys):
     class AlwaysRetrieve(ScriptedModel):
-        def with_structured_output(self, schema):
+        def with_structured_output(self, schema, **_):
             inner = super().with_structured_output(schema)
             if "route" in schema.model_fields:
                 from langchain_core.runnables import RunnableLambda

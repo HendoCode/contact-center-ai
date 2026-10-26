@@ -97,7 +97,7 @@ class FakeJudge:
         self.score = score
         self.prompts: list[str] = []
 
-    def with_structured_output(self, schema):
+    def with_structured_output(self, schema, **_):
         def respond(prompt):
             self.prompts.append(prompt)
             return schema(reasoning="faithful", score=self.score)
