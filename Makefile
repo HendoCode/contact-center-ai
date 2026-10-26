@@ -47,7 +47,7 @@ demo-change:
 # The last verified `make demo-change` run, labeled RECORDED with its date and git SHA. Needs no
 # database, model or network: use it when a provider fails.
 demo-change-replay:
-	uv run --group agent python -m agent.demo_change --replay
+	@uv run --group agent python -m agent.demo_change --replay
 
 # ── Local data pipeline ───────────────────────────────────────────────────────
 
