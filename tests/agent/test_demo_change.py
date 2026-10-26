@@ -258,6 +258,19 @@ def test_replay_prints_the_recorded_run_under_a_banner_with_date_and_sha(tmp_pat
     assert "answer: fees rose" in out
 
 
+def test_replay_opens_with_a_label_naming_the_date_commit_and_model(tmp_path, capsys, monkeypatch):
+    path = tmp_path / "run.json"
+    monkeypatch.setenv("LLM_PROVIDER", "openai")
+    monkeypatch.setenv("LLM_MODEL", "mistralai/mistral-nemo")
+    demo_change.write_record("== 1/6  a step ==\n", path)
+    record = __import__("json").loads(path.read_text())
+
+    assert demo_change.replay(path) == 0
+    first = capsys.readouterr().out.splitlines()[0]
+    assert first == (f"Recorded run of make demo-change, {record['recorded_at'][:10]}, "
+                     f"commit {record['git_sha']}, model mistralai/mistral-nemo")
+
+
 def test_a_recorded_account_number_is_masked(tmp_path):
     path = tmp_path / "run.json"
     demo_change.write_record("MEMBER: my account 123456789\n", path)

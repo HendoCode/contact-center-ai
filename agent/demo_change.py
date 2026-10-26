@@ -83,6 +83,15 @@ def _provider(name: str, fallback: str = "openai") -> str:
     return (os.getenv(name) or fallback).lower()
 
 
+# The env var that names the chat model for each LLM_PROVIDER (see rag/pipeline.py get_llm).
+CHAT_MODEL_ENV = {"openai": "LLM_MODEL", "ollama": "OLLAMA_MODEL", "anthropic": "ANTHROPIC_MODEL",
+                  "fireworks": "FIREWORKS_MODEL", "vllm": "VLLM_MODEL"}
+
+
+def _chat_model() -> str:
+    return _env(CHAT_MODEL_ENV.get(_provider("LLM_PROVIDER"), "LLM_MODEL"), "unset")
+
+
 def check_data() -> Check:
     needed = ["transcripts.json", "csat.json", "change_log.json", "branches.json"]
     missing = [n for n in needed if not (SYNTHETIC_DIR / n).exists()]
@@ -495,6 +504,7 @@ def write_record(transcript: str, path: Path = RECORD_PATH, *, steps: int = len(
         "recorded_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "git_sha": sha + ("-dirty" if dirty else ""),
         "chat_provider": _provider("LLM_PROVIDER"),
+        "chat_model": _chat_model(),
         "steps": steps,
         "transcript": mask_accounts(transcript),
     }
@@ -516,6 +526,8 @@ def replay(path: Path = RECORD_PATH) -> int:
     except ValueError as exc:
         print(f"The recorded run at {path.name} cannot be read: {exc}", file=sys.stderr)
         return 1
+    label = (f"Recorded run of make demo-change, {record['recorded_at'][:10]}, "
+             f"commit {record['git_sha']}, model {record.get('chat_model', 'unknown')}")
     bar = "#" * 72
     banner = "\n".join([
         bar,
@@ -525,6 +537,7 @@ def replay(path: Path = RECORD_PATH) -> int:
         "#  Nothing below was computed just now: this replays the last verified live run.",
         bar,
     ])
+    print(label)
     print(banner)
     print(record["transcript"].rstrip("\n"))
     print(banner)
