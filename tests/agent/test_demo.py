@@ -12,7 +12,7 @@ from agent.graph import build_graph
 class QuestionRoutingLLM:
     """Routes by question text, as the scripted steps expect a real model to."""
 
-    def with_structured_output(self, schema):
+    def with_structured_output(self, schema, **_):
         def respond(prompt):
             question = prompt.rsplit("Question:", 1)[1]
             if "fraud" in question:
@@ -49,7 +49,7 @@ async def test_all_five_steps_run_as_scripted(capsys):
 @pytest.mark.asyncio
 async def test_a_misrouted_step_is_reported_not_raised(capsys):
     class AlwaysMetric:
-        def with_structured_output(self, schema):
+        def with_structured_output(self, schema, **_):
             return RunnableLambda(lambda prompt: schema(route="resolve_metric"))
 
     matched, failures = await run_steps(_graph(AlwaysMetric()), STEPS)

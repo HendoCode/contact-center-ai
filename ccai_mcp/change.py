@@ -404,13 +404,16 @@ def _propose(calls: list[tuple[str, str]], question: str | None, *, coaching: bo
         task = (
             f"Find up to {MAX_PATTERNS} patterns in how the AGENT handled these calls that a "
             "supervisor could coach on. Describe what the agent said or did across calls. "
+            "Keep it short and scannable: a few words for each label and one sentence for each "
+            "definition, with no headings or extra sections. "
             "Never name, identify or rate an individual agent."
         )
     else:
         task = (
             f"Find up to {MAX_DRIVERS} distinct reasons members called, from what the members "
             "say in these calls. Each reason must be something several calls share. Use "
-            "only what the calls themselves say."
+            "only what the calls themselves say. Keep it short: one sentence for each "
+            "definition, with no headings or extra sections."
         )
     prompt = (
         "You read call transcripts from a credit union contact center.\n"

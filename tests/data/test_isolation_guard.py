@@ -22,6 +22,7 @@ GUARDED = [
     "agent/prompts/**/*",
     "agent/data/**/*",
     "agent/changes.py",
+    "agent/nodes/classify.py",
     "agent/nodes/ground.py",
     "agent/subgraphs/change.py",
     "agent/state.py",

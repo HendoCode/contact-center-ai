@@ -245,3 +245,14 @@ def test_get_llm_explicit_provider_overrides_env(monkeypatch):
 
     assert isinstance(llm, ChatOpenAI)
     assert llm.openai_api_base == "https://openrouter.ai/api/v1"
+
+
+def test_hosted_chat_output_is_capped_and_the_cap_is_configurable(monkeypatch):
+    monkeypatch.setenv("LLM_PROVIDER", "openai")
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    monkeypatch.delenv("LLM_MAX_TOKENS", raising=False)
+
+    assert get_llm().max_tokens == 2048
+
+    monkeypatch.setenv("LLM_MAX_TOKENS", "512")
+    assert get_llm().max_tokens == 512
