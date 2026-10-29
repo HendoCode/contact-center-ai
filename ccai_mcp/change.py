@@ -90,7 +90,7 @@ MAX_CITATIONS = 3
 MIN_QUOTE = 12  # characters; shorter quotes say too little to cite
 MAX_QUOTE = 300
 MAX_GROUPS = 6
-MAX_PARALLEL = 4  # queries or model calls in flight at once
+MAX_PARALLEL = 8  # queries or model calls in flight at once
 
 _ID_RE = re.compile(r"\b(?:AGT|MBR)-\d+\b")  # staff and member ids are never quoted or labeled
 _SPACE_RE = re.compile(r"\s+")
@@ -432,10 +432,19 @@ def _propose(calls: list[tuple[str, str]], question: str | None, *, coaching: bo
 def _assign(calls: list[tuple[str, str]], items: list[dict], *, coaching: bool) -> dict:
     """Give each call at most one item, in batches. Returns {call_id: (item index, quote)};
     a call missing from the model's answer, or with an out-of-range number, is unassigned."""
+    return _assign_many([calls], items, coaching=coaching)[0]
+
+
+def _assign_many(call_lists: list[list[tuple[str, str]]], items: list[dict], *,
+                 coaching: bool) -> list[dict]:
+    """`_assign` for several lists of calls at once: every batch of every list is one job in a
+    single pool, so a slow batch in one list does not hold up the others."""
     listing = "\n".join(f"{i}. {item['label']}: {item['definition']}"
                         for i, item in enumerate(items, start=1))
     what = "agent pattern" if coaching else "reason"
-    batches = [calls[at: at + BATCH] for at in range(0, len(calls), BATCH)]
+    batches = [(at_list, calls[at: at + BATCH])
+               for at_list, calls in enumerate(call_lists)
+               for at in range(0, len(calls), BATCH)]
 
     def ask(batch: list[tuple[str, str]]):
         prompt = (
@@ -445,17 +454,17 @@ def _assign(calls: list[tuple[str, str]], items: list[dict], *, coaching: bool) 
         )
         return _structured(_Assignments, prompt).assignments
 
-    assigned: dict[str, tuple[int, str | None]] = {}
+    assigned: list[dict[str, tuple[int, str | None]]] = [{} for _ in call_lists]
     # Batches are independent, so a hosted model can take a few at once; results are read in
     # batch order, so the counts do not depend on which one answers first.
-    for batch, rows in zip(batches, _parallel(*(lambda b=b: ask(b) for b in batches))):
+    for (at_list, batch), rows in zip(batches, _parallel(*(lambda b=b: ask(b) for _, b in batches))):
         texts = dict(batch)
         for row in rows:
             call_id, number = _norm(row.call_id).strip("[]"), row.number
-            if call_id not in texts or call_id in assigned:
+            if call_id not in texts or call_id in assigned[at_list]:
                 continue
             if isinstance(number, int) and 1 <= number <= len(items):
-                assigned[call_id] = (number - 1, _verbatim(row.quote, texts[call_id]))
+                assigned[at_list][call_id] = (number - 1, _verbatim(row.quote, texts[call_id]))
     return assigned
 
 
@@ -499,11 +508,11 @@ def _find_drivers(after: dict, before: dict, question: str | None) -> tuple[list
         return [], {"before": len(before["calls"]), "after": len(after["calls"])}, [
             "The calls after the change did not group into reasons, so no drivers are reported."
         ]
-    after_tally = _tally(_assign(after["calls"], proposed, coaching=False), after["calls"],
-                         len(proposed))
-    before_tally = _tally(_assign(before["calls"], proposed, coaching=False), before["calls"],
-                          len(proposed)) if before["calls"] else [
-        {"call_ids": [], "quotes": []} for _ in proposed]
+    # Both windows are read in one pool: the before batches wait on nothing in the after ones.
+    after_assigned, before_assigned = _assign_many([after["calls"], before["calls"]], proposed,
+                                                   coaching=False)
+    after_tally = _tally(after_assigned, after["calls"], len(proposed))
+    before_tally = _tally(before_assigned, before["calls"], len(proposed))
     drivers = []
     for item, a, b in zip(proposed, after_tally, before_tally):
         if not a["call_ids"]:
