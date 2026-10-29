@@ -38,9 +38,10 @@ GUARDED = [
     "evals/README.md",
     "evals/prompts/**/*",
     "ccai_mcp/change.py",
+    "notebooks/**/*",
 ]
 # File types the guard reads (images and caches are skipped).
-SUFFIXES = {".md", ".yml", ".yaml", ".json", ".jsonl", ".py", ".txt", ".toml"}
+SUFFIXES = {".md", ".yml", ".yaml", ".json", ".jsonl", ".py", ".txt", ".toml", ".ipynb"}
 
 
 def words(text: str) -> re.Pattern:

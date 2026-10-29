@@ -103,6 +103,10 @@ Compose profiles: a bare `docker compose up -d` is unchanged (`db`, `ollama`, Op
 on `localhost:9090`, Structurizr on `localhost:8080`); `app` is the demo stack; `gpu`
 declares a vLLM server.
 
+`make notebooks` serves JupyterLab on `127.0.0.1:8888` with the change-analysis walkthrough
+(`notebooks/change-analysis.ipynb`) on the same stack; the login token is `JUPYTER_TOKEN`
+(`ccai-demo` when unset). Notebooks are committed with their outputs cleared.
+
 ## Connecting a client
 
 Once the MCP server is running locally, add it to your Claude Desktop config:
