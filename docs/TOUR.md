@@ -238,6 +238,10 @@ prints it under a RECORDED banner with its date and git SHA, with no database, m
 The opened citation shows the call id, date and the cited turn with context, account numbers
 masked to their last four digits.
 
+The same walkthrough, with narrative, code and results together, is `notebooks/change-analysis.ipynb`;
+`make notebooks` serves it in JupyterLab on `127.0.0.1:8888` (Compose `jupyter` service, token
+`JUPYTER_TOKEN`, default `ccai-demo`). Outputs are cleared before commit (`make strip-notebooks`).
+
 **B2. Step by step on the host** (for screen-sharing one layer at a time).
 
 ```bash

@@ -3,7 +3,7 @@
 #   (no profile)  db, ollama, open-webui, structurizr
 #                                    what `docker compose up -d` starts, as the published
 #                                    posts describe it. Unchanged by L3.
-#   app           ollama-pull, seed, dbt, langgraph-api, mcp-server, demo, evals
+#   app           ollama-pull, seed, dbt, langgraph-api, mcp-server, demo, jupyter, evals
 #                                    the L3 stack. `make demo` runs it end to end.
 #                                    mcp-server is the opt-in HTTP MCP endpoint (M1); it needs
 #                                    MCP_AUTH_TOKEN in .env, and only `docker compose --profile app
@@ -222,6 +222,47 @@ services:
     command: ["python", "-m", "agent.demo"]
     volumes:
       - dbt-target:/app/olap/dbt/target
+    depends_on:
+      db:
+        condition: service_healthy
+      dbt:
+        condition: service_completed_successfully
+      langgraph-api:
+        condition: service_healthy
+
+  # JupyterLab on http://127.0.0.1:8888/lab/tree/change-analysis.ipynb?token=$JUPYTER_TOKEN
+  # (`make notebooks`). Serves ./notebooks from the app image, with the demo service's env and
+  # dependencies, so a notebook calls the same graph and tools. Published on 127.0.0.1 only; the
+  # token is the only login, so set JUPYTER_TOKEN in .env before publishing beyond this machine
+  # (JUPYTER_PUBLISH_HOST=0.0.0.0). The demo-grade default token is for loopback use.
+  jupyter:
+    <<: *app
+    command:
+      - jupyter
+      - lab
+      - --no-browser
+      - --allow-root
+      - --ip=0.0.0.0
+      - --port=8888
+      - --ServerApp.root_dir=/app/notebooks
+      - --ServerApp.token=${JUPYTER_TOKEN:-ccai-demo}
+      - --LabApp.user_settings_dir=/tmp/jupyter-settings
+    ports:
+      - "${JUPYTER_PUBLISH_HOST:-127.0.0.1}:8888:8888"
+    volumes:
+      - ./notebooks:/app/notebooks
+      - dbt-target:/app/olap/dbt/target
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://localhost:8888/api', timeout=3)
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
     depends_on:
       db:
         condition: service_healthy

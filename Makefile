@@ -6,7 +6,7 @@
 # `evals` is the L2 agent golden set offline (a CI gate); `evals-live` is the same set
 # against real models, uploaded to LangSmith.
 
-.PHONY: up down seed ingest test lint check-public demo demo-change demo-change-replay bench evals evals-live evals-compare evals-export evals-retrieval-experiment finetune-data finetune-label load-snowflake load-databricks load-dry-run dbt-build dbt-build-dev dev-data lance-azure-check parity
+.PHONY: up down seed ingest test lint check-public demo demo-change demo-change-replay notebooks strip-notebooks bench evals evals-live evals-compare evals-export evals-retrieval-experiment finetune-data finetune-label load-snowflake load-databricks load-dry-run dbt-build dbt-build-dev dev-data lance-azure-check parity
 
 PYTHON := uv run python
 # RETRIEVER_BACKEND=lancedb needs the lance dependency group wherever the store is read or written.
@@ -48,6 +48,21 @@ demo-change:
 # database, model or network: use it when a provider fails.
 demo-change-replay:
 	@uv run --group agent python -m agent.demo_change --replay
+
+# JupyterLab with the repo's notebooks (notebooks/), in Compose on the demo stack. The first
+# run builds the image, seeds and embeds like `make demo`. Open the printed URL; the login is
+# the token (JUPYTER_TOKEN in .env, `ccai-demo` when unset). Stop it with `make down`.
+notebooks:
+	export LLM_PROVIDER=$(DEMO_LLM_PROVIDER) EMBEDDING_PROVIDER=ollama; \
+	$(COMPOSE_APP) up -d --build jupyter
+	@echo
+	@echo "JupyterLab: http://127.0.0.1:8888/lab/tree/change-analysis.ipynb?token=$${JUPYTER_TOKEN:-ccai-demo}"
+	@echo "Stop it with: make down"
+
+# Clear outputs and execution counts before committing a notebook: its outputs are answers to
+# questions the agent was never tuned on, and tests/test_notebooks.py rejects them.
+strip-notebooks:
+	uv run --group notebooks jupyter nbconvert --clear-output --inplace notebooks/*.ipynb
 
 # ── Local data pipeline ───────────────────────────────────────────────────────
 
