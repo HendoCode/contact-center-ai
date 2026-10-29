@@ -52,6 +52,6 @@ raises `NotImplementedError`).
 | Explore and explain | The change analysis as a notebook; the Anchoring AI blog series; these diagrams | built (notebook, diagrams); partial (blog: four posts published) | `make notebooks`; `bash blogs/build.sh`; `docker compose up structurizr` |
 | Quality and evaluation | Golden and change eval sets scored offline as a CI gate and live in LangSmith; a retrieval benchmark across both stores | built; runs recorded in `results/` | `make evals`; `make evals-live`; `make bench` |
 | Warehouse portability | The same metrics on Postgres, Snowflake and Databricks: loaders, dbt targets, a parity check, an Apache Ossie export | built; parity run on all three targets | `make parity`; `make load-snowflake`; `make dbt-build WAREHOUSE=snowflake` |
-| Cloud deployment | Terraform for Azure (Container Apps behind Entra Easy Auth, PostgreSQL, ADLS, optional GPU VM and Databricks) and a Snowflake root | built; validated in CI, applied by hand | `infra/azure/` |
+| Cloud deployment | Terraform for Azure (Container Apps behind Entra Easy Auth, PostgreSQL, ADLS, optional GPU VM and Databricks) and a Snowflake root | validated in CI; not deployed | `infra/azure/` |
 | Model choice and fine-tuning | Five chat providers behind one switch; the fine-tune dataset; a vLLM service | partial: providers built, fine-tune dataset only, vLLM declared | `LLM_PROVIDER`; `make finetune-data`; Compose `gpu` profile |
 | Real call data in | Reading recordings and transcripts from S3; CSAT in the vector store | stub | `python -m rag.pipeline --source s3` |
