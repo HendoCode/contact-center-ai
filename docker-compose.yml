@@ -282,9 +282,11 @@ services:
 
   # The open-webui image ships its own HEALTHCHECK. structurizr has none: nothing depends
   # on it and its image has no known probe tool, so none is invented here.
+  # `local` serves docs/architecture/workspace.dsl (`playground` opens an empty editor instead).
+  # It runs as uid 65532 and writes into the mounted directory: docs/architecture/README.md.
   structurizr:
     image: structurizr/structurizr:latest
-    command: playground
+    command: local
     restart: unless-stopped
     ports:
       - "8080:8080"

@@ -39,6 +39,8 @@ The six MCP tools: `search_transcripts`, `get_call_summary`, `query_csat` (data 
 `query_metric`, `ask_the_analyst` (semantic-layer tools that shell out to MetricFlow's `mf`) and
 `explain_change` (a metric before and after a change, plus the calls in between).
 
+[MAP.md](MAP.md) has the diagrams of the whole repo and a table of each capability's status.
+
 ---
 
 ## Setup (once)
@@ -342,8 +344,8 @@ make evals-live                     # all 52; writes results/evals/ and a LangSm
 
 **C3. Snowflake. Costs warehouse credits** (XS, 60 s auto-suspend if you used the Terraform root).
 The database, warehouse and role must exist; the loader creates the raw schema and the stage.
-Key-pair auth only. Neither the loader nor `dbt build --target snowflake` has been run against a
-real account yet.
+Key-pair auth only. The loader and `dbt build --target snowflake` have run against a real
+account: `results/semantics/` holds the parity runs (S3, below).
 
 Fill in the Snowflake block of `.env` (the variable list is in `.env.example`). If you applied the
 Terraform root, `terraform output dbt_env` in `infra/azure/envs/snowflake` prints the account, user,
@@ -513,7 +515,7 @@ Azure backend, under its own state key. Cross-cloud traffic is the few MB of loa
 | Fine-tune data | `models/finetune/` | `gold.py`, `splits.py`, `data_gen.py` (`build`/`label`/`finalize`) |
 | Infra | `infra/azure/` | `bootstrap/`, `envs/dev/`, `envs/snowflake/`, `modules/*` |
 | Local stack | `docker-compose.yml`, `Dockerfile`, `Makefile` | profiles: default, `app` (`make demo`), `gpu` |
-| Results contract | `tools/results.py`, `results/` | JSON per run, rendered READMEs (both say "not run" today) |
+| Results contract | `tools/results.py`, `results/` | JSON per run, rendered READMEs (`retrieval/`, `evals/`, `semantics/`) |
 
 ---
 
@@ -535,7 +537,7 @@ Azure backend, under its own state key. Cross-cloud traffic is the few MB of loa
 - **R3 bench:** 40 labeled queries in four types (topical, filter, exact, paraphrase) with relevance
   derived from generator facts, not from search results. Honest limit: the corpus is templated
   (fewer than 30 distinct texts with names masked), so the numbers compare backends on this corpus
-  only. `results/retrieval/` says **not run**: no bench numbers exist yet.
+  only. `results/retrieval/` holds the 2026-10-03 runs at 1×, 10× and 80× scale.
 - **DuckDB over the same files:** SQL aggregates and search over the Lance dataset with no export
   step; read-only, L2 distance only, and hybrid uses an alpha blend instead of RRF.
 
@@ -573,7 +575,8 @@ Grounded in `olap/dbt/models/marts/semantic/metrics.yml`:
 - **LangSmith:** tracing on by env only. Golden set of 52 questions (12 ambiguous, 18 metric,
   10 call lookup, 12 open) whose expectations are computed from committed data. `make evals` runs
   it offline as a CI gate; `make evals-live` runs it as a LangSmith experiment with an
-  LLM-as-judge that must differ from the agent's model. `results/evals/` says **not run**.
+  LLM-as-judge that must differ from the agent's model. `results/evals/` holds the live runs
+  from 2026-10-04 and 2026-10-05.
 
 ### Snowflake and Databricks
 
@@ -597,12 +600,8 @@ Grounded in `olap/dbt/models/marts/semantic/metrics.yml`:
 - **Not built yet:** fine-tune F2–F6; S3 (AWS) ingestion
   (`rag.pipeline --source s3` raises `NotImplementedError`); CSAT in the vector store; the agent
   talking to the MCP server over HTTP (it still spawns it over stdio); an agent HTTP endpoint (L4).
-- **No results yet:** `results/retrieval/` and `results/evals/` both render "not run". The numbers
-  in `olap/dbt/README.md` come from a seeded local run, not from `results/`.
-- **Never run against a real account:** the Snowflake and Databricks loaders and dbt targets, and
-  every Terraform `apply` beyond what you applied yourself.
-- `evals/README.md` still lists three known failures (g24, g25, g38); #28 fixed them and
-  `evals/known_failures.json` is empty.
+- **Results:** `results/retrieval/`, `results/evals/` and `results/semantics/` hold real runs. The
+  numbers in `olap/dbt/README.md` come from a seeded local run, not from `results/`.
+- **Never run against a real account:** every Terraform `apply` beyond what you applied yourself.
 - The corpus is templated, so retrieval quality numbers will not transfer to real transcripts.
-- `README.md` and `infra/terraform/` still describe the original App Service setup; `infra/azure/`
-  replaces it.
+- `infra/terraform/` still describes the original App Service setup; `infra/azure/` replaces it.
