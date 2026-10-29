@@ -2,9 +2,11 @@
 retriever and model (tests/change_support.py). Offline: no database, no key."""
 
 import json
+import threading
 from datetime import date, timedelta
 
 import pytest
+from langchain_core.runnables import RunnableLambda
 
 import ccai_mcp.change as change
 from change_support import (
@@ -401,6 +403,43 @@ def test_the_model_reads_one_proposal_and_batches_of_twenty(env):
     assert len(batches) == -(-read_after // 20) + -(-read_before // 20)
     assert all(p.count("\n[CALL-") <= 20 for p in batches)
     assert proposals[0].count("\n[CALL-") == 30  # the proposal reads 30 calls, not all of them
+
+
+def test_the_batches_of_both_windows_are_in_flight_together(monkeypatch):
+    class HeldModel(FakeModel):
+        """Each assignment waits until every batch of both windows has been asked."""
+
+        def __init__(self, expected: int):
+            super().__init__()
+            self.expected, self.started = expected, 0
+            self.all_asked = threading.Event()
+            self.lock = threading.Lock()
+
+        def with_structured_output(self, schema, **kwargs):
+            inner = super().with_structured_output(schema, **kwargs)
+            if "assignments" not in schema.model_fields:
+                return inner
+
+            def respond(prompt):
+                with self.lock:
+                    self.started += 1
+                    if self.started == self.expected:
+                        self.all_asked.set()
+                assert self.all_asked.wait(timeout=10), "a batch waited for another window's"
+                return inner.invoke(prompt)
+
+            return RunnableLambda(respond)
+
+    probe = Env(monkeypatch)
+    windows = [in_window(probe.calls, CHANGE - timedelta(days=42), CHANGE, category=[HOT]),
+               in_window(probe.calls, CHANGE, CHANGE + timedelta(days=42), category=[HOT])]
+    expected = sum(-(-len(w) // change.BATCH) for w in windows)
+    assert 2 < expected <= change.MAX_PARALLEL
+    env = Env(monkeypatch, model=HeldModel(expected))
+
+    result = env.explain(filters=FILTERS, change_point="2026-04-06")
+
+    assert result["drivers"] and not [lim for lim in result["limits"] if "could not be grouped" in lim]
 
 
 def test_a_filter_that_matches_no_calls_reports_zero_and_skips_the_model(env):
