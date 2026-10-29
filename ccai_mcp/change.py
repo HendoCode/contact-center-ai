@@ -537,21 +537,32 @@ def _find_drivers(after: dict, before: dict, question: str | None) -> tuple[list
 def _find_patterns(groups: list[dict], question: str | None) -> tuple[list, list]:
     """Agent-side patterns inside each group of calls. Returns (patterns, limits)."""
     retriever = get_retriever()
-    patterns, limits = [], []
-    for group in groups[:MAX_GROUPS]:
+    reads = []
+    for group in groups[:MAX_GROUPS]:  # searches run in order: the retriever is not shared across threads
         ids = list(dict.fromkeys(group["call_ids"]))
         hits = retriever.search(
             question or group["label"], k=max(len(ids), 1), where={"call_id": {"in": ids}}
         ) if ids else []
         calls = {hit.call_id: hit.text for hit in hits}
         sample = [(c, calls[c]) for c in sorted(calls, key=_hash_order)[:SAMPLE_CAP]]
-        if len(sample) < 2:
-            continue
+        if len(sample) >= 2:
+            reads.append((group, ids, sample))
+
+    def read(sample: list[tuple[str, str]]):
         found = _propose(sample[:PROPOSE_CALLS], question, coaching=True)
         if not found:
+            return None
+        return found, _tally(_assign(sample, found, coaching=True), sample, len(found))
+
+    # The groups' model calls are independent, so the step takes about as long as the slowest
+    # group; results are read in group order, so the output does not depend on who answers first.
+    patterns, limits = [], []
+    results = _parallel(*(lambda s=s: read(s) for _, _, s in reads))
+    for (group, ids, sample), result in zip(reads, results):
+        if result is None:
             continue
-        for item, tally in zip(found, _tally(_assign(sample, found, coaching=True), sample,
-                                             len(found))):
+        found, tallies = result
+        for item, tally in zip(found, tallies):
             if len(tally["call_ids"]) < 2:  # one call is an instance, not a pattern
                 continue
             patterns.append({
