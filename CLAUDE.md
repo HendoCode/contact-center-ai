@@ -41,9 +41,10 @@ python -m ccai_mcp.server
 make test                              # == uv run pytest -m "not integration"
 pytest tests/path/to/test_file.py::test_name  # single test
 
-# Terraform (Azure infra)
-cd infra/terraform && terraform init
-terraform plan -var-file=prod.tfvars
+# Terraform (Azure infra; infra/azure/README.md has the full steps)
+cd infra/azure/bootstrap && terraform init && terraform apply    # once
+cd ../envs/dev && terraform init -backend-config=backend.hcl
+terraform plan
 terraform apply
 ```
 
@@ -68,7 +69,7 @@ ccai_mcp/server.py (stdio; HTTP opt-in) → 6 tools exposed to MCP clients
 - `ccai_mcp/metrics.py` implements the semantic-layer tools (`query_metric`, `ask_the_analyst`), which shell out to the committed `mf` (MetricFlow) CLI over the `metrics.yml` catalog.
 - `ccai_mcp/server.py` is a thin router: it receives MCP tool calls over stdio and dispatches to `ccai_mcp/tools.py`, `ccai_mcp/metrics.py` and `ccai_mcp/change.py` (the `explain_change` tool: a metric before and after a change, plus the calls in between).
 
-**Auth:** No authentication logic exists in Python code. In production, Azure App Service Easy Auth (Entra) intercepts all requests before they reach the server; the Python app sees authenticated traffic only. `AZURE_TENANT_ID` / `AZURE_CLIENT_ID` env vars are used by Terraform, not by the app.
+**Auth:** No authentication logic exists in Python code. In production, Easy Auth (Entra) on Azure Container Apps intercepts all requests before they reach the server; the Python app sees authenticated traffic only. `AZURE_TENANT_ID` / `AZURE_CLIENT_ID` env vars are used by Terraform, not by the app.
 
 **S3 ingestion** is stubbed — `pipeline.py` raises `NotImplementedError` for the `"s3"` source path.
 
@@ -185,6 +186,6 @@ Deployed via GitHub Actions → GitHub Pages at https://hendocode.github.io/cont
 
 ## What's built vs. what's next
 
-**Built:** synthetic data generator, full RAG ingest/retrieve/respond pipeline, pgvector + OpenAI integration, Ollama as local provider alternative (no API key), 6-tool MCP server (RAG/CSAT + semantic-layer metric tools + change analysis), Terraform for Azure (App Service + PostgreSQL Flexible Server), Docker Compose for local dev.
+**Built:** synthetic data generator, full RAG ingest/retrieve/respond pipeline, pgvector + OpenAI integration, Ollama as local provider alternative (no API key), 6-tool MCP server (RAG/CSAT + semantic-layer metric tools + change analysis), Terraform for Azure (`infra/azure`: Container Apps + PostgreSQL Flexible Server + ADLS), Docker Compose for local dev.
 
 **Not yet implemented:** S3 ingestion, CSAT → vector store (currently SQL-backed via `f_csat`, not embedded), observability, end-to-end deployment of the CI workflow.

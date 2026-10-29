@@ -6,37 +6,39 @@ Built to be **provider-agnostic** (swap OpenAI for Anthropic or Gemini via LangC
 
 ## What it does
 
-- Ingests call transcripts and CSAT survey results into a pgvector store
+- Ingests call transcripts into a vector store (pgvector, or LanceDB as a peer) and CSAT survey results into Postgres
 - Exposes a RAG-powered query interface: ask questions like *"what were the most common complaints last week?"* or *"show me calls where the member mentioned fraud"*
 - Serves these capabilities as MCP tools so any GenAI client (Claude, OpenAI, Gemini) can consume them without rebuilding the data layer
 
 ## Architecture
 
+[docs/MAP.md](docs/MAP.md) maps everything the repo carries, with diagrams and a capability
+table; the diagrams' source is `docs/architecture/workspace.dsl`.
+
 ```
-Call recordings / transcripts / CSAT surveys
+Synthetic transcripts / CSAT / member ledger   (S3 source: stubbed)
          │
          ▼
-    S3 (staging)
+  Ingestion pipeline (LangChain; Ollama or OpenAI-compatible embeddings)
          │
          ▼
-  Ingestion pipeline
-  (LangChain + OpenAI embeddings)
-         │
-         ▼
-   pgvector (PostgreSQL)
+   pgvector (PostgreSQL) or LanceDB  ·  dbt marts + MetricFlow metrics
          │
          ▼
    MCP Server (Python)
    ├── search_transcripts(query)
    ├── get_call_summary(call_id)
-   └── query_csat(date_range, filters)
+   ├── query_csat(score range, category, dates)
+   ├── query_metric(metrics)
+   ├── ask_the_analyst(question)
+   └── explain_change(metric, filters, change_point)
          │
          ▼
-  Any MCP-compatible GenAI client
-  (Claude Desktop, custom app, etc.)
+  LangGraph agent, or any MCP-compatible client
+  (Claude Desktop, Cursor, etc.)
 ```
 
-**Auth:** Microsoft Entra via Azure App Service Easy Auth for MCP — governs which teams and identities can access the server in production.
+**Auth:** Microsoft Entra via Easy Auth on Azure Container Apps — governs which teams and identities can access the server in production.
 
 ## Stack
 
@@ -46,12 +48,12 @@ Call recordings / transcripts / CSAT surveys
 - **OpenAI** — embeddings and completions (default; swappable)
 - **Ollama** — local embeddings and completions, no API key required (optional)
 - **Python MCP SDK** — MCP server implementation
-- **Terraform** — Azure infrastructure (App Service + PostgreSQL)
+- **Terraform** — Azure infrastructure (Container Apps + PostgreSQL Flexible Server + ADLS)
 - **Microsoft Entra** — authentication (production)
 
 ## Quick start
 
-For a guided walk-through of every layer, with what runs offline and a code map, see [docs/TOUR.md](docs/TOUR.md).
+For a guided walk-through of every layer, with what runs offline and a code map, see [docs/TOUR.md](docs/TOUR.md); for the map of what the repo carries and its status, see [docs/MAP.md](docs/MAP.md).
 
 ### Prerequisites
 - Docker and Docker Compose
@@ -62,7 +64,7 @@ For a guided walk-through of every layer, with what runs offline and a code map,
 
 ```bash
 # Clone the repo
-git clone https://github.com/yourusername/contact-center-ai
+git clone https://github.com/hendocode/contact-center-ai
 cd contact-center-ai
 
 # Copy and configure environment
@@ -180,9 +182,11 @@ The pipeline is also designed so you can add other LangChain-supported providers
 
 ## Production deployment
 
-See `infra/terraform/` for Azure App Service + PostgreSQL infrastructure.
-Entra auth is configured at the App Service level — see `infra/terraform/main.tf`.
+See `infra/azure/` for the Azure infrastructure (Container Apps, PostgreSQL Flexible Server, ADLS)
+and its README for the bootstrap, plan and apply steps. Entra auth is configured as Easy Auth on
+the Container App — see `infra/azure/modules/apps/main.tf`. `infra/terraform/` is the deprecated
+single-file App Service version.
 
 ## Notes
 
-This repo uses **synthetic data only**. The real engagement this mirrors involves a confidential financial institution client. No real member data, call recordings, or CSAT results are included anywhere in this repository.
+This repo is a working sandbox exploring what AI can do for credit union contact centers, part of a larger effort to show credit unions a range of possibilities. It uses **synthetic data only**: no real member data, call recordings, or CSAT results are included anywhere in this repository.

@@ -78,8 +78,8 @@ target/
 dbt_packages/
 .user.yml
 
-# Structurizr — generated at runtime, only workspace.dsl is source
-docs/architecture/workspace.json
+# Structurizr Local's runtime directory. workspace.dsl is the model; workspace.json is
+# committed because it holds the fixed layout of the Containers and deployment views.
 docs/architecture/.structurizr/
 
 # Covers JetBrains IDEs: IntelliJ, RubyMine, PhpStorm, AppCode, PyCharm, CLion, Android Studio and Webstorm

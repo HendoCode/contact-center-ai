@@ -1,0 +1,2268 @@
+{
+  "configuration": {},
+  "description": "A working sandbox exploring what AI can do for a credit union contact center, on synthetic data.",
+  "documentation": {},
+  "id": 0,
+  "model": {
+    "deploymentNodes": [
+      {
+        "children": [
+          {
+            "containerInstances": [
+              {
+                "containerId": "22",
+                "environment": "Local",
+                "id": "92",
+                "instanceId": 1,
+                "properties": {
+                  "structurizr.dsl.identifier": "af1542d9-ca21-4ac9-a678-51b301db062f"
+                },
+                "relationships": [
+                  {
+                    "description": "Asks steps 1 to 4 on checkpointed threads",
+                    "destinationId": "93",
+                    "id": "94",
+                    "linkedRelationshipId": "52",
+                    "sourceId": "92",
+                    "technology": "in process"
+                  },
+                  {
+                    "description": "Asks step 6 as an MCP client would",
+                    "destinationId": "95",
+                    "id": "96",
+                    "linkedRelationshipId": "54",
+                    "sourceId": "92",
+                    "technology": "explain_change"
+                  },
+                  {
+                    "description": "Opens one cited call, accounts masked",
+                    "destinationId": "98",
+                    "id": "99",
+                    "linkedRelationshipId": "53",
+                    "sourceId": "92",
+                    "technology": "get_by_id"
+                  },
+                  {
+                    "description": "Preflight: ledger, marts, vector index",
+                    "destinationId": "113",
+                    "id": "114",
+                    "linkedRelationshipId": "51",
+                    "sourceId": "92",
+                    "technology": "SQL"
+                  }
+                ],
+                "tags": "Container Instance"
+              },
+              {
+                "containerId": "21",
+                "environment": "Local",
+                "id": "93",
+                "instanceId": 1,
+                "properties": {
+                  "structurizr.dsl.identifier": "bea4480f-477e-4cd9-87c9-a7df15177f03"
+                },
+                "relationships": [
+                  {
+                    "description": "Calls explain_change and query_metric",
+                    "destinationId": "95",
+                    "id": "97",
+                    "linkedRelationshipId": "56",
+                    "sourceId": "93",
+                    "technology": "MCP stdio"
+                  },
+                  {
+                    "description": "Grounds citations: call exists, inside the window",
+                    "destinationId": "98",
+                    "id": "100",
+                    "linkedRelationshipId": "57",
+                    "sourceId": "93",
+                    "technology": "Retriever"
+                  },
+                  {
+                    "description": "Checkpoints paused and follow-up threads",
+                    "destinationId": "113",
+                    "id": "115",
+                    "linkedRelationshipId": "58",
+                    "sourceId": "93",
+                    "technology": "AsyncPostgresSaver"
+                  },
+                  {
+                    "description": "Classifies and frames the question",
+                    "destinationId": "120",
+                    "id": "121",
+                    "linkedRelationshipId": "55",
+                    "sourceId": "93",
+                    "technology": "chat"
+                  },
+                  {
+                    "description": "Chats through a self-hosted model",
+                    "destinationId": "136",
+                    "id": "137",
+                    "linkedRelationshipId": "75",
+                    "sourceId": "93",
+                    "technology": "OpenAI-compatible"
+                  }
+                ],
+                "tags": "Container Instance"
+              },
+              {
+                "containerId": "19",
+                "environment": "Local",
+                "id": "95",
+                "instanceId": 1,
+                "properties": {
+                  "structurizr.dsl.identifier": "e46e2dce-0c89-4a09-8a0b-282cd0cac96e"
+                },
+                "relationships": [
+                  {
+                    "description": "Counts and reads the calls in each window",
+                    "destinationId": "98",
+                    "id": "101",
+                    "linkedRelationshipId": "60",
+                    "sourceId": "95",
+                    "technology": "Retriever"
+                  },
+                  {
+                    "description": "Reads the metric for both windows",
+                    "destinationId": "102",
+                    "id": "103",
+                    "linkedRelationshipId": "59",
+                    "sourceId": "95",
+                    "technology": "mf"
+                  },
+                  {
+                    "description": "Reads CSAT for query_csat",
+                    "destinationId": "113",
+                    "id": "116",
+                    "linkedRelationshipId": "71",
+                    "sourceId": "95",
+                    "technology": "SQL"
+                  },
+                  {
+                    "description": "Proposes drivers, assigns verbatim quotes",
+                    "destinationId": "120",
+                    "id": "122",
+                    "linkedRelationshipId": "61",
+                    "sourceId": "95",
+                    "technology": "chat"
+                  }
+                ],
+                "tags": "Container Instance"
+              },
+              {
+                "containerId": "18",
+                "environment": "Local",
+                "id": "98",
+                "instanceId": 1,
+                "properties": {
+                  "structurizr.dsl.identifier": "ed6163f8-f6e3-4f95-99be-6a46dae2fb78"
+                },
+                "relationships": [
+                  {
+                    "description": "Upserts and searches; hybrid and full-text",
+                    "destinationId": "106",
+                    "id": "107",
+                    "linkedRelationshipId": "72",
+                    "sourceId": "98",
+                    "technology": "Lance"
+                  },
+                  {
+                    "description": "Upserts and searches call vectors",
+                    "destinationId": "113",
+                    "id": "117",
+                    "linkedRelationshipId": "48",
+                    "sourceId": "98",
+                    "technology": "pgvector"
+                  },
+                  {
+                    "description": "Embeds calls and questions",
+                    "destinationId": "120",
+                    "id": "123",
+                    "linkedRelationshipId": "49",
+                    "sourceId": "98",
+                    "technology": "nomic-embed-text"
+                  }
+                ],
+                "tags": "Container Instance"
+              },
+              {
+                "containerId": "16",
+                "environment": "Local",
+                "id": "102",
+                "instanceId": 1,
+                "properties": {
+                  "structurizr.dsl.identifier": "cf5b6d92-5a91-43db-86b4-56592f227f18"
+                },
+                "relationships": [
+                  {
+                    "description": "Builds marts; runs metric SQL",
+                    "destinationId": "113",
+                    "id": "118",
+                    "linkedRelationshipId": "50",
+                    "sourceId": "102",
+                    "technology": "dbt build, mf query"
+                  }
+                ],
+                "tags": "Container Instance"
+              },
+              {
+                "containerId": "13",
+                "environment": "Local",
+                "id": "104",
+                "instanceId": 1,
+                "properties": {
+                  "structurizr.dsl.identifier": "cc60725a-d53c-4d99-a199-f0ae7e5d1735"
+                },
+                "relationships": [
+                  {
+                    "description": "Supplies transcripts to ingest",
+                    "destinationId": "98",
+                    "id": "105",
+                    "linkedRelationshipId": "80",
+                    "sourceId": "104",
+                    "technology": "transcripts.json"
+                  },
+                  {
+                    "description": "Loads the OLTP ledger, CSAT and change log",
+                    "destinationId": "113",
+                    "id": "119",
+                    "linkedRelationshipId": "47",
+                    "sourceId": "104",
+                    "technology": "olap/seed.py"
+                  }
+                ],
+                "tags": "Container Instance"
+              },
+              {
+                "containerId": "15",
+                "environment": "Local",
+                "id": "106",
+                "instanceId": 1,
+                "properties": {
+                  "structurizr.dsl.identifier": "8f37ab56-3fbd-4579-bdf4-98879d54e537"
+                },
+                "tags": "Container Instance"
+              },
+              {
+                "containerId": "27",
+                "environment": "Local",
+                "id": "108",
+                "instanceId": 1,
+                "properties": {
+                  "structurizr.dsl.identifier": "65d82712-8ed7-4fa4-8551-b08fe1032296"
+                },
+                "relationships": [
+                  {
+                    "description": "Scores the real graph",
+                    "destinationId": "93",
+                    "id": "109",
+                    "linkedRelationshipId": "77",
+                    "sourceId": "108",
+                    "technology": "in process"
+                  }
+                ],
+                "tags": "Container Instance"
+              },
+              {
+                "containerId": "28",
+                "environment": "Local",
+                "id": "110",
+                "instanceId": 1,
+                "properties": {
+                  "structurizr.dsl.identifier": "9aebd4a6-01ca-43c2-ac55-96693ac38752"
+                },
+                "relationships": [
+                  {
+                    "description": "Runs every labeled query, each store and mode",
+                    "destinationId": "98",
+                    "id": "111",
+                    "linkedRelationshipId": "79",
+                    "sourceId": "110",
+                    "technology": "Retriever"
+                  }
+                ],
+                "tags": "Container Instance"
+              }
+            ],
+            "description": "make demo-change, make evals, make bench",
+            "environment": "Local",
+            "id": "91",
+            "instances": "1",
+            "name": "Host process (uv)",
+            "properties": {
+              "structurizr.dsl.identifier": "7f52ae57-551c-401e-bb20-cbe80b73e8e4"
+            },
+            "tags": "Element,Deployment Node",
+            "technology": "Python 3.12"
+          },
+          {
+            "containerInstances": [
+              {
+                "containerId": "14",
+                "environment": "Local",
+                "id": "113",
+                "instanceId": 1,
+                "properties": {
+                  "structurizr.dsl.identifier": "ea14f3f1-0f55-4f65-bb9b-b1953c5b013a"
+                },
+                "tags": "Container Instance"
+              },
+              {
+                "containerId": "24",
+                "environment": "Local",
+                "id": "120",
+                "instanceId": 1,
+                "properties": {
+                  "structurizr.dsl.identifier": "03187f1c-0ec3-420d-a5b0-bc5f802ef904"
+                },
+                "tags": "Container Instance"
+              },
+              {
+                "containerId": "30",
+                "environment": "Local",
+                "id": "124",
+                "instanceId": 1,
+                "properties": {
+                  "structurizr.dsl.identifier": "22f9764b-d122-4f62-9df1-d47852eeb3b1"
+                },
+                "relationships": [
+                  {
+                    "description": "Chats with local models",
+                    "destinationId": "120",
+                    "id": "125",
+                    "linkedRelationshipId": "88",
+                    "sourceId": "124",
+                    "technology": "HTTP"
+                  }
+                ],
+                "tags": "Container Instance"
+              },
+              {
+                "containerId": "31",
+                "environment": "Local",
+                "id": "126",
+                "instanceId": 1,
+                "properties": {
+                  "structurizr.dsl.identifier": "221a6d9f-4ea4-41f4-8ae6-53860c2cf756"
+                },
+                "tags": "Container Instance"
+              }
+            ],
+            "description": "make up",
+            "environment": "Local",
+            "id": "112",
+            "instances": "1",
+            "name": "Compose default profile",
+            "properties": {
+              "structurizr.dsl.identifier": "fc9366da-e1d5-4872-9a31-2918ad80208a"
+            },
+            "tags": "Element,Deployment Node",
+            "technology": "Docker Compose"
+          },
+          {
+            "containerInstances": [
+              {
+                "containerId": "23",
+                "environment": "Local",
+                "id": "128",
+                "instanceId": 1,
+                "properties": {
+                  "structurizr.dsl.identifier": "663171d7-9dd3-4def-a9cd-71b96e757d05"
+                },
+                "relationships": [
+                  {
+                    "description": "Serves the graph",
+                    "destinationId": "93",
+                    "id": "129",
+                    "linkedRelationshipId": "76",
+                    "sourceId": "128",
+                    "technology": "HTTP :2024"
+                  }
+                ],
+                "tags": "Container Instance"
+              },
+              {
+                "containerId": "20",
+                "environment": "Local",
+                "id": "130",
+                "instanceId": 1,
+                "properties": {
+                  "structurizr.dsl.identifier": "cc3a70fe-7b23-43cf-9ad2-c0f9fa5fda24"
+                },
+                "relationships": [
+                  {
+                    "description": "Serves the same tool code",
+                    "destinationId": "95",
+                    "id": "131",
+                    "linkedRelationshipId": "70",
+                    "sourceId": "130",
+                    "technology": "in process"
+                  }
+                ],
+                "tags": "Container Instance"
+              },
+              {
+                "containerId": "29",
+                "environment": "Local",
+                "id": "132",
+                "instanceId": 1,
+                "properties": {
+                  "structurizr.dsl.identifier": "5ea18565-f265-4e48-8e49-688970101629"
+                },
+                "relationships": [
+                  {
+                    "description": "Runs the graph and its MCP tools in process",
+                    "destinationId": "93",
+                    "id": "133",
+                    "linkedRelationshipId": "86",
+                    "sourceId": "132",
+                    "technology": "Python"
+                  },
+                  {
+                    "description": "Opens cited calls",
+                    "destinationId": "98",
+                    "id": "134",
+                    "linkedRelationshipId": "87",
+                    "sourceId": "132",
+                    "technology": "Retriever"
+                  }
+                ],
+                "tags": "Container Instance"
+              }
+            ],
+            "description": "make demo, make notebooks, docker compose --profile app",
+            "environment": "Local",
+            "id": "127",
+            "instances": "1",
+            "name": "Compose app profile",
+            "properties": {
+              "structurizr.dsl.identifier": "e439008d-4400-4224-b8e2-2db6038b8dba"
+            },
+            "tags": "Element,Deployment Node",
+            "technology": "Docker Compose"
+          },
+          {
+            "containerInstances": [
+              {
+                "containerId": "25",
+                "environment": "Local",
+                "id": "136",
+                "instanceId": 1,
+                "properties": {
+                  "structurizr.dsl.identifier": "1837103b-84e5-4657-86dd-c8f6a9c0a7a6"
+                },
+                "tags": "Container Instance"
+              }
+            ],
+            "description": "Needs an NVIDIA GPU",
+            "environment": "Local",
+            "id": "135",
+            "instances": "1",
+            "name": "Compose gpu profile",
+            "properties": {
+              "structurizr.dsl.identifier": "aade6801-3aa4-407b-a307-6cd22a532362"
+            },
+            "tags": "Element,Deployment Node,Partial",
+            "technology": "Docker Compose"
+          }
+        ],
+        "description": "Linux or macOS",
+        "environment": "Local",
+        "id": "90",
+        "instances": "1",
+        "name": "Developer machine",
+        "properties": {
+          "structurizr.dsl.identifier": "83f2dfac-0fca-4abc-b801-8d79757f64f7"
+        },
+        "tags": "Element,Deployment Node",
+        "technology": "Docker Compose and uv"
+      },
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "containerInstances": [
+                  {
+                    "containerId": "20",
+                    "environment": "Azure",
+                    "id": "143",
+                    "instanceId": 1,
+                    "properties": {
+                      "structurizr.dsl.identifier": "mcpHttpAzure"
+                    },
+                    "tags": "Container Instance"
+                  }
+                ],
+                "description": "Scale to zero, one replica",
+                "environment": "Azure",
+                "id": "142",
+                "infrastructureNodes": [
+                  {
+                    "description": "enable_agent_api; no agent HTTP image is built yet.",
+                    "environment": "Azure",
+                    "id": "144",
+                    "name": "agent-api app slot",
+                    "properties": {
+                      "structurizr.dsl.identifier": "agentSlot"
+                    },
+                    "tags": "Element,Infrastructure Node,Planned",
+                    "technology": "Container App"
+                  }
+                ],
+                "instances": "1",
+                "name": "Container Apps environment",
+                "properties": {
+                  "structurizr.dsl.identifier": "d369addf-590c-45b2-951e-e6b9bbebd493"
+                },
+                "tags": "Element,Deployment Node",
+                "technology": "Azure Container Apps"
+              },
+              {
+                "containerInstances": [
+                  {
+                    "containerId": "14",
+                    "environment": "Azure",
+                    "id": "146",
+                    "instanceId": 1,
+                    "properties": {
+                      "structurizr.dsl.identifier": "6fa60d8a-800d-46f9-ac8c-be7fa49f8134"
+                    },
+                    "tags": "Container Instance"
+                  }
+                ],
+                "description": "B1ms, vector extension allow-listed",
+                "environment": "Azure",
+                "id": "145",
+                "instances": "1",
+                "name": "PostgreSQL Flexible Server",
+                "properties": {
+                  "structurizr.dsl.identifier": "8de922a7-6496-4637-9dcf-f91dba96f4c1"
+                },
+                "tags": "Element,Deployment Node",
+                "technology": "PostgreSQL 16"
+              },
+              {
+                "containerInstances": [
+                  {
+                    "containerId": "15",
+                    "environment": "Azure",
+                    "id": "148",
+                    "instanceId": 1,
+                    "properties": {
+                      "structurizr.dsl.identifier": "afe448a6-8863-48bd-8e6e-27e9f8ea13a0"
+                    },
+                    "tags": "Container Instance"
+                  }
+                ],
+                "description": "lance and dbt-artifacts filesystems",
+                "environment": "Azure",
+                "id": "147",
+                "instances": "1",
+                "name": "ADLS Gen2",
+                "properties": {
+                  "structurizr.dsl.identifier": "186cbcf4-7a7a-4542-8513-ef98f181cef5"
+                },
+                "tags": "Element,Deployment Node",
+                "technology": "Storage account"
+              },
+              {
+                "containerInstances": [
+                  {
+                    "containerId": "25",
+                    "environment": "Azure",
+                    "id": "150",
+                    "instanceId": 1,
+                    "properties": {
+                      "structurizr.dsl.identifier": "d9c15d75-d981-446a-a35e-5db77d083ac4"
+                    },
+                    "tags": "Container Instance"
+                  }
+                ],
+                "description": "enable_gpu, Spot, auto-shutdown",
+                "environment": "Azure",
+                "id": "149",
+                "instances": "1",
+                "name": "GPU VM",
+                "properties": {
+                  "structurizr.dsl.identifier": "d4b3461d-0f58-4189-af0d-4cfc0cb522d4"
+                },
+                "tags": "Element,Deployment Node,Partial",
+                "technology": "Linux VM"
+              }
+            ],
+            "description": "Destroyed after each session",
+            "environment": "Azure",
+            "id": "140",
+            "infrastructureNodes": [
+              {
+                "description": "Rejects unauthenticated calls before they reach Python.",
+                "environment": "Azure",
+                "id": "141",
+                "name": "Entra Easy Auth",
+                "properties": {
+                  "structurizr.dsl.identifier": "entra"
+                },
+                "relationships": [
+                  {
+                    "description": "Authenticates every request",
+                    "destinationId": "143",
+                    "id": "152",
+                    "sourceId": "141",
+                    "tags": "Relationship"
+                  }
+                ],
+                "tags": "Element,Infrastructure Node",
+                "technology": "Container Apps auth"
+              },
+              {
+                "description": "enable_databricks; a dbt target.",
+                "environment": "Azure",
+                "id": "151",
+                "name": "Databricks workspace",
+                "properties": {
+                  "structurizr.dsl.identifier": "databricksWs"
+                },
+                "tags": "Element,Infrastructure Node,Partial",
+                "technology": "Azure Databricks"
+              }
+            ],
+            "instances": "1",
+            "name": "rg-ccai-dev",
+            "properties": {
+              "structurizr.dsl.identifier": "3ecb74a2-9c55-493d-90bd-25101ce8dad9"
+            },
+            "tags": "Element,Deployment Node",
+            "technology": "Resource group"
+          }
+        ],
+        "description": "infra/azure: bootstrap once, envs/dev per session",
+        "environment": "Azure",
+        "id": "138",
+        "infrastructureNodes": [
+          {
+            "description": "Bootstrap root: app secrets by name, state storage, budget alerts.",
+            "environment": "Azure",
+            "id": "139",
+            "name": "Key Vault and budget",
+            "properties": {
+              "structurizr.dsl.identifier": "keyVault"
+            },
+            "tags": "Element,Infrastructure Node",
+            "technology": "Azure"
+          }
+        ],
+        "instances": "1",
+        "name": "Azure subscription",
+        "properties": {
+          "structurizr.dsl.identifier": "45df828d-51a4-4044-a60d-a5bcf94587ae"
+        },
+        "tags": "Element,Deployment Node",
+        "technology": "Terraform"
+      },
+      {
+        "description": "envs/snowflake root: warehouse, database, role, dbt user, resource monitor",
+        "environment": "Azure",
+        "id": "153",
+        "infrastructureNodes": [
+          {
+            "description": "dbt target for the same metrics.",
+            "environment": "Azure",
+            "id": "154",
+            "name": "XS warehouse",
+            "properties": {
+              "structurizr.dsl.identifier": "snowflakeWh"
+            },
+            "tags": "Element,Infrastructure Node",
+            "technology": "Snowflake"
+          }
+        ],
+        "instances": "1",
+        "name": "Snowflake account",
+        "properties": {
+          "structurizr.dsl.identifier": "ea12144b-50e8-46a0-9ba7-82151cd3913f"
+        },
+        "tags": "Element,Deployment Node",
+        "technology": "Snowflake"
+      }
+    ],
+    "people": [
+      {
+        "description": "Asks why a number moved, what members said, and what to coach on.",
+        "id": "1",
+        "name": "Contact center supervisor",
+        "properties": {
+          "structurizr.dsl.identifier": "supervisor"
+        },
+        "relationships": [
+          {
+            "description": "Asks questions through the agent or an MCP client",
+            "destinationId": "12",
+            "id": "33",
+            "sourceId": "1",
+            "tags": "Relationship,Demo path"
+          },
+          {
+            "description": "Asks questions in",
+            "destinationId": "4",
+            "id": "34",
+            "sourceId": "1",
+            "tags": "Relationship"
+          },
+          {
+            "description": "Runs make demo-change",
+            "destinationId": "22",
+            "id": "46",
+            "sourceId": "1",
+            "tags": "Relationship,Demo path"
+          },
+          {
+            "description": "Chats with the local models",
+            "destinationId": "30",
+            "id": "62",
+            "sourceId": "1",
+            "tags": "Relationship"
+          },
+          {
+            "description": "Watches make demo; opens Studio",
+            "destinationId": "23",
+            "id": "63",
+            "sourceId": "1",
+            "tags": "Relationship"
+          }
+        ],
+        "tags": "Element,Person,Demo path"
+      },
+      {
+        "description": "Owns the governed metrics and the warehouses they run on.",
+        "id": "2",
+        "name": "Data and analytics team",
+        "properties": {
+          "structurizr.dsl.identifier": "analyst"
+        },
+        "relationships": [
+          {
+            "description": "Defines metrics, explores in notebooks",
+            "destinationId": "12",
+            "id": "36",
+            "sourceId": "2",
+            "tags": "Relationship"
+          },
+          {
+            "description": "Walks the change analysis step by step",
+            "destinationId": "29",
+            "id": "64",
+            "sourceId": "2",
+            "tags": "Relationship"
+          },
+          {
+            "description": "Declares metrics and dimensions",
+            "destinationId": "16",
+            "id": "65",
+            "sourceId": "2",
+            "tags": "Relationship"
+          }
+        ],
+        "tags": "Element,Person,Built"
+      },
+      {
+        "description": "Runs the stack, the evals and the cloud deployment.",
+        "id": "3",
+        "name": "Platform engineer",
+        "properties": {
+          "structurizr.dsl.identifier": "engineer"
+        },
+        "relationships": [
+          {
+            "description": "Runs the stack, evals and benchmarks",
+            "destinationId": "12",
+            "id": "37",
+            "sourceId": "3",
+            "tags": "Relationship"
+          },
+          {
+            "description": "Plans and applies Terraform",
+            "destinationId": "9",
+            "id": "38",
+            "sourceId": "3",
+            "tags": "Relationship"
+          },
+          {
+            "description": "Runs the offline gate and live experiments",
+            "destinationId": "27",
+            "id": "66",
+            "sourceId": "3",
+            "tags": "Relationship"
+          },
+          {
+            "description": "Compares the vector stores",
+            "destinationId": "28",
+            "id": "67",
+            "sourceId": "3",
+            "tags": "Relationship"
+          }
+        ],
+        "tags": "Element,Person,Built"
+      }
+    ],
+    "softwareSystems": [
+      {
+        "description": "Claude Desktop, Cursor and other MCP-compatible assistants.",
+        "documentation": {},
+        "id": "4",
+        "name": "MCP clients",
+        "properties": {
+          "structurizr.dsl.identifier": "mcpClients"
+        },
+        "relationships": [
+          {
+            "description": "Call the six tools",
+            "destinationId": "12",
+            "id": "35",
+            "sourceId": "4",
+            "tags": "Relationship",
+            "technology": "MCP stdio or HTTP"
+          },
+          {
+            "description": "Spawn and call over stdio",
+            "destinationId": "19",
+            "id": "68",
+            "sourceId": "4",
+            "tags": "Relationship",
+            "technology": "MCP stdio"
+          },
+          {
+            "description": "Call over the network",
+            "destinationId": "20",
+            "id": "69",
+            "sourceId": "4",
+            "tags": "Relationship",
+            "technology": "MCP streamable HTTP"
+          }
+        ],
+        "tags": "Element,Software System,Built,External"
+      },
+      {
+        "description": "OpenAI-compatible (OpenRouter by default), Anthropic, Fireworks. Optional: the demo runs keyless.",
+        "documentation": {},
+        "id": "5",
+        "name": "Hosted model APIs",
+        "properties": {
+          "structurizr.dsl.identifier": "hostedModels"
+        },
+        "tags": "Element,Software System,Built,External"
+      },
+      {
+        "description": "Traces and live eval experiments, on by env only.",
+        "documentation": {},
+        "id": "6",
+        "name": "LangSmith",
+        "properties": {
+          "structurizr.dsl.identifier": "langsmith"
+        },
+        "tags": "Element,Software System,Built,External"
+      },
+      {
+        "description": "dbt target and raw-table loader destination.",
+        "documentation": {},
+        "id": "7",
+        "name": "Snowflake",
+        "properties": {
+          "structurizr.dsl.identifier": "snowflake"
+        },
+        "tags": "Element,Software System,Built,External"
+      },
+      {
+        "description": "dbt target and raw-table loader destination.",
+        "documentation": {},
+        "id": "8",
+        "name": "Databricks",
+        "properties": {
+          "structurizr.dsl.identifier": "databricks"
+        },
+        "tags": "Element,Software System,Built,External"
+      },
+      {
+        "description": "Terraform roots in infra/azure: Container Apps behind Entra Easy Auth, PostgreSQL, ADLS.",
+        "documentation": {},
+        "id": "9",
+        "name": "Microsoft Azure",
+        "properties": {
+          "structurizr.dsl.identifier": "azure"
+        },
+        "tags": "Element,Software System,Built,External"
+      },
+      {
+        "description": "CI gates (lint, tests, offline evals, Terraform validate) and the blog on GitHub Pages.",
+        "documentation": {},
+        "id": "10",
+        "name": "GitHub",
+        "properties": {
+          "structurizr.dsl.identifier": "github"
+        },
+        "tags": "Element,Software System,Built,External"
+      },
+      {
+        "description": "Source for real call data. rag.pipeline --source s3 raises NotImplementedError.",
+        "documentation": {},
+        "id": "11",
+        "name": "AWS S3",
+        "properties": {
+          "structurizr.dsl.identifier": "s3"
+        },
+        "tags": "Element,Software System,External,Stub"
+      },
+      {
+        "containers": [
+          {
+            "description": "1,540 calls, CSAT, an OLTP ledger, four dated events and their answer key. make seed",
+            "documentation": {},
+            "group": "Data",
+            "id": "13",
+            "name": "Synthetic data generator",
+            "properties": {
+              "structurizr.dsl.identifier": "generator"
+            },
+            "relationships": [
+              {
+                "description": "Loads the OLTP ledger, CSAT and change log",
+                "destinationId": "14",
+                "id": "47",
+                "sourceId": "13",
+                "tags": "Relationship,Demo path",
+                "technology": "olap/seed.py"
+              },
+              {
+                "description": "Supplies transcripts to ingest",
+                "destinationId": "18",
+                "id": "80",
+                "sourceId": "13",
+                "tags": "Relationship",
+                "technology": "transcripts.json"
+              }
+            ],
+            "tags": "Element,Container,Demo path",
+            "technology": "Python, seed 42"
+          },
+          {
+            "description": "OLTP tables, dbt marts, call vectors and agent checkpoints. Compose db locally.",
+            "documentation": {},
+            "group": "Data",
+            "id": "14",
+            "name": "PostgreSQL + pgvector",
+            "properties": {
+              "structurizr.dsl.identifier": "postgres"
+            },
+            "tags": "Element,Container,Database,Demo path",
+            "technology": "PostgreSQL 16"
+          },
+          {
+            "description": "Peer vector store, embedded: vector, full-text and hybrid search. RETRIEVER_BACKEND=lancedb",
+            "documentation": {},
+            "group": "Data",
+            "id": "15",
+            "name": "LanceDB",
+            "properties": {
+              "structurizr.dsl.identifier": "lancedb"
+            },
+            "tags": "Element,Container,Database,Built",
+            "technology": "Lance files"
+          },
+          {
+            "description": "Star schema and 47 governed metrics; mf compiles the SQL per target.",
+            "documentation": {},
+            "group": "Semantic layer",
+            "id": "16",
+            "name": "dbt + MetricFlow",
+            "properties": {
+              "structurizr.dsl.identifier": "metricLayer"
+            },
+            "relationships": [
+              {
+                "description": "Builds marts; runs metric SQL",
+                "destinationId": "14",
+                "id": "50",
+                "sourceId": "16",
+                "tags": "Relationship,Demo path",
+                "technology": "dbt build, mf query"
+              },
+              {
+                "description": "Builds and queries marts",
+                "destinationId": "7",
+                "id": "84",
+                "sourceId": "16",
+                "tags": "Relationship",
+                "technology": "dbt --target snowflake"
+              },
+              {
+                "description": "Builds and queries marts",
+                "destinationId": "8",
+                "id": "85",
+                "sourceId": "16",
+                "tags": "Relationship",
+                "technology": "dbt --target databricks"
+              }
+            ],
+            "tags": "Element,Container,Demo path",
+            "technology": "dbt, MetricFlow"
+          },
+          {
+            "description": "Load OLTP rows to Snowflake or Databricks; compare five metrics on three targets. make parity",
+            "documentation": {},
+            "group": "Semantic layer",
+            "id": "17",
+            "name": "Warehouse loaders + parity",
+            "properties": {
+              "structurizr.dsl.identifier": "loaders"
+            },
+            "relationships": [
+              {
+                "description": "Loads raw tables; compares metrics",
+                "destinationId": "7",
+                "id": "82",
+                "sourceId": "17",
+                "tags": "Relationship",
+                "technology": "COPY INTO, make parity"
+              },
+              {
+                "description": "Loads raw tables; compares metrics",
+                "destinationId": "8",
+                "id": "83",
+                "sourceId": "17",
+                "tags": "Relationship",
+                "technology": "COPY INTO, make parity"
+              }
+            ],
+            "tags": "Element,Container,Built",
+            "technology": "Python"
+          },
+          {
+            "description": "Embeds and upserts calls by call_id; one Retriever interface over pgvector or LanceDB.",
+            "documentation": {},
+            "group": "Access",
+            "id": "18",
+            "name": "Retrieval and RAG",
+            "properties": {
+              "structurizr.dsl.identifier": "retrieval"
+            },
+            "relationships": [
+              {
+                "description": "Upserts and searches call vectors",
+                "destinationId": "14",
+                "id": "48",
+                "sourceId": "18",
+                "tags": "Relationship,Demo path",
+                "technology": "pgvector"
+              },
+              {
+                "description": "Embeds calls and questions",
+                "destinationId": "24",
+                "id": "49",
+                "sourceId": "18",
+                "tags": "Relationship,Demo path",
+                "technology": "nomic-embed-text"
+              },
+              {
+                "description": "Upserts and searches; hybrid and full-text",
+                "destinationId": "15",
+                "id": "72",
+                "sourceId": "18",
+                "tags": "Relationship",
+                "technology": "Lance"
+              },
+              {
+                "description": "Reads source files (raises NotImplementedError)",
+                "destinationId": "11",
+                "id": "73",
+                "sourceId": "18",
+                "tags": "Relationship",
+                "technology": "HTTPS"
+              }
+            ],
+            "tags": "Element,Container,Demo path",
+            "technology": "rag/, retrieval/"
+          },
+          {
+            "description": "Six tools: search_transcripts, get_call_summary, query_csat, query_metric, ask_the_analyst, explain_change.",
+            "documentation": {},
+            "group": "Access",
+            "id": "19",
+            "name": "MCP server",
+            "properties": {
+              "structurizr.dsl.identifier": "mcpServer"
+            },
+            "relationships": [
+              {
+                "description": "Reads the metric for both windows",
+                "destinationId": "16",
+                "id": "59",
+                "sourceId": "19",
+                "tags": "Relationship,Demo path",
+                "technology": "mf"
+              },
+              {
+                "description": "Counts and reads the calls in each window",
+                "destinationId": "18",
+                "id": "60",
+                "sourceId": "19",
+                "tags": "Relationship,Demo path",
+                "technology": "Retriever"
+              },
+              {
+                "description": "Proposes drivers, assigns verbatim quotes",
+                "destinationId": "24",
+                "id": "61",
+                "sourceId": "19",
+                "tags": "Relationship,Demo path",
+                "technology": "chat"
+              },
+              {
+                "description": "Reads CSAT for query_csat",
+                "destinationId": "14",
+                "id": "71",
+                "sourceId": "19",
+                "tags": "Relationship",
+                "technology": "SQL"
+              }
+            ],
+            "tags": "Element,Container,Demo path",
+            "technology": "ccai_mcp, stdio"
+          },
+          {
+            "description": "The same six tools over streamable HTTP; bearer token locally (Compose mcp-server :8000), Easy Auth on Azure.",
+            "documentation": {},
+            "group": "Access",
+            "id": "20",
+            "name": "MCP HTTP endpoint",
+            "properties": {
+              "structurizr.dsl.identifier": "mcpHttp"
+            },
+            "relationships": [
+              {
+                "description": "Serves the same tool code",
+                "destinationId": "19",
+                "id": "70",
+                "sourceId": "20",
+                "tags": "Relationship",
+                "technology": "in process"
+              },
+              {
+                "description": "Runs on Container Apps behind Easy Auth",
+                "destinationId": "9",
+                "id": "89",
+                "sourceId": "20",
+                "tags": "Relationship",
+                "technology": "Terraform"
+              }
+            ],
+            "tags": "Element,Container,Built",
+            "technology": "ccai_mcp --http"
+          },
+          {
+            "description": "classify, then retrieve, summarize, metric or change route; ground; answer. One clarify interrupt.",
+            "documentation": {},
+            "group": "Agent",
+            "id": "21",
+            "name": "Agent graph",
+            "properties": {
+              "structurizr.dsl.identifier": "agent"
+            },
+            "relationships": [
+              {
+                "description": "Classifies and frames the question",
+                "destinationId": "24",
+                "id": "55",
+                "sourceId": "21",
+                "tags": "Relationship,Demo path",
+                "technology": "chat"
+              },
+              {
+                "description": "Calls explain_change and query_metric",
+                "destinationId": "19",
+                "id": "56",
+                "sourceId": "21",
+                "tags": "Relationship,Demo path",
+                "technology": "MCP stdio"
+              },
+              {
+                "description": "Grounds citations: call exists, inside the window",
+                "destinationId": "18",
+                "id": "57",
+                "sourceId": "21",
+                "tags": "Relationship,Demo path",
+                "technology": "Retriever"
+              },
+              {
+                "description": "Checkpoints paused and follow-up threads",
+                "destinationId": "14",
+                "id": "58",
+                "sourceId": "21",
+                "tags": "Relationship,Demo path",
+                "technology": "AsyncPostgresSaver"
+              },
+              {
+                "description": "Chats through OpenRouter, Anthropic or Fireworks",
+                "destinationId": "5",
+                "id": "74",
+                "sourceId": "21",
+                "tags": "Relationship",
+                "technology": "HTTPS"
+              },
+              {
+                "description": "Chats through a self-hosted model",
+                "destinationId": "25",
+                "id": "75",
+                "sourceId": "21",
+                "tags": "Relationship",
+                "technology": "OpenAI-compatible"
+              }
+            ],
+            "tags": "Element,Container,Demo path",
+            "technology": "LangGraph"
+          },
+          {
+            "description": "make demo-change: preflight, six timed questions, a replayable record.",
+            "documentation": {},
+            "group": "Agent",
+            "id": "22",
+            "name": "Change-analysis demo",
+            "properties": {
+              "structurizr.dsl.identifier": "demoChange"
+            },
+            "relationships": [
+              {
+                "description": "Preflight: ledger, marts, vector index",
+                "destinationId": "14",
+                "id": "51",
+                "sourceId": "22",
+                "tags": "Relationship,Demo path",
+                "technology": "SQL"
+              },
+              {
+                "description": "Asks steps 1 to 4 on checkpointed threads",
+                "destinationId": "21",
+                "id": "52",
+                "sourceId": "22",
+                "tags": "Relationship,Demo path",
+                "technology": "in process"
+              },
+              {
+                "description": "Opens one cited call, accounts masked",
+                "destinationId": "18",
+                "id": "53",
+                "sourceId": "22",
+                "tags": "Relationship,Demo path",
+                "technology": "get_by_id"
+              },
+              {
+                "description": "Asks step 6 as an MCP client would",
+                "destinationId": "19",
+                "id": "54",
+                "sourceId": "22",
+                "tags": "Relationship,Demo path",
+                "technology": "explain_change"
+              }
+            ],
+            "tags": "Element,Container,Demo path",
+            "technology": "agent/demo_change.py"
+          },
+          {
+            "description": "make demo: five scripted questions; Studio and HTTP API. Compose langgraph-api :2024",
+            "documentation": {},
+            "group": "Agent",
+            "id": "23",
+            "name": "LangGraph dev server",
+            "properties": {
+              "structurizr.dsl.identifier": "langgraphApi"
+            },
+            "relationships": [
+              {
+                "description": "Serves the graph",
+                "destinationId": "21",
+                "id": "76",
+                "sourceId": "23",
+                "tags": "Relationship",
+                "technology": "HTTP :2024"
+              }
+            ],
+            "tags": "Element,Container,Built",
+            "technology": "langgraph dev"
+          },
+          {
+            "description": "Local chat (llama3.2) and embeddings (nomic-embed-text); no keys. Compose ollama",
+            "documentation": {},
+            "group": "Models",
+            "id": "24",
+            "name": "Ollama",
+            "properties": {
+              "structurizr.dsl.identifier": "ollama"
+            },
+            "tags": "Element,Container,Demo path",
+            "technology": "Ollama"
+          },
+          {
+            "description": "Self-hosted OpenAI-compatible server. Compose gpu profile, declared only.",
+            "documentation": {},
+            "group": "Models",
+            "id": "25",
+            "name": "vLLM",
+            "properties": {
+              "structurizr.dsl.identifier": "vllm"
+            },
+            "tags": "Element,Container,Partial",
+            "technology": "vLLM"
+          },
+          {
+            "description": "Gold labels and splits built; training and serving designed, not built.",
+            "documentation": {},
+            "group": "Models",
+            "id": "26",
+            "name": "Fine-tune dataset",
+            "properties": {
+              "structurizr.dsl.identifier": "finetune"
+            },
+            "relationships": [
+              {
+                "description": "Requests teacher labels",
+                "destinationId": "5",
+                "id": "81",
+                "sourceId": "26",
+                "tags": "Relationship",
+                "technology": "HTTPS"
+              }
+            ],
+            "tags": "Element,Container,Partial",
+            "technology": "models/finetune"
+          },
+          {
+            "description": "Golden set and change sets: offline CI gate (make evals), live LangSmith runs (make evals-live).",
+            "documentation": {},
+            "group": "Quality",
+            "id": "27",
+            "name": "Agent evals",
+            "properties": {
+              "structurizr.dsl.identifier": "evals"
+            },
+            "relationships": [
+              {
+                "description": "Scores the real graph",
+                "destinationId": "21",
+                "id": "77",
+                "sourceId": "27",
+                "tags": "Relationship",
+                "technology": "in process"
+              },
+              {
+                "description": "Uploads live experiments",
+                "destinationId": "6",
+                "id": "78",
+                "sourceId": "27",
+                "tags": "Relationship",
+                "technology": "HTTPS"
+              }
+            ],
+            "tags": "Element,Container,Built",
+            "technology": "evals/"
+          },
+          {
+            "description": "Both vector stores on 40 labeled queries; results in results/retrieval. make bench",
+            "documentation": {},
+            "group": "Quality",
+            "id": "28",
+            "name": "Retrieval benchmark",
+            "properties": {
+              "structurizr.dsl.identifier": "bench"
+            },
+            "relationships": [
+              {
+                "description": "Runs every labeled query, each store and mode",
+                "destinationId": "18",
+                "id": "79",
+                "sourceId": "28",
+                "tags": "Relationship",
+                "technology": "Retriever"
+              }
+            ],
+            "tags": "Element,Container,Built",
+            "technology": "retrieval/bench.py"
+          },
+          {
+            "description": "The change analysis as a walkthrough: notebooks/change-analysis.ipynb. make notebooks, Compose jupyter 127.0.0.1:8888",
+            "documentation": {},
+            "group": "Explore and explain",
+            "id": "29",
+            "name": "Jupyter notebooks",
+            "properties": {
+              "structurizr.dsl.identifier": "jupyter"
+            },
+            "relationships": [
+              {
+                "description": "Runs the graph and its MCP tools in process",
+                "destinationId": "21",
+                "id": "86",
+                "sourceId": "29",
+                "tags": "Relationship",
+                "technology": "Python"
+              },
+              {
+                "description": "Opens cited calls",
+                "destinationId": "18",
+                "id": "87",
+                "sourceId": "29",
+                "tags": "Relationship",
+                "technology": "Retriever"
+              }
+            ],
+            "tags": "Element,Container,Built",
+            "technology": "JupyterLab"
+          },
+          {
+            "description": "Chat UI on the local models; can register the MCP HTTP endpoint. Compose :9090",
+            "documentation": {},
+            "group": "Explore and explain",
+            "id": "30",
+            "name": "Open WebUI",
+            "properties": {
+              "structurizr.dsl.identifier": "openWebui"
+            },
+            "relationships": [
+              {
+                "description": "Chats with local models",
+                "destinationId": "24",
+                "id": "88",
+                "sourceId": "30",
+                "tags": "Relationship",
+                "technology": "HTTP"
+              }
+            ],
+            "tags": "Element,Container,Built",
+            "technology": "Open WebUI"
+          },
+          {
+            "description": "This C4 model, served by Structurizr. Compose structurizr :8080",
+            "documentation": {},
+            "group": "Explore and explain",
+            "id": "31",
+            "name": "Architecture model",
+            "properties": {
+              "structurizr.dsl.identifier": "structurizr"
+            },
+            "tags": "Element,Container,Built",
+            "technology": "Structurizr DSL"
+          },
+          {
+            "description": "Posts built from Markdown with pandoc; four published.",
+            "documentation": {},
+            "group": "Explore and explain",
+            "id": "32",
+            "name": "Anchoring AI blog",
+            "properties": {
+              "structurizr.dsl.identifier": "blog"
+            },
+            "tags": "Element,Container,Built",
+            "technology": "blogs/"
+          }
+        ],
+        "description": "Calls, CSAT and a member ledger behind governed metrics, cited search and an agent, on synthetic data.",
+        "documentation": {},
+        "id": "12",
+        "name": "Contact Center AI sandbox",
+        "properties": {
+          "structurizr.dsl.identifier": "sandbox"
+        },
+        "relationships": [
+          {
+            "description": "Chat and embeddings, when chosen instead of Ollama",
+            "destinationId": "5",
+            "id": "39",
+            "sourceId": "12",
+            "tags": "Relationship",
+            "technology": "HTTPS"
+          },
+          {
+            "description": "Sends traces and eval experiments",
+            "destinationId": "6",
+            "id": "40",
+            "sourceId": "12",
+            "tags": "Relationship",
+            "technology": "HTTPS"
+          },
+          {
+            "description": "Loads raw tables, builds marts, runs parity",
+            "destinationId": "7",
+            "id": "41",
+            "sourceId": "12",
+            "tags": "Relationship",
+            "technology": "dbt, COPY INTO"
+          },
+          {
+            "description": "Loads raw tables, builds marts, runs parity",
+            "destinationId": "8",
+            "id": "42",
+            "sourceId": "12",
+            "tags": "Relationship",
+            "technology": "dbt, COPY INTO"
+          },
+          {
+            "description": "Deploys the MCP server, Postgres and Lance storage to",
+            "destinationId": "9",
+            "id": "43",
+            "sourceId": "12",
+            "tags": "Relationship",
+            "technology": "Terraform"
+          },
+          {
+            "description": "Runs CI and publishes the blog on",
+            "destinationId": "10",
+            "id": "44",
+            "sourceId": "12",
+            "tags": "Relationship",
+            "technology": "GitHub Actions"
+          },
+          {
+            "description": "Reads real call data from (stubbed)",
+            "destinationId": "11",
+            "id": "45",
+            "sourceId": "12",
+            "tags": "Relationship",
+            "technology": "HTTPS"
+          }
+        ],
+        "tags": "Element,Software System,Demo path"
+      }
+    ]
+  },
+  "name": "Contact Center AI",
+  "views": {
+    "configuration": {
+      "styles": {
+        "elements": [
+          {
+            "background": "#dce9f7",
+            "tag": "Built"
+          },
+          {
+            "shape": "Cylinder",
+            "tag": "Database"
+          },
+          {
+            "background": "#1f4e8c",
+            "color": "#ffffff",
+            "stroke": "#f08c00",
+            "strokeWidth": 8,
+            "tag": "Demo path"
+          },
+          {
+            "background": "#ffffff",
+            "color": "#4a5d75",
+            "stroke": "#8a9bb0",
+            "tag": "Deployment Node"
+          },
+          {
+            "background": "#dce9f7",
+            "color": "#10243e",
+            "fontSize": 28,
+            "height": 300,
+            "stroke": "#6e8db5",
+            "strokeWidth": 2,
+            "tag": "Element",
+            "width": 480
+          },
+          {
+            "background": "#eeeeee",
+            "color": "#333333",
+            "stroke": "#9a9a9a",
+            "tag": "External"
+          },
+          {
+            "color": "#4a5d75",
+            "fontSize": 30,
+            "tag": "Group"
+          },
+          {
+            "background": "#f4f4f4",
+            "color": "#333333",
+            "tag": "Infrastructure Node"
+          },
+          {
+            "background": "#ffffff",
+            "border": "Dashed",
+            "color": "#4a5d75",
+            "stroke": "#8a9bb0",
+            "tag": "Partial"
+          },
+          {
+            "background": "#dce9f7",
+            "shape": "Person",
+            "tag": "Person",
+            "width": 460
+          },
+          {
+            "background": "#ffffff",
+            "border": "Dotted",
+            "color": "#4a5d75",
+            "stroke": "#8a9bb0",
+            "tag": "Planned"
+          },
+          {
+            "background": "#dce9f7",
+            "tag": "Software System"
+          },
+          {
+            "background": "#ffffff",
+            "border": "Dotted",
+            "color": "#777777",
+            "stroke": "#a0a0a0",
+            "tag": "Stub"
+          }
+        ],
+        "relationships": [
+          {
+            "color": "#f08c00",
+            "tag": "Demo path",
+            "thickness": 6
+          },
+          {
+            "color": "#8a9bb0",
+            "fontSize": 30,
+            "style": "Solid",
+            "tag": "Relationship",
+            "thickness": 2,
+            "width": 360
+          }
+        ]
+      },
+      "terminology": {}
+    },
+    "containerViews": [
+      {
+        "description": "Every container, store and Compose service, grouped by capability, with the systems outside it at either side. Dark with an orange border: exercised by make demo-change. Light: built. Dashed: partial. Dotted: planned or stubbed. DemoPathSequence draws the connections.",
+        "elements": [
+          {
+            "id": "4",
+            "x": 120,
+            "y": 120
+          },
+          {
+            "id": "5",
+            "x": 4420,
+            "y": 120
+          },
+          {
+            "id": "6",
+            "x": 4420,
+            "y": 580
+          },
+          {
+            "id": "7",
+            "x": 4420,
+            "y": 1040
+          },
+          {
+            "id": "8",
+            "x": 4420,
+            "y": 1500
+          },
+          {
+            "id": "9",
+            "x": 120,
+            "y": 580
+          },
+          {
+            "id": "11",
+            "x": 120,
+            "y": 1040
+          },
+          {
+            "id": "13",
+            "x": 2560,
+            "y": 580
+          },
+          {
+            "id": "14",
+            "x": 2560,
+            "y": 120
+          },
+          {
+            "id": "15",
+            "x": 2560,
+            "y": 1040
+          },
+          {
+            "id": "16",
+            "x": 1980,
+            "y": 120
+          },
+          {
+            "id": "17",
+            "x": 1980,
+            "y": 580
+          },
+          {
+            "id": "18",
+            "x": 1400,
+            "y": 580
+          },
+          {
+            "id": "19",
+            "x": 1400,
+            "y": 120
+          },
+          {
+            "id": "20",
+            "x": 1400,
+            "y": 1040
+          },
+          {
+            "id": "21",
+            "x": 820,
+            "y": 580
+          },
+          {
+            "id": "22",
+            "x": 820,
+            "y": 120
+          },
+          {
+            "id": "23",
+            "x": 820,
+            "y": 1040
+          },
+          {
+            "id": "24",
+            "x": 3140,
+            "y": 120
+          },
+          {
+            "id": "25",
+            "x": 3140,
+            "y": 580
+          },
+          {
+            "id": "26",
+            "x": 3140,
+            "y": 1040
+          },
+          {
+            "id": "27",
+            "x": 3720,
+            "y": 120
+          },
+          {
+            "id": "28",
+            "x": 3720,
+            "y": 580
+          },
+          {
+            "id": "29",
+            "x": 820,
+            "y": 1580
+          },
+          {
+            "id": "30",
+            "x": 1400,
+            "y": 1580
+          },
+          {
+            "id": "31",
+            "x": 1980,
+            "y": 1580
+          },
+          {
+            "id": "32",
+            "x": 2560,
+            "y": 1580
+          }
+        ],
+        "externalSoftwareSystemBoundariesVisible": false,
+        "key": "Containers",
+        "name": "Container View: Contact Center AI sandbox",
+        "order": 2,
+        "softwareSystemId": "12",
+        "title": "Contact Center AI: everything the repo runs",
+        "paperSize": "A0_Landscape"
+      }
+    ],
+    "deploymentViews": [
+      {
+        "description": "Host processes under uv next to the Compose profiles. make demo-change runs on the host against the default profile's Postgres and Ollama.",
+        "elements": [
+          {
+            "id": "90",
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "91",
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "92",
+            "x": 240,
+            "y": 200
+          },
+          {
+            "id": "93",
+            "x": 880,
+            "y": 200
+          },
+          {
+            "id": "95",
+            "x": 1520,
+            "y": 200
+          },
+          {
+            "id": "98",
+            "x": 240,
+            "y": 720
+          },
+          {
+            "id": "102",
+            "x": 880,
+            "y": 720
+          },
+          {
+            "id": "104",
+            "x": 1520,
+            "y": 720
+          },
+          {
+            "id": "106",
+            "x": 240,
+            "y": 1240
+          },
+          {
+            "id": "108",
+            "x": 880,
+            "y": 1240
+          },
+          {
+            "id": "110",
+            "x": 1520,
+            "y": 1240
+          },
+          {
+            "id": "112",
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "113",
+            "x": 2416,
+            "y": 200
+          },
+          {
+            "id": "120",
+            "x": 3056,
+            "y": 200
+          },
+          {
+            "id": "124",
+            "x": 2416,
+            "y": 720
+          },
+          {
+            "id": "126",
+            "x": 3056,
+            "y": 720
+          },
+          {
+            "id": "127",
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "128",
+            "x": 3952,
+            "y": 200
+          },
+          {
+            "id": "130",
+            "x": 4592,
+            "y": 200
+          },
+          {
+            "id": "132",
+            "x": 3952,
+            "y": 720
+          },
+          {
+            "id": "135",
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "136",
+            "x": 3952,
+            "y": 1396
+          }
+        ],
+        "environment": "Local",
+        "key": "DeploymentLocal",
+        "name": "Deployment View: Contact Center AI sandbox - Local",
+        "order": 4,
+        "softwareSystemId": "12",
+        "title": "Where it runs locally",
+        "paperSize": "A0_Landscape"
+      },
+      {
+        "description": "Terraform in infra/azure. Costly pieces are off by default (enable_gpu, enable_databricks, enable_mcp_server, enable_agent_api). The demo runs locally; orange marks the containers it uses.",
+        "elements": [
+          {
+            "id": "138",
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "139",
+            "x": 2484,
+            "y": 200
+          },
+          {
+            "id": "140",
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "141",
+            "x": 240,
+            "y": 200
+          },
+          {
+            "id": "142",
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "143",
+            "x": 240,
+            "y": 800
+          },
+          {
+            "id": "144",
+            "x": 920,
+            "y": 800
+          },
+          {
+            "id": "145",
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "146",
+            "x": 240,
+            "y": 1400
+          },
+          {
+            "id": "147",
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "148",
+            "x": 920,
+            "y": 1400
+          },
+          {
+            "id": "149",
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "150",
+            "x": 1600,
+            "y": 800
+          },
+          {
+            "id": "151",
+            "x": 1600,
+            "y": 200
+          },
+          {
+            "id": "153",
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "154",
+            "x": 3367,
+            "y": 800
+          }
+        ],
+        "environment": "Azure",
+        "key": "DeploymentAzure",
+        "name": "Deployment View: Contact Center AI sandbox - Azure",
+        "order": 5,
+        "relationships": [
+          {
+            "id": "152"
+          }
+        ],
+        "softwareSystemId": "12",
+        "title": "Where it runs on Azure",
+        "paperSize": "A0_Landscape"
+      }
+    ],
+    "dynamicViews": [
+      {
+        "automaticLayout": {
+          "edgeSeparation": 50,
+          "nodeSeparation": 150,
+          "rankDirection": "LeftRight",
+          "rankSeparation": 300,
+          "vertices": true
+        },
+        "description": "Steps 1 to 3 are make dev-data, once. The agent checkpoints every thread in Postgres. make demo-change-replay prints the last verified run with no model or database.",
+        "elementId": "12",
+        "elements": [
+          {
+            "id": "13",
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "14",
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "16",
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "18",
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "19",
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "21",
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "22",
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "24",
+            "x": 0,
+            "y": 0
+          }
+        ],
+        "externalBoundariesVisible": false,
+        "key": "DemoPathSequence",
+        "name": "Dynamic View: Contact Center AI sandbox",
+        "order": 3,
+        "relationships": [
+          {
+            "description": "make dev-data: load the ledger, CSAT and change log",
+            "id": "47",
+            "order": "1",
+            "response": false
+          },
+          {
+            "description": "make dev-data: embed and upsert 1,540 calls",
+            "id": "48",
+            "order": "2",
+            "response": false
+          },
+          {
+            "description": "make dev-data: dbt build the marts",
+            "id": "50",
+            "order": "3",
+            "response": false
+          },
+          {
+            "description": "Preflight: data, marts and vector index present",
+            "id": "51",
+            "order": "4",
+            "response": false
+          },
+          {
+            "description": "Ask: why did fee-call satisfaction drop after the fee change?",
+            "id": "52",
+            "order": "5",
+            "response": false
+          },
+          {
+            "description": "classify and frame the question",
+            "id": "55",
+            "order": "6",
+            "response": false
+          },
+          {
+            "description": "explain_change (and query_metric for the fee question)",
+            "id": "56",
+            "order": "7",
+            "response": false
+          },
+          {
+            "description": "The metric before and after the change, with SQL",
+            "id": "59",
+            "order": "8",
+            "response": false
+          },
+          {
+            "description": "Count and read the calls in each window",
+            "id": "60",
+            "order": "9",
+            "response": false
+          },
+          {
+            "description": "Propose drivers; keep only verbatim quotes",
+            "id": "61",
+            "order": "10",
+            "response": false
+          },
+          {
+            "description": "ground: every citation exists and sits in its window",
+            "id": "57",
+            "order": "11",
+            "response": false
+          },
+          {
+            "description": "Open one citation, accounts masked",
+            "id": "53",
+            "order": "12",
+            "response": false
+          },
+          {
+            "description": "Step 6: the same question as an MCP client asks it",
+            "id": "54",
+            "order": "13",
+            "response": false
+          }
+        ],
+        "title": "make demo-change, step by step"
+      }
+    ],
+    "systemLandscapeViews": [
+      {
+        "automaticLayout": {
+          "edgeSeparation": 50,
+          "nodeSeparation": 60,
+          "rankDirection": "LeftRight",
+          "rankSeparation": 600,
+          "vertices": true
+        },
+        "description": "Who uses the sandbox and what it talks to. Orange marks the change-analysis demo path; dashed boxes are planned or stubbed.",
+        "elements": [
+          {
+            "id": "1",
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "2",
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "3",
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "4",
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "5",
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "6",
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "7",
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "8",
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "9",
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "10",
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "11",
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "12",
+            "x": 0,
+            "y": 0
+          }
+        ],
+        "enterpriseBoundaryVisible": true,
+        "key": "Landscape",
+        "name": "System Landscape View",
+        "order": 1,
+        "relationships": [
+          {
+            "id": "33"
+          },
+          {
+            "id": "34"
+          },
+          {
+            "id": "35"
+          },
+          {
+            "id": "36"
+          },
+          {
+            "id": "37"
+          },
+          {
+            "id": "38"
+          },
+          {
+            "id": "39"
+          },
+          {
+            "id": "40"
+          },
+          {
+            "id": "41"
+          },
+          {
+            "id": "42"
+          },
+          {
+            "id": "43"
+          },
+          {
+            "id": "44"
+          },
+          {
+            "id": "45"
+          }
+        ],
+        "title": "Contact Center AI: system landscape"
+      }
+    ]
+  }
+}

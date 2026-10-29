@@ -54,10 +54,7 @@ Each record also carries `reference` (what a correct answer rests on, for the ju
 
 The real graph runs on the doubles in `offline.py`. The call-id shortcut, the summarize-to-retrieve fallback, the term interrupt and resume, metric resolution, SQL extraction, grounding and answer formatting are all the agent's own code. Model decisions are scripted from the golden item: the classifier returns the golden route, `ask_the_analyst` resolves to the golden metrics, and search cites the lowest call ids in the golden categories. Offline scores therefore measure the graph's deterministic behavior. Only `make evals-live` measures the model.
 
-The run fails on any failure not listed in `known_failures.json`, and on any listed failure that now passes. The same gate runs in `make test` (`tests/evals/`) and in CI. The listed failures are findings about the agent, not about the golden set:
-
-- **g24, g25:** naming `banking_ledger_balance` or `checking_available_balance` by label still interrupts, because two candidates tie on qualifier votes.
-- **g38:** a lowercase call id is not recognized, because `CALL_ID_RE` is case-sensitive.
+The run fails on any failure not listed in `known_failures.json`, and on any listed failure that now passes. The same gate runs in `make test` (`tests/evals/`) and in CI. Listed failures are findings about the agent, not about the golden set; the list is empty today.
 
 LangSmith tracing is forced off for the offline run.
 
