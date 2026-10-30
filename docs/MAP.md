@@ -30,6 +30,12 @@ run with no model, database or network.
 
 ![make demo-change, step by step](architecture/demo-path.png)
 
+## Inside the MCP server
+
+The five parts of `ccai_mcp` and what each calls, with the change result (v1) that `explain_change` returns. Appendix A of [design/change-analysis.md](design/change-analysis.md#appendix-a-interfaces) has the full result schema.
+
+![McpServerComponents: the parts inside the MCP server](architecture/mcp-components.png)
+
 ## Where it runs
 
 ![Local: host processes and the Compose profiles](architecture/deployment-local.png)

@@ -83,6 +83,22 @@ workspace "Contact Center AI" "A working sandbox exploring what AI can do for a 
                 }
                 mcpServer = container "MCP server" "Six tools: search_transcripts, get_call_summary, query_csat, query_metric, ask_the_analyst, explain_change." "ccai_mcp, stdio" {
                     tags "Demo path"
+
+                    router = component "Tool router" "Receives each MCP tool call, checks its arguments against the tool's schema and hands it to the tool that owns it." "ccai_mcp/server.py" {
+                        tags "Demo path"
+                    }
+                    searchTools = component "Search and call tools" "search_transcripts, get_call_summary, query_csat: cited search over the calls, one call's summary, CSAT counts from SQL." "ccai_mcp/tools.py" {
+                        tags "Built"
+                    }
+                    metricTools = component "Metric tools" "query_metric and ask_the_analyst: one governed metric, or a question matched to metrics. Runs MetricFlow's mf and returns the value with its SQL." "ccai_mcp/metrics.py" {
+                        tags "Demo path"
+                    }
+                    changeAnalysis = component "Change analysis" "explain_change: finds the change point, reads the metric before and after, reads the calls, has the model propose and assign reasons, counts them in code, keeps only verbatim quotes." "ccai_mcp/change.py" {
+                        tags "Demo path"
+                    }
+                    masking = component "Account masking" "Masks account numbers in the quotes and answer text it is given, keeping the last four digits." "ccai_mcp/masking.py" {
+                        tags "Demo path"
+                    }
                 }
                 mcpHttp = container "MCP HTTP endpoint" "The same six tools over streamable HTTP; bearer token locally (Compose mcp-server :8000), Easy Auth on Azure." "ccai_mcp --http" {
                     tags "Built"
@@ -205,6 +221,41 @@ workspace "Contact Center AI" "A working sandbox exploring what AI can do for a 
             tags "Demo path"
         }
         mcpServer -> ollama "Proposes drivers, assigns verbatim quotes" "chat" {
+            tags "Demo path"
+        }
+
+        # Inside the MCP server (the McpServerComponents view)
+        agent -> router "Calls explain_change and query_metric" "MCP stdio" {
+            tags "Demo path"
+        }
+        demoChange -> router "Asks step 6 as an MCP client would" "explain_change" {
+            tags "Demo path"
+        }
+        mcpClients -> router "Call the six tools" "MCP stdio"
+        router -> searchTools "Passes search_transcripts, get_call_summary, query_csat" "in process"
+        router -> metricTools "Passes query_metric, ask_the_analyst" "in process"
+        router -> changeAnalysis "Passes explain_change; returns the cited answer and the change result" "in process" {
+            tags "Demo path"
+        }
+        changeAnalysis -> metricTools "Reads the governed metric for the before and after windows" "query_metric_raw" {
+            tags "Demo path"
+        }
+        metricTools -> metricLayer "Runs the governed metric and gets its SQL" "mf, governed SQL" {
+            tags "Demo path"
+        }
+        changeAnalysis -> retrieval "Counts the calls in each window; reads them by id" "Retriever" {
+            tags "Demo path"
+        }
+        searchTools -> retrieval "Searches calls; opens one call by id" "Retriever"
+        searchTools -> postgres "Reads CSAT scores from the f_csat fact" "SQL"
+        changeAnalysis -> ollama "Proposes reasons; assigns each call to one" "chat" {
+            tags "Demo path"
+        }
+        changeAnalysis -> hostedModels "The same, when a hosted model is chosen" "HTTPS"
+        changeAnalysis -> masking "Masks account numbers in every quote and answer line" "in process" {
+            tags "Demo path"
+        }
+        changeAnalysis -> router "Returns change result v1: change_point, windows (before/after value, n, SQL), drivers and patterns (counts, call ids, quotes), limits" "text plus JSON" {
             tags "Demo path"
         }
 
@@ -346,6 +397,26 @@ workspace "Contact Center AI" "A working sandbox exploring what AI can do for a 
             autoLayout lr 300 150
             title "make demo-change, step by step"
             description "Steps 1 to 3 are make dev-data, once. The agent checkpoints every thread in Postgres. make demo-change-replay prints the last verified run with no model or database."
+        }
+
+        # ── Inside the MCP server ────────────────────────────────────────────────
+
+        component mcpServer "McpServerComponents" {
+            include router searchTools metricTools changeAnalysis masking
+            include agent mcpClients metricLayer retrieval postgres ollama hostedModels
+            exclude "agent -> retrieval"
+            exclude "agent -> ollama"
+            exclude "agent -> postgres"
+            exclude "agent -> hostedModels"
+            exclude "agent -> mcpServer"
+            exclude "mcpClients -> mcpServer"
+            exclude "mcpServer -> *"
+            exclude "retrieval -> postgres"
+            exclude "retrieval -> ollama"
+            exclude "metricLayer -> postgres"
+            autoLayout lr 500 250
+            title "Inside the MCP server: how explain_change answers"
+            description "The five parts of ccai_mcp and what each calls. The line back from Change analysis is the change result (version 1); docs/design/change-analysis.md Appendix A has its full schema."
         }
 
         # ── Deployment ───────────────────────────────────────────────────────────

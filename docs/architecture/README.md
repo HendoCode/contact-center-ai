@@ -2,7 +2,7 @@
 
 Source: `workspace.dsl` (Structurizr DSL), one C4 model of the whole repo.
 Layout: `workspace.json` holds the fixed positions of the Containers and deployment views; the
-other views lay themselves out. Renderer: the `structurizr` Compose service (Structurizr Local).
+other views, including the component view, lay themselves out. Renderer: the `structurizr` Compose service (Structurizr Local).
 [docs/MAP.md](../MAP.md) shows the exported views with a capability table.
 
 ## Render locally
@@ -35,6 +35,7 @@ whose content changed and keep the file names below.
 | `Landscape` | System landscape | [landscape](landscape.png) ([svg](landscape.svg)) | The three kinds of user, the sandbox, and the systems it calls: model APIs, LangSmith, Snowflake, Databricks, Azure, GitHub, and the stubbed S3 source |
 | `Containers` | Container | [containers](containers.png) ([svg](containers.svg)) | Every container, store and Compose service, grouped by capability, without connecting lines; the demo-path pieces stand out |
 | `DemoPathSequence` | Dynamic | [demo-path](demo-path.png) ([svg](demo-path.svg)) | `make dev-data` then `make demo-change`, as 13 numbered calls between the pieces it uses |
+| `McpServerComponents` | Component | [mcp-components](mcp-components.png) ([svg](mcp-components.svg)) | The five parts inside the MCP server, what each calls, and the change result (v1) that `explain_change` returns; the full schema is in [change-analysis.md Appendix A](../design/change-analysis.md#appendix-a-interfaces) |
 | `DeploymentLocal` | Deployment | [deployment-local](deployment-local.png) ([svg](deployment-local.svg)) | Host processes under uv next to the Compose default, `app` and `gpu` profiles |
 | `DeploymentAzure` | Deployment | [deployment-azure](deployment-azure.png) ([svg](deployment-azure.svg)) | The `infra/azure` roots: Container Apps behind Easy Auth, PostgreSQL, ADLS, the optional GPU VM and Databricks, Key Vault, and the Snowflake account |
 
