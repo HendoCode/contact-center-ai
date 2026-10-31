@@ -189,6 +189,7 @@ services:
     command: ["python", "-m", "ccai_mcp.server", "--http"]
     environment:
       DATABASE_URL: postgresql://postgres:postgres@db:5432/contactcenter
+      DBT_HOST: db
       OLLAMA_BASE_URL: http://ollama:11434
       LLM_PROVIDER: ${LLM_PROVIDER:-ollama}
       EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-ollama}
