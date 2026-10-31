@@ -38,7 +38,7 @@ from mcp.types import (
 
 from ccai_mcp.change import SUPPORTED_METRICS, explain_change_blocks
 from ccai_mcp.metrics import ask_the_analyst, query_metric
-from ccai_mcp.tools import get_call_summary, query_csat, search_transcripts
+from ccai_mcp.tools import get_call_summary, get_transcript, query_csat, search_transcripts
 
 # Every tool only reads: hosted assistants use this hint to skip a confirmation per call.
 READ_ONLY = ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False)
@@ -73,6 +73,26 @@ TOOLS = [
         annotations=READ_ONLY,
         name="get_call_summary",
         description="Get a summary of a specific call by its ID.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "call_id": {
+                    "type": "string",
+                    "description": "The call ID (e.g. CALL-00042)"
+                }
+            },
+            "required": ["call_id"]
+        }
+    ),
+    Tool(
+        annotations=READ_ONLY,
+        name="get_transcript",
+        description=(
+            "Get the verbatim dialogue of one call by its ID, with a header of its date, "
+            "length (minutes:seconds), category, outcome, agent and member. Use this when "
+            "the user wants to read or see the transcript itself; get_call_summary returns "
+            "only a short written summary. Account numbers are masked."
+        ),
         inputSchema={
             "type": "object",
             "properties": {
@@ -336,6 +356,8 @@ async def _run_tool(name: str, arguments: dict) -> str | list[str]:
         )
     elif name == "get_call_summary":
         result = await asyncio.to_thread(get_call_summary, call_id=arguments["call_id"])
+    elif name == "get_transcript":
+        result = await asyncio.to_thread(get_transcript, call_id=arguments["call_id"])
     elif name == "query_csat":
         result = await asyncio.to_thread(
             query_csat,

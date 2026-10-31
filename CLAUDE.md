@@ -58,14 +58,14 @@ generate_data.py → transcripts.json + csat.json
                         ↓
 pipeline.py --ingest → embed (OpenAI default / Ollama local) → pgvector (PostgreSQL)
                         ↓
-ccai_mcp/server.py (stdio; HTTP opt-in) → 6 tools exposed to MCP clients
+ccai_mcp/server.py (stdio; HTTP opt-in) → 7 tools exposed to MCP clients
 ```
 
 **Data flow across files:**
 - `data/synthetic/generate_data.py` outputs `transcripts.json` (1,540 calls with full_text: 1,250 baseline calls plus the calls for four dated events), `csat.json` (survey scores 1–5), and the OLTP JSON files loaded by `olap/seed.py`.
 - `rag/embeddings.py` owns pgvector setup and the shared `get_embeddings()`; `retrieval/` (`get_retriever()`, `Hit`, `Retriever`) is the only entry point for search/ingest — `retrieval/pgvector_backend.py` is the sole caller of `get_vector_store()` apart from `--reset`. To swap from OpenAI embeddings to Anthropic/Gemini, only this file needs to change.
 - `rag/pipeline.py` owns ingestion (`--ingest`) and querying (`rag_query()`). Ingestion upserts by `call_id`, so re-running `--ingest` is idempotent (rows ingested before this change have UUID ids and need `--reset` first).
-- `ccai_mcp/tools.py` implements the RAG/CSAT tools (`search_transcripts`, `get_call_summary`, `query_csat`). `search_transcripts` goes through `rag_query()` and `get_call_summary` uses `get_retriever().get_by_id()`; `query_csat` reads the Postgres `f_csat` fact (falling back to the `csat_survey` source), not `csat.json`.
+- `ccai_mcp/tools.py` implements the RAG/CSAT tools (`search_transcripts`, `get_call_summary`, `get_transcript`, `query_csat`). `search_transcripts` goes through `rag_query()` and `get_call_summary` uses `get_retriever().get_by_id()`; `query_csat` reads the Postgres `f_csat` fact (falling back to the `csat_survey` source), not `csat.json`.
 - `ccai_mcp/metrics.py` implements the semantic-layer tools (`query_metric`, `ask_the_analyst`), which shell out to the committed `mf` (MetricFlow) CLI over the `metrics.yml` catalog.
 - `ccai_mcp/server.py` is a thin router: it receives MCP tool calls over stdio and dispatches to `ccai_mcp/tools.py`, `ccai_mcp/metrics.py` and `ccai_mcp/change.py` (the `explain_change` tool: a metric before and after a change, plus the calls in between).
 
@@ -186,6 +186,6 @@ Deployed via GitHub Actions → GitHub Pages at https://hendocode.github.io/cont
 
 ## What's built vs. what's next
 
-**Built:** synthetic data generator, full RAG ingest/retrieve/respond pipeline, pgvector + OpenAI integration, Ollama as local provider alternative (no API key), 6-tool MCP server (RAG/CSAT + semantic-layer metric tools + change analysis), Terraform for Azure (`infra/azure`: Container Apps + PostgreSQL Flexible Server + ADLS), Docker Compose for local dev.
+**Built:** synthetic data generator, full RAG ingest/retrieve/respond pipeline, pgvector + OpenAI integration, Ollama as local provider alternative (no API key), 7-tool MCP server (RAG/CSAT + semantic-layer metric tools + change analysis), Terraform for Azure (`infra/azure`: Container Apps + PostgreSQL Flexible Server + ADLS), Docker Compose for local dev.
 
 **Not yet implemented:** S3 ingestion, CSAT → vector store (currently SQL-backed via `f_csat`, not embedded), observability, end-to-end deployment of the CI workflow.

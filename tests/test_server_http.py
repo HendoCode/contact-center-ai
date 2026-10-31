@@ -9,7 +9,7 @@ What this guards:
   * stdio stays the default (the handshake tests cover that path; here the env/flag selection);
   * a non-loopback bind refuses to start without MCP_AUTH_TOKEN;
   * a missing or wrong bearer token is a 401 before any MCP handling;
-  * the same six tools, with the same schemas, are served over the wire.
+  * the same seven tools, with the same schemas, are served over the wire.
 """
 
 import asyncio
@@ -197,7 +197,7 @@ async def _session(base: str, token: str | None):
 
 
 @pytest.mark.asyncio
-async def test_lists_the_six_tools_and_calls_one_over_http(monkeypatch):
+async def test_lists_the_seven_tools_and_calls_one_over_http(monkeypatch):
     calls = []
 
     def fake_query_metric(**kwargs):

@@ -1,6 +1,6 @@
 # ccai_mcp
 
-The MCP server: six tools (`search_transcripts`, `get_call_summary`, `query_csat`, `query_metric`, `ask_the_analyst`, `explain_change`) over two transports. Tool names and input schemas are identical on both.
+The MCP server: seven tools (`search_transcripts`, `get_call_summary`, `get_transcript`, `query_csat`, `query_metric`, `ask_the_analyst`, `explain_change`) over two transports. Tool names and input schemas are identical on both.
 
 | Transport | How to start | Use it for |
 |---|---|---|
@@ -100,7 +100,7 @@ With both `CF_ACCESS_*` values set the server rejects (403) any `/mcp` request w
 
 **Developers** (Claude Code, Gemini CLI, Cursor, VS Code): add the same URL as an HTTP MCP server; they run the same browser sign-in.
 
-All six tools are marked read-only, so the assistants do not ask for confirmation on each call. Speed differs by tool. `query_metric`, `query_csat` and `search_transcripts` answer in seconds. `explain_change` reads the calls in both windows and asks a model to label drivers, so it can take minutes; ask for it deliberately and expect the assistant to wait.
+All seven tools are marked read-only, so the assistants do not ask for confirmation on each call. Speed differs by tool. `query_metric`, `query_csat` and `search_transcripts` answer in seconds. `explain_change` reads the calls in both windows and asks a model to label drivers, so it can take minutes; ask for it deliberately and expect the assistant to wait.
 
 ## Registering a client
 
@@ -204,7 +204,7 @@ The request comes from the Open WebUI **backend**, not your browser. If Open Web
 
 | Client | Status |
 |---|---|
-| Real MCP client (`mcp` 2.2.0) over HTTP | tested in `tests/test_server_http.py`: handshake, six tools, a call, 401s |
+| Real MCP client (`mcp` 2.2.0) over HTTP | tested in `tests/test_server_http.py`: handshake, seven tools, a call, 401s |
 | `mcp-remote` 0.14.3 (the Claude Desktop route 1 bridge) | run by hand against this server with the header form above: `tools/list` returned the five tools it had then. Claude Desktop itself was not run |
 | Claude Code CLI 2.1.310 as the client, stdio server, one `explain_change` call (2026-10-25, on `2df810a` plus the replay change) | ran: the CLI started `python -m ccai_mcp.server` over stdio, called `explain_change` for `csat_average_score` on `fee_dispute` calls at 2026-04-15, and returned the cited answer (both windows, SQL-backed values, a driver with three verbatim quotes). The database, MetricFlow and the tool were real; the chat and embedding models were deterministic stand-ins, so the driver label is not a model's reading |
 | Claude Desktop, stdio config above | **not run.** The config follows Claude Desktop's documented `mcpServers` format |

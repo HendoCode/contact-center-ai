@@ -28,14 +28,14 @@ data/synthetic/generate_data.py  (seed 42)
   ├─ transcripts.json ──► retrieval/        Retriever interface: pgvector ⇄ LanceDB   (RETRIEVER_BACKEND)
   ├─ OLTP JSON ─────────► olap/dbt/         dbt star schema + MetricFlow metrics      (--target dev | snowflake | databricks)
   │                        olap/dbt/loaders/  OLTP JSON → Snowflake / Databricks raw tables
-  └─ (both) ────────────► ccai_mcp/server.py  6 MCP tools over stdio
+  └─ (both) ────────────► ccai_mcp/server.py  7 MCP tools over stdio
                              └─► agent/     LangGraph graph, tools bound via langchain.mcp
                                    └─► evals/  golden set: offline gate (make evals) + LangSmith (make evals-live)
 chat models: rag/pipeline.py get_llm()      (LLM_PROVIDER = openai | ollama | anthropic | fireworks | vllm)
 infra: docker-compose.yml (local, no bill)  ·  infra/azure/ Terraform (Azure + a Snowflake root)
 ```
 
-The six MCP tools: `search_transcripts`, `get_call_summary`, `query_csat` (data tools),
+The seven MCP tools: `search_transcripts`, `get_call_summary`, `get_transcript`, `query_csat` (data tools),
 `query_metric`, `ask_the_analyst` (semantic-layer tools that shell out to MetricFlow's `mf`) and
 `explain_change` (a metric before and after a change, plus the calls in between).
 
@@ -125,7 +125,7 @@ refuses to start without `MCP_AUTH_TOKEN`.
 
 ```bash
 MCP_AUTH_TOKEN=demo-token uv run python -m ccai_mcp.server --http &      # http://127.0.0.1:8000/mcp
-MCP_AUTH_TOKEN=demo-token uv run python -m ccai_mcp.http_smoke           # lists the six tools
+MCP_AUTH_TOKEN=demo-token uv run python -m ccai_mcp.http_smoke           # lists the seven tools
 ```
 
 To see the sixth tool answer, call it with `--call explain_change '{"metric": "csat_average_score", "filters": {"category": ["fee_dispute"]}, "change_point": "2026-04-15", "window_days": 14}'`.

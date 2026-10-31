@@ -150,6 +150,57 @@ def test_get_call_summary_grounds_prompt_in_retrieved_doc(monkeypatch):
     assert doc.page_content in captured["prompt"]
 
 
+def _transcript_retriever(monkeypatch, text, hit=True):
+    class _Retriever:
+        def get_by_id(self, call_id):
+            if not hit:
+                return None
+            meta = {
+                "call_id": call_id, "date": "2026-08-01", "duration_seconds": 425,
+                "category": "loan_inquiry", "outcome": "resolved",
+                "agent_id": "AGT-007", "member_id": "MBR-000584",
+            }
+            return Hit(call_id=call_id, text=text, score=1.0, metadata=meta)
+
+    def _no_llm():
+        raise AssertionError("get_transcript must not call an LLM")
+
+    monkeypatch.setattr(tools, "get_retriever", lambda: _Retriever())
+    monkeypatch.setattr(tools, "get_llm", _no_llm)
+
+
+def test_get_transcript_returns_header_and_verbatim_dialogue(monkeypatch):
+    dialogue = "AGENT: Hello.\nMEMBER: I want a lower rate."
+    _transcript_retriever(monkeypatch, dialogue)
+
+    result = tools.get_transcript("CALL-00042")
+
+    assert "Call ID: CALL-00042" in result
+    assert "Date: 2026-08-01" in result
+    assert "Duration: 7:05" in result
+    assert "Category: loan_inquiry" in result
+    assert "Outcome: resolved" in result
+    assert "Agent: AGT-007" in result
+    assert "Member: MBR-000584" in result
+    assert result.endswith(dialogue)
+
+
+def test_get_transcript_not_found(monkeypatch):
+    _transcript_retriever(monkeypatch, "", hit=False)
+
+    assert tools.get_transcript("CALL-99999") == "No transcript found for call ID: CALL-99999"
+
+
+def test_get_transcript_masks_account_numbers(monkeypatch):
+    _transcript_retriever(monkeypatch, "MEMBER: My account is 123456789012.")
+
+    result = tools.get_transcript("CALL-00042")
+
+    assert "123456789012" not in result
+    assert "****9012" in result
+    assert "CALL-00042" in result and "MBR-000584" in result
+
+
 def test_transcripts_to_documents_carries_olap_ids(monkeypatch):
     # Regression: RAG transcript metadata must carry interaction_id +
     # account_id so RAG answers and OLAP aggregates cite the same member.
