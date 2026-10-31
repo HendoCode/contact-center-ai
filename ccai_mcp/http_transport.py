@@ -14,6 +14,14 @@ Safe by default, because this puts database-backed tools on a network:
     compared in constant time, and is rejected with 401 before MCP sees it. The token is never
     logged.
 
+Optional Cloudflare Access check (off unless both `CF_ACCESS_TEAM_DOMAIN` and `CF_ACCESS_AUD` are
+set): every request except `/healthz` must carry a valid `Cf-Access-Jwt-Assertion` header, a JWT
+signed by the team's published keys, issued by the team domain, for this application's audience
+tag, and not expired. Anything else is a 403 before MCP sees it. When enabled it replaces the
+bearer check (a client's `Authorization` header then belongs to Access's own OAuth, not to us),
+and it satisfies the non-loopback guard because Access is the authenticating front door. Put the
+origin behind a tunnel (the Compose `tunnel` profile) so Access cannot be bypassed.
+
 A static bearer token is demo-grade: no expiry, no per-user identity, no revocation. It
 does not encrypt anything either; put TLS (a reverse proxy, Azure ingress) in front of any
 non-local use. Auth, OAuth and TLS termination beyond this are out of scope.
@@ -25,8 +33,12 @@ import ipaddress
 import json
 import logging
 import os
-from collections.abc import Mapping
+import asyncio
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from typing import Any
+
+import jwt
 
 from mcp.server import Server
 from mcp.server.transport_security import TransportSecuritySettings
@@ -80,6 +92,8 @@ class HttpSettings:
     token: str | None = None
     auth_upstream: bool = False
     platform_signal: tuple[str, ...] = ()  # names (never values) of the ACA variables found
+    cf_team_domain: str | None = None  # e.g. "myteam.cloudflareaccess.com"
+    cf_aud: str | None = None  # the Access application's audience tag
 
     @classmethod
     def from_env(cls, environ: Mapping[str, str] | None = None) -> "HttpSettings":
@@ -94,6 +108,8 @@ class HttpSettings:
             token=(env.get("MCP_AUTH_TOKEN") or "").strip() or None,
             auth_upstream=(env.get("MCP_AUTH_UPSTREAM") or "").strip().lower() in _TRUE,
             platform_signal=tuple(n for n in PLATFORM_SIGNAL_VARS if (env.get(n) or "").strip()),
+            cf_team_domain=_normalize_team_domain(env.get("CF_ACCESS_TEAM_DOMAIN")),
+            cf_aud=(env.get("CF_ACCESS_AUD") or "").strip() or None,
         )
         settings.validate()
         return settings
@@ -101,7 +117,11 @@ class HttpSettings:
     def validate(self) -> None:
         if not 0 <= self.port <= 65535:
             raise ConfigError(f"MCP_SERVER_PORT out of range: {self.port}")
-        if is_loopback(self.host) or self.token:
+        if bool(self.cf_team_domain) != bool(self.cf_aud):
+            raise ConfigError(
+                "CF_ACCESS_TEAM_DOMAIN and CF_ACCESS_AUD must be set together (or both left unset)."
+            )
+        if is_loopback(self.host) or self.token or self.cf_access:
             return
         if not self.auth_upstream:
             raise ConfigError(
@@ -121,12 +141,27 @@ class HttpSettings:
             )
 
     @property
+    def cf_access(self) -> bool:
+        return bool(self.cf_team_domain and self.cf_aud)
+
+    @property
     def auth_mode(self) -> str:
+        if self.cf_access:
+            return "Cloudflare Access"
         if self.token:
             return "bearer token"
         if self.auth_upstream:
             return "upstream proxy"
         return "none (loopback only)"
+
+
+def _normalize_team_domain(raw: str | None) -> str | None:
+    """`https://team.cloudflareaccess.com/` or `team.cloudflareaccess.com` -> the bare host."""
+    value = (raw or "").strip()
+    for prefix in ("https://", "http://"):
+        if value.lower().startswith(prefix):
+            value = value[len(prefix):]
+    return value.strip("/") or None
 
 
 def _digest(value: bytes) -> bytes:
@@ -176,6 +211,67 @@ async def _unauthorized(send: Send) -> None:
     await send({"type": "http.response.body", "body": body})
 
 
+CF_ACCESS_HEADER = b"cf-access-jwt-assertion"
+KeyResolver = Callable[[str], Any]  # token -> public key usable by PyJWT
+
+
+class CloudflareAccessMiddleware:
+    """Fail-closed check of the `Cf-Access-Jwt-Assertion` header Cloudflare Access adds.
+
+    Verifies the RS256 signature against the team's keys (`/cdn-cgi/access/certs`, cached by
+    PyJWT's JWKS client), the issuer (the team domain), the audience tag and the expiry. A
+    missing header, a bad token or an unreachable key set all end in 403; nothing is let
+    through on error. `key_resolver` exists so tests can sign with a local key, offline.
+    """
+
+    def __init__(self, app: ASGIApp, team_domain: str, aud: str, key_resolver: KeyResolver | None = None):
+        self.app = app
+        self._issuer = f"https://{team_domain}"
+        self._aud = aud
+        if key_resolver is None:
+            client = jwt.PyJWKClient(f"{self._issuer}/cdn-cgi/access/certs", cache_keys=True, lifespan=3600)
+            key_resolver = lambda token: client.get_signing_key_from_jwt(token).key  # noqa: E731
+        self._resolve_key = key_resolver
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] == "http" and not await self._authorized(scope):
+            await _forbidden(send)
+            return
+        await self.app(scope, receive, send)
+
+    async def _authorized(self, scope: Scope) -> bool:
+        token = next((v for k, v in scope["headers"] if k.lower() == CF_ACCESS_HEADER), b"").decode("latin-1").strip()
+        if not token:
+            return False
+        try:
+            # Key lookup may fetch the key set over the network: keep it off the event loop.
+            key = await asyncio.to_thread(self._resolve_key, token)
+            jwt.decode(
+                token,
+                key,
+                algorithms=["RS256"],
+                audience=self._aud,
+                issuer=self._issuer,
+                options={"require": ["exp", "iss", "aud"]},
+            )
+        except Exception as exc:  # any failure, including a network error, is a denial
+            logger.warning("Cloudflare Access token rejected: %s", type(exc).__name__)
+            return False
+        return True
+
+
+async def _forbidden(send: Send) -> None:
+    body = json.dumps({"error": "forbidden", "detail": "missing or invalid Cloudflare Access token"}).encode()
+    await send(
+        {
+            "type": "http.response.start",
+            "status": 403,
+            "headers": [(b"content-type", b"application/json"), (b"content-length", str(len(body)).encode())],
+        }
+    )
+    await send({"type": "http.response.body", "body": body})
+
+
 class HealthMiddleware:
     """`GET /healthz` -> 200, for Compose and Container Apps probes. Reveals nothing."""
 
@@ -196,7 +292,7 @@ class HealthMiddleware:
         await self.app(scope, receive, send)
 
 
-def build_app(server: Server, settings: HttpSettings) -> ASGIApp:
+def build_app(server: Server, settings: HttpSettings, cf_key_resolver: KeyResolver | None = None) -> ASGIApp:
     """The streamable-HTTP ASGI app for `server`, wrapped in health and auth middleware.
 
     Stateless with plain JSON replies: the tools never push to the client, and no session
@@ -205,9 +301,10 @@ def build_app(server: Server, settings: HttpSettings) -> ASGIApp:
     The SDK's DNS-rebinding guard defaults on for loopback binds and rejects any Host it
     does not expect, which breaks a TLS reverse proxy that forwards the public name. It
     guards unauthenticated localhost servers; a bearer token already stops a rebinding page,
-    so it is switched off whenever a token is set.
+    so it is switched off whenever a token is set or Cloudflare Access is enforced.
     """
-    security = TransportSecuritySettings(enable_dns_rebinding_protection=False) if settings.token else None
+    authenticated = bool(settings.token) or settings.cf_access
+    security = TransportSecuritySettings(enable_dns_rebinding_protection=False) if authenticated else None
     mcp_app = server.streamable_http_app(
         streamable_http_path=MCP_PATH,
         stateless_http=True,
@@ -216,7 +313,13 @@ def build_app(server: Server, settings: HttpSettings) -> ASGIApp:
         host=settings.host,
     )
     # Health is the outer layer on purpose: it answers before the bearer check.
-    return HealthMiddleware(BearerAuthMiddleware(mcp_app, settings.token))
+    if settings.cf_access:
+        guarded: ASGIApp = CloudflareAccessMiddleware(
+            mcp_app, settings.cf_team_domain, settings.cf_aud, cf_key_resolver
+        )
+    else:
+        guarded = BearerAuthMiddleware(mcp_app, settings.token)
+    return HealthMiddleware(guarded)
 
 
 async def serve_http(server: Server, settings: HttpSettings) -> None:

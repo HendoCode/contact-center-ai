@@ -7,7 +7,7 @@ The MCP server: six tools (`search_transcripts`, `get_call_summary`, `query_csat
 | stdio (default) | `python -m ccai_mcp.server` | a client on the same machine that spawns the server (Claude Desktop, the agent) |
 | streamable HTTP (opt in) | `python -m ccai_mcp.server --http` or `MCP_TRANSPORT=http` | clients on other machines: register a URL |
 
-Built on `mcp` 2.2.0 (`Server.streamable_http_app()`, served by uvicorn). Code: `server.py` (tools, transport choice), `change.py` (`explain_change`), `http_transport.py` (settings, bearer check, `/healthz`), `http_smoke.py` (a client for checking it).
+Built on `mcp` 2.2.0 (`Server.streamable_http_app()`, served by uvicorn). Code: `server.py` (tools, transport choice), `change.py` (`explain_change`), `http_transport.py` (settings, bearer check, optional Cloudflare Access check, `/healthz`), `http_smoke.py` (a client for checking it).
 
 ## `explain_change`
 
@@ -73,6 +73,34 @@ The service is in the `app` profile, so a bare `docker compose up -d` is unchang
 ### Azure
 
 `infra/azure/modules/apps` has a count-gated `mcp-server` Container App (`enable_mcp_server`, off by default) that runs `python -m ccai_mcp.server --http` behind Easy Auth. Clients send an Entra access token as the bearer token. Nothing here applies it; see that module's README for what Stephen runs.
+
+## Connect from Claude / Gemini
+
+The hosted connectors (Claude on the web, desktop and mobile; the Gemini app) call the server from the vendor's cloud, not from your machine. They can reach it only through a public HTTPS name, so a server on `localhost` or a LAN address cannot be added to them. The setup below publishes it with a Cloudflare Tunnel and puts Cloudflare Access in front. `https://ccai-mcp.example.com/mcp` stands for your own hostname.
+
+**Once, on the Cloudflare side** (Zero Trust): create a remotely-managed tunnel and copy its connector token; give it a public hostname whose service is `http://mcp-server:8000`; create a self-hosted Access application for that hostname with an allow policy for the people who may use it, and turn on Managed OAuth so non-browser clients can sign in, with dynamic client registration allowing these redirect URIs: `https://claude.ai/api/mcp/auth_callback`, `https://claude.com/api/mcp/auth_callback` and `https://oauth-redirect.googleusercontent.com/*` (add loopback URIs for Claude Code and Gemini CLI). Note the team domain and the application's audience tag.
+
+**On the host that runs the stack**, in the git-ignored `.env`:
+
+```
+CLOUDFLARE_TUNNEL_TOKEN=<connector token>
+CF_ACCESS_TEAM_DOMAIN=<your-team>.cloudflareaccess.com
+CF_ACCESS_AUD=<application audience tag>
+```
+
+```bash
+docker compose --profile app --profile tunnel up -d mcp-server cloudflared
+```
+
+With both `CF_ACCESS_*` values set the server rejects (403) any `/mcp` request without a valid `Cf-Access-Jwt-Assertion` for that team and application, so a request that bypasses the tunnel gets nothing. Leave `MCP_PUBLISH_HOST` at `127.0.0.1`. The check replaces the static bearer token while it is on.
+
+**Claude** (claude.ai, Desktop or mobile): Customize > Connectors > + Add > Add custom connector. Paste `https://ccai-mcp.example.com/mcp`, Continue, Sign in now, Add. In a chat, + > Connectors, and switch it on.
+
+**Gemini** (gemini.google.com, personal account where custom apps are available): Settings > Connected Apps > Add a custom app. Paste the same address, Next, and sign in. In a chat, type @ and pick the app.
+
+**Developers** (Claude Code, Gemini CLI, Cursor, VS Code): add the same URL as an HTTP MCP server; they run the same browser sign-in.
+
+All six tools are marked read-only, so the assistants do not ask for confirmation on each call. Speed differs by tool. `query_metric`, `query_csat` and `search_transcripts` answer in seconds. `explain_change` reads the calls in both windows and asks a model to label drivers, so it can take minutes; ask for it deliberately and expect the assistant to wait.
 
 ## Registering a client
 
