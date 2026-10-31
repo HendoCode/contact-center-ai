@@ -627,3 +627,45 @@ def test_labels_lose_ids_and_are_capped():
 
 def test_the_data_window_is_the_world(env):
     assert START.weekday() == 0 and (END - START).days == 182
+
+
+def test_structured_calls_carry_their_own_larger_output_cap(monkeypatch):
+    from langchain_openai import ChatOpenAI
+
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    monkeypatch.delenv("LLM_REASONING_EFFORT", raising=False)
+    monkeypatch.delenv("LLM_STRUCTURED_MAX_TOKENS", raising=False)
+    seen = []
+
+    class Probe(ChatOpenAI):
+        def with_structured_output(self, schema, **_):
+            seen.append((self.max_tokens, self.extra_body))
+            return RunnableLambda(lambda _p: schema(reasons=[]))
+
+    base = Probe(model="m", api_key="sk-test", max_tokens=2048,
+                 extra_body={"reasoning": {"effort": "low"}})
+    change._structured(change._Reasons, "p", llm=base)
+    assert seen == [(8192, {"reasoning": {"effort": "low"}})]
+    assert base.max_tokens == 2048  # the supervisor-facing answer cap is untouched
+
+    monkeypatch.setenv("LLM_STRUCTURED_MAX_TOKENS", "4096")
+    change._structured(change._Reasons, "p", llm=base)
+    assert seen[-1][0] == 4096
+
+
+def test_a_structured_call_that_hit_the_cap_says_so():
+    class Capped:
+        def with_structured_output(self, schema, **_):
+            def respond(_prompt):
+                raise ValueError("Could not parse response: finish_reason='length'")
+            return RunnableLambda(respond)
+
+    with pytest.raises(RuntimeError, match="output limit.*LLM_STRUCTURED_MAX_TOKENS"):
+        change._structured(change._Reasons, "p", llm=Capped())
+
+    class Empty:
+        def with_structured_output(self, schema, **_):
+            return RunnableLambda(lambda _p: None)
+
+    with pytest.raises(RuntimeError, match="output limit"):
+        change._structured(change._Reasons, "p", llm=Empty())

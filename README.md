@@ -162,6 +162,13 @@ LLM_BASE_URL=https://openrouter.ai/api/v1
 LLM_MODEL=z-ai/glm-5.3-flash           # low-cost; e.g. deepseek/deepseek-v4-flash-latest also works
 ```
 
+Reasoning models spend output tokens thinking, and those count against
+`LLM_MAX_TOKENS`. The openai branch therefore sends OpenRouter's
+`reasoning: {"effort": ...}` field from `LLM_REASONING_EFFORT` (default `low`;
+`none` leaves the request unchanged), and `explain_change`'s structured calls
+use their own cap, `LLM_STRUCTURED_MAX_TOKENS` (default `8192`). If that cap is
+still hit, the result's limits say so.
+
 OpenRouter currently serves **no embedding models**, so an OpenRouter chat
 setup pairs with the free local Ollama embeddings path:
 

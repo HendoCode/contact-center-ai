@@ -30,6 +30,7 @@ second is the line "CHANGE RESULT (JSON, v1):" followed by the result as JSON, w
 import hashlib
 import json
 import math
+import os
 import re
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
@@ -40,7 +41,7 @@ from pydantic import BaseModel, Field
 
 from ccai_mcp.masking import mask_accounts
 from ccai_mcp.metrics import query_metric_raw
-from rag.pipeline import get_llm
+from rag.pipeline import get_llm, with_output_cap
 from retrieval import get_retriever
 
 SYNTHETIC_DIR = Path(__file__).resolve().parent.parent / "data" / "synthetic"
@@ -382,15 +383,32 @@ class _Assignments(BaseModel):
     assignments: list[_Assignment]
 
 
+def _hit_cap(exc: Exception) -> bool:
+    """True when the provider stopped at the output cap (finish_reason "length")."""
+    text = f"{type(exc).__name__} {exc}".lower()
+    return "lengthfinishreason" in text or "length limit" in text or "finish_reason='length'" in text
+
+
 def _structured(schema, prompt: str, llm=None):
-    """One structured model call; a failed parse is tried once more."""
-    llm = llm or get_llm()
+    """One structured model call; a failed parse is tried once more. Structured answers get
+    their own output cap (LLM_STRUCTURED_MAX_TOKENS) so a reasoning model has room to reason
+    and still answer."""
+    llm = with_output_cap(llm or get_llm(), int(os.getenv("LLM_STRUCTURED_MAX_TOKENS", "8192")))
     last: Exception | None = None
     for _ in range(2):
         try:
-            return llm.with_structured_output(schema).invoke(prompt)
+            out = llm.with_structured_output(schema).invoke(prompt)
         except Exception as exc:  # noqa: BLE001 - a provider or parse error costs the step, not the answer
             last = exc
+            continue
+        if out is None:  # some providers return empty content, not an error, at the cap
+            last = ValueError("the model returned no content")
+            continue
+        return out
+    if _hit_cap(last) or str(last) == "the model returned no content":
+        raise RuntimeError(
+            "the model reached its output limit before it finished answering; raise "
+            "LLM_STRUCTURED_MAX_TOKENS or lower LLM_REASONING_EFFORT")
     raise RuntimeError(f"{type(last).__name__}: {last}")
 
 

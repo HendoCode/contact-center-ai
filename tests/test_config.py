@@ -307,3 +307,17 @@ def test_hosted_chat_output_is_capped_and_the_cap_is_configurable(monkeypatch):
 
     monkeypatch.setenv("LLM_MAX_TOKENS", "512")
     assert get_llm().max_tokens == 512
+
+
+def test_hosted_chat_requests_low_reasoning_effort_unless_disabled(monkeypatch):
+    monkeypatch.setenv("LLM_PROVIDER", "openai")
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    monkeypatch.delenv("LLM_REASONING_EFFORT", raising=False)
+    assert get_llm().extra_body == {"reasoning": {"effort": "low"}}
+
+    monkeypatch.setenv("LLM_REASONING_EFFORT", "medium")
+    assert get_llm().extra_body == {"reasoning": {"effort": "medium"}}
+
+    for off in ("none", ""):
+        monkeypatch.setenv("LLM_REASONING_EFFORT", off)
+        assert get_llm().extra_body is None
