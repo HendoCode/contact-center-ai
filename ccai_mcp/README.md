@@ -26,6 +26,26 @@ python -m ccai_mcp.http_smoke --call explain_change '{"metric": "csat_average_sc
 
 It never reports a per-agent score. `mode="coaching"` takes `groups` (call ids from an earlier answer) and reports patterns in how those calls were handled. The result is two text blocks: the cited answer, then `CHANGE RESULT (JSON, v1):` and the result as JSON. `change_log.json` and `branches.json` are read from `data/synthetic/` (see `agent/changes.py`); the windows are half-open ISO dates. Code: `change.py`; the agent's route is described in [agent/README.md](../agent/README.md).
 
+## Smoke-test prompt
+
+One prompt that exercises the whole toolset from a connected assistant (Claude Desktop, Cursor, Open WebUI):
+
+> Did the new-merchant text verification rule in mid-June hurt member satisfaction or first-contact resolution for card and fraud calls? Compare the six weeks before and after June 15, show me the CSAT surveys that scored 1 or 2 in that period, find calls where members were frustrated about verification texts, and walk me through the worst one in full.
+
+The tools the assistant is expected to call:
+
+| Part of the prompt | Tool | Arguments |
+|---|---|---|
+| "Did it hurt satisfaction or resolution" | `ask_the_analyst` | `question`; resolves to the declared metrics |
+| Before/after by category | `query_metric` | two calls, one per `time_window`, with a `where` filter on `interaction__category_code` |
+| Why resolution moved | `explain_change` | `metric: first_contact_resolution_rate`, `change_point: 2026-06-15` |
+| Low-score surveys | `query_csat` | `max_score: 2`, `start_date` / `end_date` covering the period |
+| "Members frustrated about verification texts" | `search_transcripts` | `query` |
+| Picking the worst call | `get_call_summary` | `call_id`, across a few hits |
+| Reading it in full | `get_transcript` | `call_id` |
+
+Coaching follow-up: "Of those calls, what did the ones resolved on first contact do differently from the ones that weren't?" This should call `explain_change` with `mode: coaching` and two `groups` (each a `label` and `call_ids`) taken from the previous answer.
+
 ## Streamable HTTP
 
 ```bash
