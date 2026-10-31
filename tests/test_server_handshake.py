@@ -80,3 +80,20 @@ async def test_bad_arguments_are_a_tool_error_not_a_protocol_error():
 
     assert result.is_error
     assert "call_id" in result.content[0].text
+
+
+@pytest.mark.asyncio
+async def test_every_tool_is_marked_read_only():
+    """Hosted assistants skip a confirmation per call only when `readOnlyHint` is true."""
+    async with (
+        stdio_client(_server_params()) as (read, write),
+        ClientSession(read, write) as session,
+    ):
+        await session.initialize()
+        listed = (await session.list_tools()).tools
+
+    assert {t.name for t in listed} == EXPECTED_TOOLS
+    for tool in listed:
+        assert tool.annotations is not None, tool.name
+        assert tool.annotations.read_only_hint is True, tool.name
+        assert tool.annotations.destructive_hint is False, tool.name

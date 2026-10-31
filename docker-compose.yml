@@ -8,6 +8,8 @@
 #                                    mcp-server is the opt-in HTTP MCP endpoint (M1); it needs
 #                                    MCP_AUTH_TOKEN in .env, and only `docker compose --profile app
 #                                    up -d mcp-server` (or the whole profile) starts it.
+#   tunnel        cloudflared        opt-in Cloudflare Tunnel to mcp-server (needs the `app`
+#                                    profile too and CLOUDFLARE_TUNNEL_TOKEN in .env).
 #   gpu           vllm               needs an NVIDIA GPU and the container toolkit.
 #
 # Profiles combine: `docker compose --profile app --profile gpu up -d`.
@@ -194,6 +196,8 @@ services:
       MCP_SERVER_HOST: 0.0.0.0
       MCP_SERVER_PORT: "8000"
       MCP_AUTH_TOKEN: ${MCP_AUTH_TOKEN:-}
+      CF_ACCESS_TEAM_DOMAIN: ${CF_ACCESS_TEAM_DOMAIN:-}
+      CF_ACCESS_AUD: ${CF_ACCESS_AUD:-}
     ports:
       - "${MCP_PUBLISH_HOST:-127.0.0.1}:${MCP_SERVER_PORT:-8000}:8000"
     volumes:
@@ -214,6 +218,22 @@ services:
         condition: service_healthy
       dbt:
         condition: service_completed_successfully
+
+  # Off by default (own `tunnel` profile). Publishes mcp-server through a Cloudflare Tunnel; the
+  # public hostname and its Access application are configured on the Cloudflare side, with the
+  # ingress pointing at http://mcp-server:8000. Needs CLOUDFLARE_TUNNEL_TOKEN in .env, and
+  # CF_ACCESS_TEAM_DOMAIN + CF_ACCESS_AUD so the server enforces Access itself. Start with
+  # `docker compose --profile app --profile tunnel up -d mcp-server cloudflared`.
+  cloudflared:
+    image: cloudflare/cloudflared:2025.11.1
+    command: ["tunnel", "--no-autoupdate", "run"]
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}
+    profiles: [tunnel]
+    restart: unless-stopped
+    depends_on:
+      mcp-server:
+        condition: service_healthy
 
   # One-shot: the five scripted questions (`make demo`). Runs the graph in-process on the
   # Postgres checkpointer; it waits for the dev server so the stack is up when it prints.

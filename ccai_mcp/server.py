@@ -33,14 +33,19 @@ from mcp.types import (
     PaginatedRequestParams,
     TextContent,
     Tool,
+    ToolAnnotations,
 )
 
 from ccai_mcp.change import SUPPORTED_METRICS, explain_change_blocks
 from ccai_mcp.metrics import ask_the_analyst, query_metric
 from ccai_mcp.tools import get_call_summary, query_csat, search_transcripts
 
+# Every tool only reads: hosted assistants use this hint to skip a confirmation per call.
+READ_ONLY = ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False)
+
 TOOLS = [
     Tool(
+        annotations=READ_ONLY,
         name="search_transcripts",
         description=(
             "Search call transcripts using natural language. "
@@ -65,6 +70,7 @@ TOOLS = [
         }
     ),
     Tool(
+        annotations=READ_ONLY,
         name="get_call_summary",
         description="Get a summary of a specific call by its ID.",
         inputSchema={
@@ -79,6 +85,7 @@ TOOLS = [
         }
     ),
     Tool(
+        annotations=READ_ONLY,
         name="query_csat",
         description=(
             "Query CSAT survey results from Postgres. Filter by score range, call category "
@@ -116,6 +123,7 @@ TOOLS = [
         }
     ),
     Tool(
+        annotations=READ_ONLY,
         name="query_metric",
         description=(
             "Query one or more DECLARED metrics from the MetricFlow semantic layer "
@@ -178,6 +186,7 @@ TOOLS = [
         }
     ),
     Tool(
+        annotations=READ_ONLY,
         name="ask_the_analyst",
         description=(
             "Answer a natural-language analytics question by resolving it to one or "
@@ -203,6 +212,7 @@ TOOLS = [
         }
     ),
     Tool(
+        annotations=READ_ONLY,
         name="explain_change",
         description=(
             "Explain why a governed metric moved around a change. Compares the metric "

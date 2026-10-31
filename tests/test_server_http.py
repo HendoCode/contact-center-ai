@@ -417,3 +417,130 @@ async def test_entrypoint_serves_http_when_asked(how):
             proc.kill()
             _, err = proc.communicate()
     assert TOKEN not in err, "the bearer token must never be logged"
+
+
+# ── Cloudflare Access (offline, locally generated keys) ──────────────────────
+
+CF_TEAM = "example-team.cloudflareaccess.com"
+CF_AUD = "a" * 64
+
+
+@pytest.fixture(scope="module")
+def cf_keys():
+    from cryptography.hazmat.primitives.asymmetric import rsa
+
+    return rsa.generate_private_key(public_exponent=65537, key_size=2048), rsa.generate_private_key(
+        public_exponent=65537, key_size=2048
+    )
+
+
+def _cf_token(key, *, aud=CF_AUD, iss=f"https://{CF_TEAM}", exp_in=300):
+    import time
+
+    import jwt
+
+    now = int(time.time())
+    return jwt.encode({"aud": [aud], "iss": iss, "iat": now, "exp": now + exp_in, "sub": "u"}, key, algorithm="RS256")
+
+
+def _cf_app(cf_keys, reached):
+    from ccai_mcp.http_transport import CloudflareAccessMiddleware
+
+    async def inner(scope, receive, send):
+        reached.append(scope["path"])
+        await send({"type": "http.response.start", "status": 200, "headers": []})
+
+    public = cf_keys[0].public_key()
+    return CloudflareAccessMiddleware(inner, CF_TEAM, CF_AUD, key_resolver=lambda _t: public)
+
+
+def _cf_headers(token):
+    return [(b"cf-access-jwt-assertion", token.encode())] if token is not None else []
+
+
+@pytest.mark.asyncio
+async def test_cf_access_accepts_a_valid_token(cf_keys):
+    reached: list[str] = []
+    assert await _call(_cf_app(cf_keys, reached), _cf_headers(_cf_token(cf_keys[0]))) == 200
+    assert reached == ["/mcp"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "case",
+    ["missing", "empty", "garbage", "wrong_audience", "expired", "wrong_issuer", "wrong_key", "bearer_only"],
+)
+async def test_cf_access_rejects_everything_else_before_the_app(cf_keys, case):
+    good, other = cf_keys
+    token = {
+        "missing": None,
+        "empty": "",
+        "garbage": "not-a-jwt",
+        "wrong_audience": _cf_token(good, aud="b" * 64),
+        "expired": _cf_token(good, exp_in=-60),
+        "wrong_issuer": _cf_token(good, iss="https://other.cloudflareaccess.com"),
+        "wrong_key": _cf_token(other),
+        "bearer_only": None,
+    }[case]
+    headers = _cf_headers(token)
+    if case == "bearer_only":
+        headers = [(b"authorization", f"Bearer {TOKEN}".encode())]
+    reached: list[str] = []
+    assert await _call(_cf_app(cf_keys, reached), headers) == 403
+    assert reached == []
+
+
+@pytest.mark.asyncio
+async def test_cf_access_fails_closed_when_the_key_set_is_unreachable(cf_keys):
+    from ccai_mcp.http_transport import CloudflareAccessMiddleware
+
+    def down(_token):
+        raise OSError("certs endpoint unreachable")
+
+    async def inner(scope, receive, send):
+        raise AssertionError("must not be reached")
+
+    app = CloudflareAccessMiddleware(inner, CF_TEAM, CF_AUD, key_resolver=down)
+    assert await _call(app, _cf_headers(_cf_token(cf_keys[0]))) == 403
+
+
+def test_cf_access_settings_need_both_values_and_unlock_a_tokenless_remote_bind():
+    with pytest.raises(ConfigError, match="together"):
+        HttpSettings.from_env({"CF_ACCESS_TEAM_DOMAIN": CF_TEAM})
+    with pytest.raises(ConfigError, match="together"):
+        HttpSettings.from_env({"CF_ACCESS_AUD": CF_AUD})
+    s = HttpSettings.from_env(
+        {"MCP_SERVER_HOST": "0.0.0.0", "CF_ACCESS_TEAM_DOMAIN": f"https://{CF_TEAM}/", "CF_ACCESS_AUD": CF_AUD}
+    )
+    assert (s.cf_team_domain, s.auth_mode) == (CF_TEAM, "Cloudflare Access")
+
+
+def test_without_cf_settings_behaviour_is_unchanged():
+    s = HttpSettings.from_env({"MCP_SERVER_HOST": "0.0.0.0", "MCP_AUTH_TOKEN": TOKEN})
+    assert not s.cf_access and s.auth_mode == "bearer token"
+    with pytest.raises(ConfigError, match="MCP_AUTH_TOKEN"):
+        HttpSettings.from_env({"MCP_SERVER_HOST": "0.0.0.0"})
+
+
+@pytest.mark.asyncio
+async def test_cf_access_app_keeps_healthz_open_and_guards_mcp(cf_keys):
+    settings = HttpSettings.from_env(
+        {"MCP_SERVER_HOST": "0.0.0.0", "CF_ACCESS_TEAM_DOMAIN": CF_TEAM, "CF_ACCESS_AUD": CF_AUD}
+    )
+    public = cf_keys[0].public_key()
+    app = build_app(ccai_server.app, settings, cf_key_resolver=lambda _t: public)
+
+    async def status(path, headers):
+        sent: list[dict] = []
+
+        async def receive():
+            return {"type": "http.request", "body": b"", "more_body": False}
+
+        async def send(message):
+            sent.append(message)
+
+        await app({"type": "http", "method": "GET", "path": path, "headers": headers}, receive, send)
+        return sent[0]["status"]
+
+    assert await status("/healthz", []) == 200
+    assert await status("/mcp", []) == 403
