@@ -23,6 +23,7 @@ SCHEMA_SNAPSHOT = Path(__file__).parent / "fixtures" / "mcp_tool_schemas.json"
 EXPECTED_TOOLS = {
     "search_transcripts",
     "get_call_summary",
+    "get_transcript",
     "query_csat",
     "query_metric",
     "ask_the_analyst",

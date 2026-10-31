@@ -49,7 +49,7 @@ The latest analysis is kept on the thread as `prior_change` (the output `change`
 
 ## Tools
 
-`agent/tools.py` starts `python -m ccai_mcp.server` over stdio and calls the six tools through `langchain.mcp` (`MCPAdapter`, on fastmcp 4 and mcp 2.x). No tool logic lives here.
+`agent/tools.py` starts `python -m ccai_mcp.server` over stdio and calls the seven tools through `langchain.mcp` (`MCPAdapter`, on fastmcp 4 and mcp 2.x). No tool logic lives here.
 
 ## Tracing
 

@@ -4,6 +4,7 @@ MCP tool definitions — these are the capabilities exposed to any MCP client.
 Tools:
     search_transcripts   — semantic search over call transcripts
     get_call_summary     — summarize a specific call by ID
+    get_transcript       — one call's verbatim dialogue, with its date and length
     query_csat           — query CSAT data with optional score, category and date filters
 """
 
@@ -16,6 +17,7 @@ from psycopg2 import errors as pg_errors
 
 from rag.embeddings import CONNECTION_STRING
 from rag.pipeline import rag_query, get_llm
+from ccai_mcp.masking import mask_accounts
 from retrieval import get_retriever
 
 
@@ -73,6 +75,41 @@ TRANSCRIPT:
 
     response = get_llm().invoke(prompt)
     return response.content
+
+
+def get_transcript(call_id: str) -> str:
+    """
+    Return one call's verbatim dialogue with a short header. No LLM is called.
+
+    Args:
+        call_id: The call identifier (e.g. CALL-00042)
+
+    Returns:
+        Header (call id, date, length, category, outcome, agent, member) and the
+        transcript text with account numbers masked, or a not-found message
+    """
+    hit = get_retriever().get_by_id(call_id)
+
+    if hit is None:
+        return f"No transcript found for call ID: {call_id}"
+
+    meta = hit.metadata
+    seconds = meta.get("duration_seconds")
+    if isinstance(seconds, (int, float)):
+        minutes, secs = divmod(int(seconds), 60)
+        length = f"{minutes}:{secs:02d}"
+    else:
+        length = "unknown"
+    header = "\n".join([
+        f"Call ID: {meta.get('call_id', call_id)}",
+        f"Date: {meta.get('date')}",
+        f"Duration: {length} (minutes:seconds)",
+        f"Category: {meta.get('category')}",
+        f"Outcome: {meta.get('outcome')}",
+        f"Agent: {meta.get('agent_id')}",
+        f"Member: {meta.get('member_id')}",
+    ])
+    return mask_accounts(f"{header}\n\nTRANSCRIPT:\n{hit.text}")
 
 
 def query_csat(

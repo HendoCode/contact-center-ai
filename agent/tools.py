@@ -1,6 +1,6 @@
 """Tools for the graph, served by the repo's MCP server over stdio.
 
-The graph calls the same six tools Claude Desktop sees, through
+The graph calls the same seven tools Claude Desktop sees, through
 `langchain.mcp` (the `langchain[mcp]` extra, on fastmcp 4 and mcp 2.x), so no tool
 logic lives in `agent/`. Nodes depend on the small `Toolbox` protocol; tests pass a
 stub, runtime uses `MCPToolbox`. Only this module imports the MCP client.

@@ -138,6 +138,21 @@
       "type": "object"
     }
   },
+  "get_transcript": {
+    "description": "Get the verbatim dialogue of one call by its ID, with a header of its date, length (minutes:seconds), category, outcome, agent and member. Use this when the user wants to read or see the transcript itself; get_call_summary returns only a short written summary. Account numbers are masked.",
+    "inputSchema": {
+      "properties": {
+        "call_id": {
+          "description": "The call ID (e.g. CALL-00042)",
+          "type": "string"
+        }
+      },
+      "required": [
+        "call_id"
+      ],
+      "type": "object"
+    }
+  },
   "query_csat": {
     "description": "Query CSAT survey results from Postgres. Filter by score range, call category or survey date window (start_date inclusive, end_date exclusive). Use this to understand member satisfaction trends.",
     "inputSchema": {
