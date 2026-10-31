@@ -85,13 +85,34 @@ def get_llm(provider: str | None = None):
         )
 
     from langchain_openai import ChatOpenAI
+    kwargs = {}
+    effort = reasoning_effort()
+    if effort:
+        # OpenRouter's request field; reasoning tokens count against max_tokens, so a
+        # reasoning model left at its default can spend the whole cap before it answers.
+        kwargs["extra_body"] = {"reasoning": {"effort": effort}}
     return ChatOpenAI(
         model=os.getenv("LLM_MODEL", "z-ai/glm-5.3-flash"),
         api_key=os.getenv("OPENAI_API_KEY"),
         base_url=os.getenv("LLM_BASE_URL", "https://openrouter.ai/api/v1"),
         # A hosted model can write far past what a supervisor reads; cap the output.
         max_tokens=int(os.getenv("LLM_MAX_TOKENS", "2048")),
+        **kwargs,
     )
+
+
+def reasoning_effort() -> str | None:
+    """LLM_REASONING_EFFORT for the OpenAI-compatible branch: default "low"; "none" or empty
+    leaves the request unchanged."""
+    value = os.getenv("LLM_REASONING_EFFORT", "low").strip().lower()
+    return None if value in ("", "none") else value
+
+
+def with_output_cap(llm, max_tokens: int):
+    """Copy of a hosted chat model with a different output cap; any other model is returned as is."""
+    if getattr(llm, "max_tokens", None) is None or not hasattr(llm, "model_copy"):
+        return llm
+    return llm.model_copy(update={"max_tokens": max_tokens})
 
 
 # ── Ingest ────────────────────────────────────────────────────────────────────
