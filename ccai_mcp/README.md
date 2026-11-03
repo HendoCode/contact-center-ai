@@ -41,6 +41,7 @@ The tools the assistant is expected to call:
 | Why resolution moved | `explain_change` | `metric: first_contact_resolution_rate`, `change_point: 2026-06-15` |
 | Low-score surveys | `query_csat` | `max_score: 2`, `start_date` / `end_date` covering the period |
 | "Members frustrated about verification texts" | `search_transcripts` | `query` |
+| "What do members who scored us 1-2 say about fees?" | `search_transcripts` | `query`, `max_csat: 2` (also `min_csat`; needs `RETRIEVER_BACKEND=lancedb`, otherwise the call returns a tool error) |
 | Picking the worst call | `get_call_summary` | `call_id`, across a few hits |
 | Reading it in full | `get_transcript` | `call_id` |
 

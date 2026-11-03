@@ -265,23 +265,35 @@
     }
   },
   "search_transcripts": {
-    "description": "Search call transcripts using natural language. Use this to find calls about specific topics, issues, or patterns. Examples: 'calls where members complained about fees', 'fraud disputes where the member was frustrated', 'calls that were escalated'.",
+    "description": "Search call transcripts using natural language. Use this to find calls about specific topics, issues, or patterns. Examples: 'calls where members complained about fees', 'fraud disputes where the member was frustrated', 'calls that were escalated'. min_csat and max_csat restrict the search to calls whose survey score is in that range (e.g. max_csat=2: what do members who scored us 1-2 say about fees?); they need the LanceDB retriever and leave out calls with no survey.",
     "inputSchema": {
+      "type": "object",
       "properties": {
-        "k": {
-          "default": 5,
-          "description": "Number of transcripts to retrieve (default: 5)",
-          "type": "integer"
-        },
         "query": {
-          "description": "Natural language search query",
-          "type": "string"
+          "type": "string",
+          "description": "Natural language search query"
+        },
+        "k": {
+          "type": "integer",
+          "description": "Number of transcripts to retrieve (default: 5)",
+          "default": 5
+        },
+        "min_csat": {
+          "type": "integer",
+          "description": "Only search calls whose CSAT survey score is at least this (1-5). Needs the LanceDB retriever; calls with no survey are left out",
+          "minimum": 1,
+          "maximum": 5
+        },
+        "max_csat": {
+          "type": "integer",
+          "description": "Only search calls whose CSAT survey score is at most this (1-5), e.g. 2 for unhappy members. Needs the LanceDB retriever",
+          "minimum": 1,
+          "maximum": 5
         }
       },
       "required": [
         "query"
-      ],
-      "type": "object"
+      ]
     }
   }
 }

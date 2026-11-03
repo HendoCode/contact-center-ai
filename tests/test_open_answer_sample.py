@@ -46,7 +46,7 @@ def test_no_hits():
 
 
 class FakeRetriever:
-    def search(self, query, k, mode):
+    def search(self, query, k, mode, where=None):
         return [hit(f"CALL-0000{i}", "fraud_dispute") for i in range(k)]
 
     def count(self, where=None):

@@ -168,6 +168,39 @@ the cost of object storage over local disk, not a recall tradeoff.
 - **A real ADLS account:** Entra via `az` against a hierarchical-namespace (ADLS Gen2) account, the RBAC role in practice, real `az://` latency.
 - **`DefaultAzureCredential`:** `object_store` has its own credential chain (CLI, managed identity, workload identity, client secret), not the Azure SDK's.
 
+## CSAT-aware search (LanceDB only)
+
+The survey score lives in Postgres `csat_survey`. After every `--ingest` on the LanceDB backend,
+`rag.pipeline` reads it and calls `LanceDBRetriever.set_csat()`, which adds `csat_score` (int32)
+and `surveyed_at` (string, ISO date) with Lance schema evolution and fills them with a
+partial-column `merge_insert`. The `vector`, `text` and `metadata` columns are not rewritten and
+nothing is re-embedded. Calls with no survey keep NULL (1,147 of the 1,540 synthetic calls have
+one). A Bitmap scalar index covers `csat_score`.
+
+```bash
+RETRIEVER_BACKEND=lancedb python -m rag.pipeline --ingest      # ends with the CSAT step
+RETRIEVER_BACKEND=lancedb python -m rag.pipeline --query "fees"  # unfiltered, as before
+```
+
+`search_transcripts(query, min_csat=None, max_csat=None)` turns the bounds into
+`where={"csat_score": {"gte": ..., "lte": ...}}`, applied as a prefilter in `vector`, `fts` and
+`hybrid` mode alike, so a selective range still returns k hits. The answer's opening sentence
+counts the filtered calls ("2 of 21 calls in fee_dispute with a CSAT score of 1 to 2").
+
+- **Re-ingest:** on lancedb 0.39 a re-ingest with the narrower schema (no CSAT columns) leaves the
+  filled columns in place, but rows it inserts have NULL scores. The CSAT step runs after every
+  ingest, so they are filled in the same command; `--reset` then `--ingest` rebuilds them too.
+  `tests/retrieval/test_lancedb_csat.py` covers all three.
+- **Freshness:** scores are as of the last ingest. A survey added later is not searchable until the
+  next `--ingest` (or a call to `set_csat`).
+- **pgvector:** keeps no score, so `where` with `csat_score` raises a `ValueError` naming
+  `RETRIEVER_BACKEND=lancedb`, the way the `fts` and `hybrid` modes are refused. The DuckDB reader
+  below refuses it too.
+- **Versions:** the CSAT step runs before the `seed-<git sha>` tag, so a tag names a table with
+  scores. Rolling back to a version from before the first CSAT step drops the columns again; a
+  `csat_score` filter then says to re-run the ingest. A snapshot reader (`as_of`) cannot call
+  `set_csat`.
+
 ## DuckDB over the Lance dataset (R3 stretch)
 
 `duckdb_lance.py` opens the dataset `LanceDBRetriever` writes (`<LANCE_URI>/<table>.lance`)

@@ -207,6 +207,30 @@ def transcripts_to_documents(transcripts: list[dict], data_dir: Path = SYNTHETIC
     return docs
 
 
+def load_csat_surveys(docs: list[Document], connect=None) -> dict[str, tuple[int, str | None]]:
+    """call_id -> (score, surveyed_at ISO date) from the Postgres `csat_survey` table.
+
+    Calls are matched through the `interaction_id` the documents carry (falling back to the
+    number in the call id, as `olap/seed.py` does); a call with no survey has no entry.
+    """
+    import psycopg2
+
+    from rag.embeddings import CONNECTION_STRING
+
+    by_interaction = {}
+    for d in docs:
+        call_id = d.metadata["call_id"]
+        by_interaction[d.metadata.get("interaction_id") or int(call_id.rsplit("-", 1)[1])] = call_id
+    with (connect or (lambda: psycopg2.connect(CONNECTION_STRING)))() as conn, conn.cursor() as cur:
+        cur.execute("SELECT interaction_id, score, surveyed_at FROM csat_survey")
+        rows = cur.fetchall()
+    return {
+        by_interaction[iid]: (int(score), day.isoformat() if day else None)
+        for iid, score, day in rows
+        if iid in by_interaction
+    }
+
+
 def ingest(source: str = "synthetic", use_cache: bool = True):
     """
     Ingest call transcripts into the vector store.
@@ -246,6 +270,11 @@ def ingest(source: str = "synthetic", use_cache: bool = True):
     )
 
     print(f"Ingestion complete. {written} documents upserted ({retriever.count()} total, {retriever.name}).")
+    if hasattr(retriever, "set_csat"):
+        # Runs after every ingest, before the tag: a rebuilt table or newly inserted rows get their
+        # scores here, and the seed tag names a table that has them.
+        scored = retriever.set_csat(load_csat_surveys(docs))
+        print(f"CSAT scores attached to {scored} documents (from csat_survey).")
     if hasattr(retriever, "tag_seed"):  # versioned stores (LanceDB) name this snapshot
         print(f"Tagged the store {retriever.tag_seed()} (roll back with `make lance-rollback TAG=...`).")
 
@@ -259,9 +288,31 @@ def retrieve(query: str, k: int = 5, where: dict | None = None, mode: str = "vec
 
 # ── RAG query ─────────────────────────────────────────────────────────────────
 
-def sample_statement(hits: list[Hit], count) -> str:
+def csat_scope(where: dict | None) -> str:
+    """The survey filter in words ("with a CSAT score of 1 to 2"), or "" when there is none."""
+    cond = (where or {}).get("csat_score")
+    if cond is None:
+        return ""
+    if not isinstance(cond, dict):
+        return f"with a CSAT score of {cond}"
+    lo, hi = cond.get("gte"), cond.get("lte")
+    if lo is not None and hi is not None:
+        return f"with a CSAT score of {lo} to {hi}" if lo != hi else f"with a CSAT score of {lo}"
+    if lo is not None:
+        return f"with a CSAT score of {lo} or higher"
+    if hi is not None:
+        return f"with a CSAT score of {hi} or lower"
+    return "within the given CSAT filter"
+
+
+def sample_statement(hits: list[Hit], count, where: dict | None = None) -> str:
     """What the answer rests on: N retrieved calls out of M in their category, from
-    `count(where)` over the same store, e.g. "Based on 5 of 143 calls in fraud_dispute"."""
+    `count(where)` over the same store, e.g. "Based on 5 of 143 calls in fraud_dispute".
+
+    With a CSAT filter in `where`, M counts only the surveyed calls that pass it, and the
+    statement says so ("... in fee_dispute with a CSAT score of 1 to 2")."""
+    scope = csat_scope(where)
+    csat_filter = {"csat_score": where["csat_score"]} if scope else {}
     n = len(hits)
     if not n:
         return "No matching calls were retrieved."
@@ -272,33 +323,41 @@ def sample_statement(hits: list[Hit], count) -> str:
     parts = []
     for cat, got in sorted(by_cat.items(), key=lambda kv: (-kv[1], str(kv[0]))):
         try:
-            total = count({"category": cat}) if cat is not None else None
+            total = count({"category": cat, **csat_filter}) if cat is not None else None
         except Exception:  # noqa: BLE001 - a size we cannot count is said so, never guessed
             total = None
-        where = f"calls in {cat}" if cat is not None else "calls with no category"
-        parts.append(f"{got} of {total} {where}" if total is not None else f"{got} {where} (category size unavailable)")
+        label = f"calls in {cat}" if cat is not None else "calls with no category"
+        label = f"{label} {scope}" if scope else label
+        parts.append(f"{got} of {total} {label}" if total is not None else f"{got} {label} (category size unavailable)")
     return f"Based on a sample of {n} retrieved call{'s' if n != 1 else ''}: " + "; ".join(parts) + "."
 
 
-def rag_query(query: str, k: int = 5, mode: str = "vector") -> str:
+def rag_query(query: str, k: int = 5, mode: str = "vector", where: dict | None = None) -> str:
     """
     Run a full RAG query: retrieve relevant transcripts, then generate a response.
 
     The response opens with the sample statement (how many calls it read, out of how many
     in each category), so a few retrieved calls are never presented as a whole category.
 
+    `where` is the portable filter of `retrieval.base` (for example `{"csat_score": {"lte": 2}}`,
+    LanceDB only); it is applied before the top-k is taken.
+
     This is the core function exposed by the MCP tools.
     """
     retriever = get_retriever()
-    hits = retriever.search(query, k=k, mode=mode)
-    sample = sample_statement(hits, retriever.count)
+    hits = retriever.search(query, k=k, where=where, mode=mode)
+    sample = sample_statement(hits, retriever.count, where)
+    scope = csat_scope(where)
+    if scope:
+        sample += f" Only calls {scope} were searched."
 
     context = "\n\n---\n\n".join(
         f"Call ID: {hit.call_id}\n"
         f"Date: {hit.metadata['date']}\n"
         f"Category: {hit.metadata['category']}\n"
-        f"Outcome: {hit.metadata['outcome']}\n\n"
-        f"{hit.text}"
+        f"Outcome: {hit.metadata['outcome']}\n"
+        + (f"CSAT score: {hit.metadata['csat_score']}\n" if hit.metadata.get("csat_score") else "")
+        + f"\n{hit.text}"
         for hit in hits
     )
 
