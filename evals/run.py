@@ -38,6 +38,7 @@ from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.types import Command
 
 from evals.datasets import build_golden
+from retrieval.base import backend_name
 from evals.datasets import build_change
 from evals.datasets.build_change import CHANGE_GOLDEN_PATH, CHANGE_HOLDOUT_PATH
 from evals.datasets.build_golden import DATA_DIR, GOLDEN_PATH, HOLDOUT_PATH, KINDS, REPO_ROOT
@@ -443,7 +444,7 @@ async def run_live(limit: int | None, max_concurrency: int, run_name: str | None
         "llm_provider": provider, "agent_model": agent_model,
         "judge_provider": os.getenv("EVAL_JUDGE_PROVIDER", "anthropic"),
         "judge_model": judge_model, "judge_prompt": JUDGE_PROMPT_VERSION,
-        "retriever_backend": os.getenv("RETRIEVER_BACKEND", "pgvector"),
+        "retriever_backend": backend_name(),
         "retrieval_mode": os.getenv("AGENT_RETRIEVAL_MODE", "vector") or "vector",
         "retrieval_k": int(os.getenv("AGENT_RETRIEVAL_K") or 5),
         "embedding_provider": os.getenv("EMBEDDING_PROVIDER", provider),

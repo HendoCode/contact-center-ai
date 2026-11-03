@@ -49,3 +49,11 @@ def test_the_volume_is_declared():
 def test_image_installs_the_lance_group():
     syncs = [line for line in (ROOT / "Dockerfile").read_text().splitlines() if "uv sync" in line]
     assert len(syncs) == 2 and all("--group lance" in line for line in syncs)
+
+
+def test_env_example_and_azure_default_to_lancedb():
+    root = Path(__file__).resolve().parent.parent
+    assert "\nRETRIEVER_BACKEND=lancedb" in (root / ".env.example").read_text()
+    dev = (root / "infra/azure/envs/dev/main.tf").read_text()
+    assert 'RETRIEVER_BACKEND          = "lancedb"' in dev and "module.data.lance_uri" in dev
+    assert "--group lance" in (root / "tools/dev-data.sh").read_text()

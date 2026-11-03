@@ -7,7 +7,7 @@
 # 1 generate  synthetic JSON (data/synthetic/generate_data.py, seed 42)
 # 2 schema    OLTP tables in Postgres (olap/oltp/apply.sh)
 # 3 load      the JSON into those tables (olap/seed.py)
-# 4 ingest    transcripts into the vector store (rag.pipeline --ingest; reuses the
+# 4 ingest    transcripts into the LanceDB store (rag.pipeline --ingest; reuses the
 #             .cache/embeddings/ cache, so a rerun embeds only new text)
 # 5 dbt       the marts and the semantic manifest for the dev target (dbt build --target dev)
 #
@@ -42,7 +42,7 @@ step 2 schema "start Postgres ('make up' or 'docker compose up -d db'), then rer
 step 3 load "rerun 'uv run python olap/seed.py' after the schema step succeeds" \
   "$UV" run python olap/seed.py
 step 4 ingest "check the embedding provider (Ollama up for EMBEDDING_PROVIDER=ollama), then 'make ingest'" \
-  "$UV" run python -m rag.pipeline --ingest
+  "$UV" run --group lance python -m rag.pipeline --ingest
 step 5 dbt "rerun 'make dbt-build-dev' and read the failing model in its output" \
   "$UV" run --group dbt dbt build --project-dir olap/dbt --profiles-dir olap/dbt --target dev
 echo "dev-data: done: raw tables, vector store, marts and the dev semantic manifest are built"
