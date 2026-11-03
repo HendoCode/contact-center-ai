@@ -311,6 +311,7 @@ def _free_port() -> int:
 
 def _run_module(env_extra: dict[str, str], *args: str) -> subprocess.Popen:
     env = {k: v for k, v in os.environ.items() if not k.startswith(("MCP_", "CONTAINER_APP"))}
+    env["MCP_STORE_CHECK"] = "off"  # these runs have no transcript store; the check is tested elsewhere
     env.update(env_extra)
     return subprocess.Popen(
         [sys.executable, "-m", "ccai_mcp.server", *args],

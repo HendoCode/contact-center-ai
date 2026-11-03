@@ -56,7 +56,7 @@ python -m ccai_mcp.http_smoke                     # lists the tools (reads MCP_S
 python -m ccai_mcp.http_smoke --call get_call_summary '{"call_id": "CALL-00042"}'
 ```
 
-**URL shape:** `http://<host>:<port>/mcp` (`https://` behind TLS). `GET /healthz` returns `200 ok` without auth, for container probes. The server is stateless and answers with plain JSON, so a restart or a scale-to-zero never leaves a client holding a dead session.
+**URL shape:** `http://<host>:<port>/mcp` (`https://` behind TLS). `GET /healthz` returns `200 ok` without auth, for container probes. It returns `503 unhealthy` instead while the configured transcript store (`RETRIEVER_BACKEND`) is empty or unreadable, with the reason in the server log only (`MCP_STORE_CHECK=off` skips the check); an empty store otherwise makes every lookup answer "No transcript found". The server is stateless and answers with plain JSON, so a restart or a scale-to-zero never leaves a client holding a dead session.
 
 ### Safe by default
 

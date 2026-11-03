@@ -2,7 +2,9 @@
 Streamable HTTP transport for the MCP server (M1), beside the stdio default.
 
 Opt in with `MCP_TRANSPORT=http` or `python -m ccai_mcp.server --http`. The endpoint is
-`http://<host>:<port>/mcp`; `GET /healthz` answers 200 without auth for container probes.
+`http://<host>:<port>/mcp`; `GET /healthz` answers 200 without auth for container probes. When the app is built with a
+store check (the server does), it answers 503 instead while the configured transcript store is
+empty or unreadable, so a healthy-looking container cannot be serving "No transcript found".
 
 Safe by default, because this puts database-backed tools on a network:
   * binds 127.0.0.1 unless `MCP_SERVER_HOST` says otherwise;
@@ -272,27 +274,49 @@ async def _forbidden(send: Send) -> None:
     await send({"type": "http.response.body", "body": body})
 
 
-class HealthMiddleware:
-    """`GET /healthz` -> 200, for Compose and Container Apps probes. Reveals nothing."""
+StoreCheck = Callable[[], "str | None"]  # None when the store is usable, else a reason
 
-    def __init__(self, app: ASGIApp):
+
+class HealthMiddleware:
+    """`GET /healthz` -> 200, for Compose and Container Apps probes.
+
+    With a `store_check`, a reason it returns (or an exception it raises) turns the answer into
+    503. The reason goes to the log only; the unauthenticated response reveals nothing.
+    """
+
+    def __init__(self, app: ASGIApp, store_check: StoreCheck | None = None):
         self.app = app
+        self._store_check = store_check
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] == "http" and scope["path"] == HEALTH_PATH and scope["method"] in ("GET", "HEAD"):
+            status, body = 200, b"ok"
+            if self._store_check is not None:
+                try:
+                    problem = await asyncio.to_thread(self._store_check)
+                except Exception as exc:
+                    problem = f"store check failed ({type(exc).__name__})"
+                if problem:
+                    logger.warning("unhealthy: %s", problem)
+                    status, body = 503, b"unhealthy"
             await send(
                 {
                     "type": "http.response.start",
-                    "status": 200,
-                    "headers": [(b"content-type", b"text/plain"), (b"content-length", b"2")],
+                    "status": status,
+                    "headers": [(b"content-type", b"text/plain"), (b"content-length", str(len(body)).encode())],
                 }
             )
-            await send({"type": "http.response.body", "body": b"ok"})
+            await send({"type": "http.response.body", "body": body})
             return
         await self.app(scope, receive, send)
 
 
-def build_app(server: Server, settings: HttpSettings, cf_key_resolver: KeyResolver | None = None) -> ASGIApp:
+def build_app(
+    server: Server,
+    settings: HttpSettings,
+    cf_key_resolver: KeyResolver | None = None,
+    store_check: StoreCheck | None = None,
+) -> ASGIApp:
     """The streamable-HTTP ASGI app for `server`, wrapped in health and auth middleware.
 
     Stateless with plain JSON replies: the tools never push to the client, and no session
@@ -319,13 +343,18 @@ def build_app(server: Server, settings: HttpSettings, cf_key_resolver: KeyResolv
         )
     else:
         guarded = BearerAuthMiddleware(mcp_app, settings.token)
-    return HealthMiddleware(guarded)
+    return HealthMiddleware(guarded, store_check)
 
 
 async def serve_http(server: Server, settings: HttpSettings) -> None:
     import uvicorn
 
-    app = build_app(server, settings)
+    from ccai_mcp.store_check import store_problem
+
+    app = build_app(server, settings, store_check=store_problem)
+    problem = store_problem()
+    if problem:
+        logger.warning("transcript store not ready, /healthz answers 503 until it is: %s", problem)
     if settings.auth_mode == "upstream proxy":
         logger.info(
             "tokenless non-loopback bind allowed: MCP_AUTH_UPSTREAM=true and Azure Container Apps "

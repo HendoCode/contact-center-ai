@@ -5,7 +5,8 @@
 # as a stdio subprocess; the `mcp-server` service runs `python -m ccai_mcp.server --http`.
 #
 # Dependencies come from uv.lock: the base install, the dev extra (pytest) and the
-# agent, dbt and notebooks (JupyterLab) groups. The lance and finetune groups stay out.
+# agent, dbt, notebooks (JupyterLab) and lance (LanceDB, the Compose transcript store) groups.
+# The finetune group stays out.
 FROM python:3.12-slim
 
 # psql is for olap/oltp/apply.sh, which falls back to `psql $DATABASE_URL` when there is
@@ -27,7 +28,7 @@ ENV UV_PYTHON_DOWNLOADS=never \
 
 # Dependencies first so editing source does not re-resolve the environment.
 COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen --no-install-project --extra dev --group agent --group dbt --group notebooks
+RUN uv sync --frozen --no-install-project --extra dev --group agent --group dbt --group notebooks --group lance
 
 COPY . .
-RUN uv sync --frozen --extra dev --group agent --group dbt --group notebooks
+RUN uv sync --frozen --extra dev --group agent --group dbt --group notebooks --group lance

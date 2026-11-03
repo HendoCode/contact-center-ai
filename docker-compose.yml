@@ -18,6 +18,10 @@
 # (a finished job must stay finished). Ordering uses `depends_on: condition`, so a
 # dependent starts only once its dependency is healthy or has exited 0.
 #
+# Transcript store: the app services read LanceDB (RETRIEVER_BACKEND/LANCE_URI are hard-coded
+# below, not taken from .env) from the `lance-data` volume that `seed` fills. `seed` also keeps
+# pgvector filled; to roll back, set RETRIEVER_BACKEND to pgvector on the readers and recreate.
+#
 # The agent still spawns the MCP server as a stdio subprocess inside the app image; the
 # `mcp-server` service is the separate streamable-HTTP endpoint for clients on other machines.
 
@@ -39,6 +43,10 @@ x-app: &app
     OLLAMA_BASE_URL: http://ollama:11434
     LLM_PROVIDER: ${LLM_PROVIDER:-ollama}
     EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-ollama}
+    # Hard-coded, not read from .env: .env.example ships RETRIEVER_BACKEND=pgvector and a
+    # relative LANCE_URI. Roll back to pgvector by editing this value (see the seed comment).
+    RETRIEVER_BACKEND: lancedb
+    LANCE_URI: /app/data/lance
   profiles: [app]
   restart: "no"
 
@@ -106,6 +114,9 @@ services:
 
   # One-shot: OLTP schema, deterministic synthetic data, load into Postgres, embed the
   # transcripts into the vector store. Every step is idempotent, so a re-run changes nothing.
+  # Transcripts are ingested into both stores: LanceDB (the one the readers use, on the
+  # lance-data volume) and pgvector (kept filled so rolling back is one setting). The second
+  # run reuses the embedding cache the first one wrote, so it adds seconds.
   seed:
     <<: *app
     command:
@@ -115,7 +126,10 @@ services:
         olap/oltp/apply.sh
         python data/synthetic/generate_data.py
         python olap/seed.py
-        python -m rag.pipeline --ingest
+        RETRIEVER_BACKEND=pgvector python -m rag.pipeline --ingest
+        RETRIEVER_BACKEND=lancedb python -m rag.pipeline --ingest
+    volumes:
+      - lance-data:/app/data/lance
     depends_on:
       db:
         condition: service_healthy
@@ -161,6 +175,7 @@ services:
       - "127.0.0.1:2024:2024"
     volumes:
       - dbt-target:/app/olap/dbt/target
+      - lance-data:/app/data/lance
     restart: unless-stopped
     healthcheck:
       test:
@@ -193,6 +208,8 @@ services:
       OLLAMA_BASE_URL: http://ollama:11434
       LLM_PROVIDER: ${LLM_PROVIDER:-ollama}
       EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-ollama}
+      RETRIEVER_BACKEND: lancedb
+      LANCE_URI: /app/data/lance
       MCP_TRANSPORT: http
       MCP_SERVER_HOST: 0.0.0.0
       MCP_SERVER_PORT: "8000"
@@ -203,6 +220,7 @@ services:
       - "${MCP_PUBLISH_HOST:-127.0.0.1}:${MCP_SERVER_PORT:-8000}:8000"
     volumes:
       - dbt-target:/app/olap/dbt/target
+      - lance-data:/app/data/lance
     restart: unless-stopped
     healthcheck:
       test:
@@ -243,6 +261,7 @@ services:
     command: ["python", "-m", "agent.demo"]
     volumes:
       - dbt-target:/app/olap/dbt/target
+      - lance-data:/app/data/lance
     depends_on:
       db:
         condition: service_healthy
@@ -273,6 +292,7 @@ services:
     volumes:
       - ./notebooks:/app/notebooks
       - dbt-target:/app/olap/dbt/target
+      - lance-data:/app/data/lance
     restart: unless-stopped
     healthcheck:
       test:
@@ -367,4 +387,5 @@ volumes:
   open-webui: {}
   pgdata: {}
   dbt-target: {}
+  lance-data: {}
   hf-cache: {}
