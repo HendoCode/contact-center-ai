@@ -1,0 +1,145 @@
+{{- $m := .Values.mcpServer }}
+{{- $name := include "ccai.component" (dict "root" . "name" "mcp") }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "ccai.labels" . | nindent 4 }}
+    app.kubernetes.io/component: mcp-server
+  {{- with $m.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ $m.service.type }}
+  ports:
+    - name: http
+      port: {{ $m.service.port }}
+      targetPort: http
+  selector:
+    {{- include "ccai.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: mcp-server
+---
+# The Compose `mcp-server` service: `python -m ccai_mcp.server --http` on 0.0.0.0, which the
+# server allows only with MCP_AUTH_TOKEN set (from the Secret).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "ccai.labels" . | nindent 4 }}
+    app.kubernetes.io/component: mcp-server
+spec:
+  replicas: {{ $m.replicaCount }}
+  {{- with $m.strategy }}
+  strategy:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "ccai.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: mcp-server
+  template:
+    metadata:
+      {{- include "ccai.appPodMeta" (dict "root" . "component" "mcp-server") | nindent 6 }}
+    spec:
+      {{- include "ccai.appPodSpec" . | nindent 6 }}
+      initContainers:
+        {{- if $m.waitForData }}
+        {{- include "ccai.waitForPostgres" . | nindent 8 }}
+        # Starts the server only on built marts and a non-empty transcript store: the readers wait
+        # on the data Job here, so the probes below never see the first, long seed.
+        - name: wait-for-data
+          image: {{ include "ccai.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - sh
+            - -c
+            - |
+              {{- if .Values.dbt.enabled }}
+              until [ "$(psql "$DATABASE_URL" -tAc "SELECT 1 FROM deploy.job_run WHERE job = 'dbt' LIMIT 1" 2>/dev/null)" = 1 ]; do
+                echo "waiting for a finished dbt step (deploy.job_run)"; sleep 15
+              done
+              {{- end }}
+              until python -c "import sys; from ccai_mcp.store_check import store_problem; p = store_problem(); print(p or 'transcript store ready'); sys.exit(1 if p else 0)"; do
+                sleep 15
+              done
+          {{- include "ccai.appEnv" . | nindent 10 }}
+          {{- with .Values.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            {{- include "ccai.lanceMount" . | nindent 12 }}
+        {{- end }}
+        # target/semantic_manifest.json for the metric tools (`mf`). dbt parse reads the project
+        # and the profile, and writes target/ into this pod's own volume.
+        - name: dbt-parse
+          image: {{ include "ccai.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          workingDir: /app/olap/dbt
+          command: ["dbt", "parse", "--quiet"]
+          {{- include "ccai.appEnv" . | nindent 10 }}
+          {{- with .Values.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: dbt-target
+              mountPath: /app/olap/dbt/target
+      containers:
+        - name: mcp-server
+          image: {{ include "ccai.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["python", "-m", "ccai_mcp.server", "--http"]
+          envFrom:
+            - configMapRef:
+                name: {{ include "ccai.component" (dict "root" . "name" "config") }}
+            - secretRef:
+                name: {{ .Values.secrets.name }}
+          env:
+            {{- include "ccai.dbEnv" . | nindent 12 }}
+            - name: MCP_TRANSPORT
+              value: http
+            - name: MCP_SERVER_HOST
+              value: 0.0.0.0
+            - name: MCP_SERVER_PORT
+              value: {{ $m.port | toString | quote }}
+          ports:
+            - name: http
+              containerPort: {{ $m.port }}
+          {{- with $m.startupProbe }}
+          startupProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with $m.readinessProbe }}
+          readinessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with $m.livenessProbe }}
+          livenessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with $m.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: dbt-target
+              mountPath: /app/olap/dbt/target
+            {{- include "ccai.lanceMount" . | nindent 12 }}
+            {{- with $m.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+      volumes:
+        - name: dbt-target
+          emptyDir: {}
+        {{- include "ccai.lanceVolume" . | nindent 8 }}
+        {{- with $m.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}

@@ -1,0 +1,102 @@
+# AKS worked example, layered on the chart defaults:
+#
+#   helm upgrade --install ccai infra/k8s/ccai -n ccai -f infra/k8s/values-aks.yaml \
+#     --set image.repository=<acr_login_server>/ccai-app --set image.tag=<git sha> \
+#     --set serviceAccount.annotations."azure\.workload\.identity/client-id"=<app_identity_client_id> \
+#     --set config.AZURE_STORAGE_ACCOUNT_NAME=<adls_account_name> \
+#     --set externalDatabase.host=<postgres_fqdn>
+#
+# Every <...> is a `terraform output` of infra/azure/envs/aks; infra/k8s/README.md has the steps.
+# The placeholders below render and validate as they are; they point at nothing real.
+
+image:
+  repository: acrccaiaksxxxxxx.azurecr.io/ccai-app
+  tag: "0000000"
+  pullPolicy: IfNotPresent
+
+# Create it in the namespace first (README "Secrets"): MCP_AUTH_TOKEN, POSTGRES_PASSWORD (the
+# Flexible Server admin password, `terraform output -raw postgres_admin_password`) and
+# OPENAI_API_KEY for the chat provider below.
+secrets:
+  name: ccai-secrets
+
+# Chat on the repo's default OpenAI-compatible endpoint (key in the Secret); embeddings on the
+# in-cluster Ollama, as in the other run modes. No Azure OpenAI.
+config:
+  LLM_PROVIDER: openai
+  LLM_BASE_URL: https://openrouter.ai/api/v1
+  LLM_MODEL: z-ai/glm-5.3-flash
+  EMBEDDING_PROVIDER: ollama
+  OLLAMA_EMBEDDING_MODEL: nomic-embed-text
+  # The ADLS Gen2 account from infra/azure/modules/data (`terraform output adls_account_name`).
+  AZURE_STORAGE_ACCOUNT_NAME: stccaiaksxxxxxx
+
+# Workload identity: the webhook injects AZURE_CLIENT_ID, AZURE_TENANT_ID and
+# AZURE_FEDERATED_TOKEN_FILE into pods that carry the label, for the service account whose
+# annotation names the app identity. envs/aks federates that identity with this service account
+# (namespace ccai, name ccai), and modules/data grants it Storage Blob Data Contributor on ADLS.
+# Without workload identity, put AZURE_STORAGE_ACCOUNT_KEY in the Secret and drop both.
+serviceAccount:
+  create: true
+  name: ccai
+  annotations:
+    azure.workload.identity/client-id: "00000000-0000-0000-0000-000000000000"
+podLabels:
+  azure.workload.identity/use: "true"
+
+# Azure Database for PostgreSQL Flexible Server from modules/data (pgvector allow-listed there).
+postgresql:
+  enabled: false
+externalDatabase:
+  host: psql-ccai-aks-xxxxxx.postgres.database.azure.com
+  port: 5432
+  database: contactcenter
+  user: pgadmin
+  sslmode: require
+
+# Ollama's model cache on an Azure Disk (managed-csi, ReadWriteOnce: one pod, Recreate rollout).
+ollama:
+  enabled: true
+  persistence:
+    storageClass: managed-csi
+    size: 10Gi
+  resources:
+    requests:
+      cpu: "1"
+      memory: 2Gi
+    limits:
+      memory: 4Gi
+
+# The Lance dataset in ADLS (az://lance), as on Container Apps, so no pod is tied to one node's
+# disk. To keep it on a volume instead, set uri to "" and use Azure Files, which mounts on every
+# node at once:
+#   lance:
+#     uri: ""
+#     persistence: {storageClass: azurefile-csi, accessMode: ReadWriteMany, size: 5Gi}
+lance:
+  uri: az://lance
+
+# Ingress through the AKS application routing add-on's Gateway API implementation (meshless
+# Istio, GatewayClass approuting-istio), which envs/aks turns on. TLS terminates at the Gateway
+# with a certificate in the Secret ccai-mcp-tls (create it from your certificate, or sync it from
+# Key Vault). Clients reach https://<hostname>/mcp with the bearer token.
+gateway:
+  create: true
+  className: approuting-istio
+  listeners:
+    - name: https
+      port: 443
+      protocol: HTTPS
+      hostname: mcp.example.com
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - kind: Secret
+            name: ccai-mcp-tls
+      allowedRoutes:
+        namespaces:
+          from: Same
+  httpRoute:
+    enabled: true
+    hostnames:
+      - mcp.example.com

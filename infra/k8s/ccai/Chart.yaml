@@ -1,0 +1,13 @@
+apiVersion: v2
+name: ccai
+description: >-
+  The contact-center-ai MCP server on Kubernetes: Postgres (in-chart or external), optional
+  Ollama, the seed and dbt Jobs, and the streamable-HTTP mcp-server with its LanceDB store.
+type: application
+version: 0.1.0
+# The app image has no release versions yet; the chart tracks the repo, not an image tag.
+appVersion: "0.1.0"
+home: https://github.com/hendocode/contact-center-ai
+sources:
+  - https://github.com/hendocode/contact-center-ai
+kubeVersion: ">=1.29.0-0"

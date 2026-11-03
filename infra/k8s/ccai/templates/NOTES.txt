@@ -1,0 +1,17 @@
+{{- $mcp := include "ccai.component" (dict "root" . "name" "mcp") }}
+{{- $job := include "ccai.component" (dict "root" . "name" (printf "data-r%d" (int .Release.Revision))) }}
+Release {{ .Release.Name }} (revision {{ .Release.Revision }}) in namespace {{ .Release.Namespace }}.
+
+Secret {{ .Values.secrets.name }} must exist with MCP_AUTH_TOKEN and POSTGRES_PASSWORD.
+{{- if or .Values.seed.enabled .Values.dbt.enabled }}
+
+The data Job ({{ $job }}) seeds and builds the marts. A first install embeds every transcript
+(about 45 minutes on 2 CPU cores with Ollama); later revisions reuse the stored vectors.
+  kubectl -n {{ .Release.Namespace }} logs -f job/{{ $job }} -c {{ ternary "seed" "dbt" (and .Values.seed.enabled (not .Values.dbt.enabled)) }}
+  kubectl -n {{ .Release.Namespace }} wait --for=condition=complete --timeout=3h job/{{ $job }}
+{{- end }}
+
+The mcp-server pods wait in Init until the data is in place, then serve /mcp and /healthz:
+  kubectl -n {{ .Release.Namespace }} rollout status deploy/{{ $mcp }} --timeout=3h
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ $mcp }} 8000:{{ .Values.mcpServer.service.port }}
+  MCP_SERVER_URL=http://127.0.0.1:8000/mcp MCP_AUTH_TOKEN=<token> python -m ccai_mcp.http_smoke

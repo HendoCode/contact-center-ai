@@ -5,10 +5,12 @@ Terraform for the Azure side of the stack, following [`docs/design/infra.md`](..
 ```
 bootstrap/        applied once, local state: state storage, subscription budget, Key Vault
 envs/dev/         destroyed each session, azurerm backend: composes the modules below
+envs/aks/         destroyed each session, same backend with its own state key: core, data and aks
 envs/snowflake/   persistent, same backend with its own state key: composes modules/snowflake
 modules/core        resource group, Log Analytics (0.5 GB/day cap), app identity
 modules/data        Postgres Flexible 16 + pgvector, ADLS Gen2 (Lance, dbt artifacts)
 modules/apps        ACR, Container Apps (mcp-server, agent-api) + Easy Auth via azapi
+modules/aks         AKS (Free tier, 1-2 nodes, workload identity, Gateway API routing) + ACR, for infra/k8s
 modules/compute-gpu A10 Spot VM, nightly shutdown, cloud-init variable (TODO)
 modules/databricks  Premium workspace + single-node all-purpose cluster, 10 min auto-terminate
 modules/snowflake   XS warehouse (60 s auto-suspend), database, dbt role + key-pair service user, 5-credit monitor
@@ -41,7 +43,7 @@ Cross-region effects, from the current config and Microsoft's docs:
 ```bash
 cd infra/azure
 terraform fmt -check -recursive
-for root in bootstrap envs/dev envs/snowflake; do
+for root in bootstrap envs/dev envs/aks envs/snowflake; do
   (cd "$root" && terraform init -backend=false -input=false && terraform validate)
 done
 tflint --init --config="$PWD/.tflint.hcl"
@@ -68,5 +70,10 @@ terraform apply
 # end of session
 terraform destroy
 ```
+
+`envs/aks` is the Kubernetes path beside `envs/dev`'s Container Apps, for the Helm chart in
+`infra/k8s`. Its init, plan, apply and the Helm install are in
+[`infra/k8s/README.md`](../k8s/README.md#aks-worked-example). It creates its own resource group
+(`rg-ccai-aks`), so it can be applied and destroyed separately from `envs/dev`.
 
 Never `destroy` `bootstrap`. `envs/snowflake` is persistent too and not part of the session teardown; its steps, including the dbt key-pair generation, are in [`envs/snowflake/README.md`](envs/snowflake/README.md).

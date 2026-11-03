@@ -39,6 +39,10 @@ whose content changed and keep the file names below.
 | `DeploymentLocal` | Deployment | [deployment-local](deployment-local.png) ([svg](deployment-local.svg)) | Host processes under uv next to the Compose default, `app` and `gpu` profiles |
 | `DeploymentAzure` | Deployment | [deployment-azure](deployment-azure.png) ([svg](deployment-azure.svg)) | The `infra/azure` roots: Container Apps behind Easy Auth, PostgreSQL, ADLS, the optional GPU VM and Databricks, Key Vault, and the Snowflake account |
 
+The Kubernetes deployment (the Helm chart in `infra/k8s` and the AKS root `infra/azure/envs/aks`)
+has no deployment view yet; [infra/k8s/README.md](../../infra/k8s/README.md) describes it, and
+drawing it is listed in [docs/ROADMAP.md](../ROADMAP.md).
+
 ## Conventions
 
 Every element carries one status tag, styled the same in every view:

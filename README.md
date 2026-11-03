@@ -64,6 +64,7 @@ rollback need LanceDB.
 | Host: `make dev-data`, `python -m ccai_mcp.server`, Claude Desktop | LanceDB in `data/lance` | needs `uv sync --group lance` |
 | Compose `app` profile: `make demo`, `mcp-server`, `jupyter` | LanceDB on the `lance-data` volume | pgvector is ingested too, for rollback; a re-seed with unchanged transcripts and model embeds nothing (vectors persist in the Lance table) |
 | Azure `mcp-server` Container App | LanceDB on ADLS (`az://` URI) | Terraform validated in CI; not deployed |
+| Kubernetes: Helm chart `infra/k8s/ccai` | LanceDB on a PersistentVolumeClaim, or on ADLS (`az://`) with the AKS values | install, upgrade and rollback smoke-tested on a local kind cluster; the AKS Terraform is validated in CI and not deployed |
 | Benchmark or rollback | pgvector | `RETRIEVER_BACKEND=pgvector` |
 
 **Auth:** the HTTP transport has demo-grade guards: a static bearer token (`MCP_AUTH_TOKEN`) or
@@ -84,7 +85,7 @@ Microsoft Entra Easy Auth; that infrastructure is validated in CI and has not be
 - **Local runtime:** Python 3.12 managed by uv; Docker Compose for Postgres, Ollama, the demo
   stack, Open WebUI, JupyterLab and Structurizr
 - **Infrastructure:** Terraform for Azure (Container Apps, PostgreSQL Flexible Server, ADLS,
-  Entra Easy Auth) and a Snowflake root
+  Entra Easy Auth, and an AKS cluster), a Helm chart for Kubernetes, and a Snowflake root
 
 **Defaults:** chat goes through the OpenAI-compatible client to OpenRouter (`z-ai/glm-5.3-flash`);
 embeddings use Ollama `nomic-embed-text`; `make demo` runs both on Ollama.
@@ -258,6 +259,15 @@ provider in `rag/embeddings.py`.
 and its README has the bootstrap, plan and apply steps. Entra auth is configured as Easy Auth on
 the Container App (`infra/azure/modules/apps/main.tf`). CI validates the Terraform; it has not
 been applied, and no workflow builds the server image yet.
+
+## Kubernetes deployment
+
+`infra/k8s/ccai` is a Helm chart for the MCP server stack: Postgres (or an external server),
+optional Ollama, one Job for the seed and dbt steps, and the streamable-HTTP `mcp-server` with
+probes on `/healthz`. `infra/k8s/values-aks.yaml` is the AKS example, and
+`infra/azure/envs/aks` is its Terraform (validated in CI, not applied). The deploy guide is
+[infra/k8s/README.md](infra/k8s/README.md), covering install, upgrade, rollback and where the
+data lives. `make k8s-check` runs the chart's lint and schema checks.
 
 ## Notes
 

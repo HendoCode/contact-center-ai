@@ -38,3 +38,9 @@ output "dbt_artifacts_uri" {
   description = "abfss URI of the dbt artifacts filesystem."
   value       = "abfss://dbt-artifacts@${azurerm_storage_account.adls.name}.dfs.core.windows.net/"
 }
+
+output "postgres_admin_password" {
+  description = "Postgres administrator password, for a client that takes it apart from the URL (the Helm chart's Secret)."
+  value       = random_password.postgres_admin.result
+  sensitive   = true
+}

@@ -1,0 +1,28 @@
+# `helm test <release>`: /healthz through the Service from inside the cluster.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ include "ccai.component" (dict "root" . "name" "test-healthz") }}
+  labels:
+    {{- include "ccai.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: test
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  restartPolicy: Never
+  automountServiceAccountToken: false
+  securityContext:
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: healthz
+      image: {{ include "ccai.image" . }}
+      imagePullPolicy: {{ .Values.image.pullPolicy }}
+      command:
+        - python
+        - -c
+        - import urllib.request; print(urllib.request.urlopen('http://{{ include "ccai.component" (dict "root" . "name" "mcp") }}:{{ .Values.mcpServer.service.port }}/healthz', timeout=10).read().decode())
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop: [ALL]

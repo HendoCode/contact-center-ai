@@ -1,0 +1,93 @@
+{{- if or .Values.seed.enabled .Values.dbt.enabled }}
+{{- $j := .Values.dataJob }}
+{{- $s := .Values.seed }}
+{{- $d := .Values.dbt }}
+# The Compose `seed` and `dbt` services as one Job, in order: the seed step (OLTP schema,
+# deterministic synthetic data, OLTP load, transcript ingest into LanceDB and then pgvector) runs
+# as an init container, so `dbt build` starts only after it succeeded. One pod keeps the order
+# when `helm rollback` re-applies an earlier revision's Job. Logs per step:
+#   kubectl logs job/<name> -c seed    kubectl logs job/<name> -c dbt
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "ccai.component" (dict "root" . "name" (printf "data-r%d" (int .Release.Revision))) }}
+  labels:
+    {{- include "ccai.labels" . | nindent 4 }}
+    app.kubernetes.io/component: data
+spec:
+  backoffLimit: {{ $j.backoffLimit }}
+  {{- with $j.activeDeadlineSeconds }}
+  activeDeadlineSeconds: {{ . }}
+  {{- end }}
+  {{- if not (kindIs "invalid" $j.ttlSecondsAfterFinished) }}
+  ttlSecondsAfterFinished: {{ $j.ttlSecondsAfterFinished }}
+  {{- end }}
+  template:
+    metadata:
+      {{- include "ccai.appPodMeta" (dict "root" . "component" "data") | nindent 6 }}
+    spec:
+      restartPolicy: Never
+      {{- include "ccai.appPodSpec" . | nindent 6 }}
+      initContainers:
+        {{- include "ccai.waitForPostgres" . | nindent 8 }}
+        {{- if and $s.enabled .Values.ollama.enabled .Values.ollama.pullModels }}
+        - name: pull-models
+          image: {{ include "ccai.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - sh
+            - -ec
+            - |
+              i=0
+              until python -c "import os, urllib.request; urllib.request.urlopen(os.environ['OLLAMA_BASE_URL'] + '/api/version', timeout=3)" 2>/dev/null; do
+                i=$((i + 1)); [ "$i" -lt 120 ] || { echo "Ollama never answered at $OLLAMA_BASE_URL" >&2; exit 1; }
+                echo "waiting for Ollama at $OLLAMA_BASE_URL"; sleep 5
+              done
+              python - <<'PY'
+              import os
+              from rag.ollama_models import ensure_model
+              url = os.environ["OLLAMA_BASE_URL"]
+              ensure_model(os.environ.get("OLLAMA_EMBEDDING_MODEL", "nomic-embed-text"), url)
+              if os.environ.get("LLM_PROVIDER") == "ollama":
+                  ensure_model(os.environ.get("OLLAMA_MODEL", "llama3.2"), url)
+              PY
+          {{- include "ccai.appEnv" . | nindent 10 }}
+          {{- with .Values.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+        {{- end }}
+        {{- if and $s.enabled $d.enabled }}
+        - name: seed
+          {{- include "ccai.seedStep" . | nindent 10 }}
+        {{- end }}
+      containers:
+        {{- if $d.enabled }}
+        - name: dbt
+          image: {{ include "ccai.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          workingDir: /app/olap/dbt
+          command:
+            - sh
+            - -ec
+            - |
+              dbt build
+              {{- include "ccai.markJob" (dict "root" . "job" "dbt") | nindent 14 }}
+          {{- include "ccai.appEnv" . | nindent 10 }}
+          {{- with $d.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+        {{- else }}
+        - name: seed
+          {{- include "ccai.seedStep" . | nindent 10 }}
+        {{- end }}
+      {{- with concat (ternary (include "ccai.lanceVolume" . | fromYamlArray) (list) $s.enabled) $j.extraVolumes }}
+      volumes:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

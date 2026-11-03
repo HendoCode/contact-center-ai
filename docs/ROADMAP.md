@@ -15,7 +15,9 @@ disagrees with this page, this page is current.
 | CSAT survey text in the transcript store | The CSAT score is a typed, filterable column on the LanceDB table (`min_csat` / `max_csat`). The survey text is not embedded | `retrieval/README.md` (CSAT section) |
 | The agent calls the MCP server over HTTP | The LangGraph agent starts the server as a stdio subprocess; `MCP_SERVER_URL` is read only by the HTTP smoke test | `agent/tools.py`, `ccai_mcp/http_smoke.py` |
 | Agent HTTP endpoint | Designed: start and resume agent runs over HTTP with the Postgres checkpointer, safe to scale to zero | `docs/design/agent-graph.md` (L4) |
-| Server image build and an Azure apply | CI validates the Terraform. No workflow builds or pushes the `mcp-server` image, and nothing has been applied | `.github/workflows/ci.yml`, `infra/azure/` |
+| Server image build and an Azure apply | CI validates the Terraform (Container Apps in `envs/dev`, AKS in `envs/aks`) and lints and schema-checks the Helm chart. No workflow builds or pushes the app image, and nothing has been applied | `.github/workflows/ci.yml`, `infra/azure/`, `infra/k8s/` |
+| Entra sign-in in front of the server on AKS | On AKS the chart relies on the static bearer token (`MCP_AUTH_TOKEN`) with TLS at the Gateway. Container Apps has Easy Auth; AKS has no equivalent for this setup | `infra/k8s/README.md` (Auth) |
+| Secrets from Key Vault on AKS | The chart reads one Kubernetes Secret that the operator creates by hand. Syncing it from the bootstrap Key Vault (Secrets Store CSI driver) is not set up | `infra/k8s/README.md` (Secrets) |
 
 ## Designed, not built
 
@@ -23,6 +25,8 @@ disagrees with this page, this page is current.
 |---|---|---|
 | Fine-tune comparison on call summaries | The labeled dataset and splits (`make finetune-data`). LoRA training, a hosted fine-tune, vLLM serving, the load test and the evals are designed and not built | `docs/design/finetune.md`, `models/finetune/README.md` |
 | vLLM serving | A Compose `gpu` profile declares a `vllm` service. The Azure GPU VM module takes a cloud-init that installs nothing yet | `docker-compose.yml`, `infra/azure/modules/compute-gpu/README.md` |
+| The rest of the Compose stack on Kubernetes | The Helm chart runs Postgres, Ollama, the seed and dbt steps and `mcp-server`. `langgraph-api` (a dev server), `jupyter`, `demo`, `evals` and `cloudflared` are not in it; each needs its own auth or exposure decision | `infra/k8s/README.md`, `docker-compose.yml` |
+| Kubernetes in the architecture diagrams | The deployment views cover the host, Compose and the `infra/azure` Container Apps roots. The chart and the AKS root are not drawn yet | `docs/architecture/workspace.dsl` |
 | `agent-api` Container App | A planned slot in the Azure apps module that expects an `agent-api` image. It waits on the agent HTTP endpoint above | `infra/azure/modules/apps/main.tf`, `docs/architecture/README.md` |
 | Embedding-model swaps on a versioned table | LanceDB versioning (seed tags, time travel, rollback) is built. Ingest refuses a vector of a different dimension, so a second model needs a second vector column or a new table | `retrieval/README.md` |
 

@@ -1,0 +1,53 @@
+{{- $g := .Values.gateway }}
+{{- $gwName := include "ccai.component" (dict "root" . "name" "gateway") }}
+{{- if $g.create }}
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: {{ $gwName }}
+  labels:
+    {{- include "ccai.labels" . | nindent 4 }}
+  {{- with $g.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  gatewayClassName: {{ required "gateway.className is required when gateway.create is true" $g.className }}
+  listeners:
+    {{- toYaml $g.listeners | nindent 4 }}
+{{- end }}
+{{- if $g.httpRoute.enabled }}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ include "ccai.component" (dict "root" . "name" "mcp") }}
+  labels:
+    {{- include "ccai.labels" . | nindent 4 }}
+    app.kubernetes.io/component: mcp-server
+  {{- with $g.httpRoute.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  parentRefs:
+    {{- if $g.httpRoute.parentRefs }}
+    {{- toYaml $g.httpRoute.parentRefs | nindent 4 }}
+    {{- else if $g.create }}
+    - name: {{ $gwName }}
+    {{- else }}
+    {{- fail "gateway.httpRoute.parentRefs is required when gateway.create is false" }}
+    {{- end }}
+  {{- with $g.httpRoute.hostnames }}
+  hostnames:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: {{ include "ccai.component" (dict "root" . "name" "mcp") }}
+          port: {{ .Values.mcpServer.service.port }}
+{{- end }}
