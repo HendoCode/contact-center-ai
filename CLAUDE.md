@@ -189,4 +189,4 @@ Deployed via GitHub Actions → GitHub Pages at https://hendocode.github.io/cont
 
 **Built:** synthetic data generator, full RAG ingest/retrieve/respond pipeline, pgvector + OpenAI integration, Ollama as local provider alternative (no API key), 7-tool MCP server (four evidence tools and three metric tools), Terraform for Azure (`infra/azure`: Container Apps + PostgreSQL Flexible Server + ADLS), Docker Compose for local dev.
 
-**Not yet implemented:** S3 ingestion, CSAT → vector store (currently SQL-backed via `f_csat`, not embedded), observability, end-to-end deployment of the CI workflow.
+**Not yet implemented:** S3 ingestion, CSAT text → vector store (the score is a filterable column on the LanceDB table; `query_csat` reads `f_csat`; the survey text is not embedded), observability, end-to-end deployment of the CI workflow.

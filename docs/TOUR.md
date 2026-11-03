@@ -1,6 +1,6 @@
 # Tour: what was built, how to run it, where the code is
 
-A walk-through of everything that landed in PRs #8–#28 (2026-09-29 to 2026-10-02), with a code map.
+A walk-through of the built system with a code map. It is kept current; the A2 and A4 outputs were last re-run on 2026-11-03. Sections that carry an older date say so.
 Each step has one label:
 
 | Label | Meaning |
@@ -57,8 +57,9 @@ sync; the Make targets that need them pass `--group` themselves.
 
 ## A. Run now (offline)
 
-Every command here was run for this doc on 2026-10-02 (Linux x86_64, Python 3.12, no Docker,
-no keys). The output shown is trimmed real output.
+The commands here were run for this doc on 2026-10-02 (Linux x86_64, Python 3.12, no Docker,
+no keys). A2 and A4 were re-run on 2026-11-03 (Linux x86_64, Python 3.13, no Docker, no keys).
+The output shown is trimmed real output.
 
 **A1. Generate the data.** Deterministic, so every later count matches.
 
@@ -75,7 +76,7 @@ transactions: 25078
 
 ```bash
 make lint            # All checks passed!
-make test            # 274 passed, 5 skipped, 9 deselected
+make test            # 1005 passed, 11 skipped, 11 deselected (about 4 minutes)
 make check-public    # check-public: clean
 ```
 
@@ -112,11 +113,11 @@ and lists its tools through `langchain.mcp` (`MCPAdapter`), the same binding the
 uv run --group agent python -c "import asyncio; from agent.tools import MCPToolbox; print(sorted(asyncio.run(MCPToolbox().tools())))"
 ```
 ```
-['ask_the_analyst', 'explain_change', 'get_call_summary', 'query_csat', 'query_metric', 'search_transcripts']
+['ask_the_analyst', 'explain_change', 'get_call_summary', 'get_transcript', 'query_csat', 'query_metric', 'search_transcripts']
 ```
 
 `uv run python -m ccai_mcp.server` on its own starts the server and waits for a client on stdin
-(Ctrl-C to stop); `tests/test_server_handshake.py` checks the handshake and the six names.
+(Ctrl-C to stop); `tests/test_server_handshake.py` checks the handshake and the seven names.
 Calling a tool for real needs B (a database, and a chat model for the summarizing tools).
 
 **A4b. MCP over streamable HTTP (opt in).** For clients on other machines: Claude Desktop (via
@@ -128,7 +129,7 @@ MCP_AUTH_TOKEN=demo-token uv run python -m ccai_mcp.server --http &      # http:
 MCP_AUTH_TOKEN=demo-token uv run python -m ccai_mcp.http_smoke           # lists the seven tools
 ```
 
-To see the sixth tool answer, call it with `--call explain_change '{"metric": "csat_average_score", "filters": {"category": ["fee_dispute"]}, "change_point": "2026-04-15", "window_days": 14}'`.
+To see `explain_change` answer, call it with `--call explain_change '{"metric": "csat_average_score", "filters": {"category": ["fee_dispute"]}, "change_point": "2026-04-15", "window_days": 14}'`.
 
 `ccai_mcp/README.md` has the URL shape, the safety rules, and the registration snippets. A tool
 that reads Postgres needs B; the listing does not.
@@ -291,9 +292,9 @@ for mode in ('vector', 'fts', 'hybrid'):
     print(mode, [(h.call_id, round(h.score, 3), h.metadata['category']) for h in hits])"
 ```
 
-Swap `RETRIEVER_BACKEND=pgvector` (the rollback and benchmark peer, after `RETRIEVER_BACKEND=pgvector make ingest`) and `mode='vector'` gives the
-same shape of answer; `mode='fts'` raises `NotImplementedError`, because the pgvector backend is
-vector-only. For this doc the LanceDB half was run on the real 1,250-call corpus with the
+LanceDB is the default transcript store. Set `RETRIEVER_BACKEND=pgvector` (the rollback and benchmark
+peer, filled by `make ingest`) and `mode='vector'` gives the same shape of answer; `mode='fts'` raises `NotImplementedError`, because the pgvector backend is
+vector-only. For this doc the LanceDB half was run on 2026-10-02 on the 1,250 baseline calls (the corpus now has 1,540) with the
 fixture's offline embedding in place of Ollama: ingest twice gave 1,250 rows both times, and all
 three modes returned escalated calls only. The scores from that run are not meaningful.
 
@@ -314,7 +315,7 @@ uv run python -m rag.pipeline --query "fraud disputes from last week"
 uv run --group agent python -m agent.demo           # the five questions, Postgres checkpointer
 ```
 
-A sample supervisor chat built from the real output of all five tools, SQL attached: `docs/demo-chat.md`
+A sample supervisor chat built from the real output of the metric and evidence tools, SQL attached: `docs/demo-chat.md`
 (regenerate after B2 with `uv run --group agent --group dbt python -m tools.demo_chat`).
 
 ---
@@ -498,7 +499,7 @@ Azure backend, under its own state key. Cross-cloud traffic is the few MB of loa
 | Warehouse targets | `olap/dbt/profiles.yml` | `dev` (Postgres), `snowflake` (key pair, no password), `databricks`; every value from env |
 | Warehouse loaders | `olap/dbt/loaders/` | `__main__.py` (CLI), `snowflake_loader.py` (PUT + `COPY INTO`), `databricks_loader.py` (volume + `COPY INTO`), `schema.py` (DDL type mapping), `plan.py` |
 | Portability guards | `tests/test_dbt_portability.py`, `tests/test_warehouse_loaders.py` | no Postgres-only SQL; loader plans checked against a fake |
-| MCP server | `ccai_mcp/server.py` | the six `Tool(...)` declarations and `call_tool` dispatch (mcp 2.x low-level server); stdio by default |
+| MCP server | `ccai_mcp/server.py` | the seven `Tool(...)` declarations and `call_tool` dispatch (mcp 2.x low-level server); stdio by default |
 | MCP over HTTP | `ccai_mcp/http_transport.py`, `ccai_mcp/http_smoke.py`, `ccai_mcp/README.md` | settings and the non-loopback refusal, constant-time bearer check, `/healthz`; smoke client; client snippets |
 | Metric tools | `ccai_mcp/metrics.py` | `run_metricflow` (shells out to `mf`), `query_metric`, `resolve_metrics` + `ask_the_analyst` |
 | Change analysis | `ccai_mcp/change.py`, `agent/subgraphs/change.py`, `agent/changes.py`, `agent/data/change_*.yml` | `explain_change` (windows, drivers counted in code, coaching mode) and the agent route that frames, resolves and grounds it |
@@ -513,7 +514,7 @@ Azure backend, under its own state key. Cross-cloud traffic is the few MB of loa
 | Embeddings | `rag/embeddings.py` | `get_embeddings()` (`EMBEDDING_PROVIDER`), shared by both backends |
 | Fine-tune data | `models/finetune/` | `gold.py`, `splits.py`, `data_gen.py` (`build`/`label`/`finalize`) |
 | Infra | `infra/azure/` | `bootstrap/`, `envs/dev/`, `envs/snowflake/`, `modules/*` |
-| Local stack | `docker-compose.yml`, `Dockerfile`, `Makefile` | profiles: default, `app` (`make demo`), `gpu` |
+| Local stack | `docker-compose.yml`, `Dockerfile`, `Makefile` | profiles: default, `app` (`make demo`), `tunnel`, `gpu` |
 | Results contract | `tools/results.py`, `results/` | JSON per run, rendered READMEs (`retrieval/`, `evals/`, `semantics/`) |
 
 ---
@@ -524,7 +525,7 @@ Azure backend, under its own state key. Cross-cloud traffic is the few MB of loa
 
 - **Where:** `retrieval/lancedb_backend.py` behind the same `Retriever` protocol as pgvector;
   LanceDB is the default (`RETRIEVER_BACKEND=pgvector` swaps back) everywhere (ingest, MCP tools, the agent's `ground` node).
-- **Embedded:** no server and no Compose service. `LANCE_URI` is a local directory or an
+- **Embedded:** no server. In Compose it lives on the `lance-data` volume and is the store the app services read. `LANCE_URI` is a local directory or an
   `az://`/`s3://` URI on the same code path (only local has been run).
 - **Three search modes** where pgvector has one: vector (cosine), native FTS (BM25), and hybrid
   fused with RRF (K=60), which needs no score calibration between cosine and BM25.
@@ -599,7 +600,7 @@ Grounded in `olap/dbt/models/marts/semantic/metrics.yml`:
 ## Known limits and not built yet
 
 - **Not built yet:** fine-tune F2–F6; S3 (AWS) ingestion
-  (`rag.pipeline --source s3` raises `NotImplementedError`); CSAT in the vector store; the agent
+  (`rag.pipeline --source s3` raises `NotImplementedError`); CSAT text in the vector store (the CSAT score is already a filterable column on the LanceDB table); the agent
   talking to the MCP server over HTTP (it still spawns it over stdio); an agent HTTP endpoint (L4).
 - **Results:** `results/retrieval/`, `results/evals/` and `results/semantics/` hold real runs. The
   numbers in `olap/dbt/README.md` come from a seeded local run, not from `results/`.

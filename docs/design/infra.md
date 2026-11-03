@@ -1,5 +1,7 @@
 # Azure infrastructure (Terraform)
 
+> Design note as of 2026-10-02. It records the plan at that date and is not updated as the code changes. The current state is in [MAP.md](../MAP.md).
+
 D0.3, 2026-10-02. Feeds I1, I-SF, F4.
 
 Checked 2026-10-02 against:

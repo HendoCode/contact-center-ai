@@ -1,5 +1,7 @@
 # Agent graph (W2)
 
+> Design note as of 2026-10-02. The MCP server now has seven tools; where this note says six, read seven (`get_transcript` was added later). The current state is in [MAP.md](../MAP.md).
+
 D0.2, 2026-10-02. Feeds M0, L1–L4 and M1. Checked against the LangGraph docs and PyPI on 2026-10-02: langgraph 1.2.12, langgraph-checkpoint-postgres 3.1.2, langgraph-cli 0.4.32, langchain 1.4.3, langchain-mcp-adapters 0.3.2, mcp 2.2.0. The repo pins langchain 1.3.4 and mcp 1.27.2.
 
 ```

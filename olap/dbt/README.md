@@ -1,8 +1,7 @@
 # OLAP + Semantic Layer (dbt Core + MetricFlow)
 
-Phase 2 of the semantic-layer demo: the star/snowflake models (§6 of the demo
-plan) and the MetricFlow declarations that disambiguate the deliberately
-ambiguous metrics (§7). This layer is **additive** — it reads the OLTP
+Phase 2 of the semantic-layer demo: the star/snowflake models and the
+MetricFlow declarations that disambiguate the deliberately ambiguous metrics. This layer is **additive** — it reads the OLTP
 foundation (`olap/oltp/schema.sql`, seeded by `olap/seed.py`) and writes its
 own tables into the `marts` schema. It does not touch `ccai_mcp/`, `rag/`, or
 the OLTP schema/seed.
@@ -238,8 +237,8 @@ where:
 
 These numbers are a **convention, not a fact** — they are parameters to argue
 about, and because the formula lives in one committed YAML file, the argument
-happens in a code review instead of a slide deck. §8 of the plan (Q4) leaves
-this open; this is the explicitly-parameterized version the plan asked for.
+happens in a code review instead of a slide deck. The formula is left open to
+revision; this is the explicitly parameterized version.
 
 ### NPS mapping
 

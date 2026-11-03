@@ -71,7 +71,7 @@ def _stub_sql(names: list[str]) -> str:
 
 
 class OfflineToolbox:
-    """The six MCP tools' output shapes (ccai_mcp/tools.py, ccai_mcp/metrics.py,
+    """The MCP tools' output shapes (ccai_mcp/tools.py, ccai_mcp/metrics.py,
     ccai_mcp/change.py), filled from the golden set and the corpus. Records every call."""
 
     def __init__(self, items: list[dict], calls: list[dict], corpus=None):
