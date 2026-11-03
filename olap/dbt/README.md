@@ -1,11 +1,11 @@
 # OLAP + Semantic Layer (dbt Core + MetricFlow)
 
-Phase 2 of the semantic-layer demo: the star/snowflake models (§6 of the demo
-plan) and the MetricFlow declarations that disambiguate the deliberately
-ambiguous metrics (§7). This layer is **additive** — it reads the OLTP
+The semantic layer: the star/snowflake models and the MetricFlow declarations
+that disambiguate the deliberately ambiguous metrics. It reads the OLTP
 foundation (`olap/oltp/schema.sql`, seeded by `olap/seed.py`) and writes its
-own tables into the `marts` schema. It does not touch `ccai_mcp/`, `rag/`, or
-the OLTP schema/seed.
+own tables into the `marts` schema. The MCP metric tools query it:
+`query_metric` and `ask_the_analyst` (`ccai_mcp/metrics.py`) and
+`explain_change` (`ccai_mcp/change.py`).
 
 ## What's here
 
@@ -136,8 +136,9 @@ make load-databricks                                 # uv run --group dbt --grou
 ```
 
 The loaders read the same `SNOWFLAKE_*` / `DATABRICKS_*` variables as the dbt targets, plus
-`SNOWFLAKE_RAW_SCHEMA` and `DATABRICKS_RAW_SCHEMA`. Neither loader has been run against a real
-warehouse; the offline tests use a fake that interprets the generated statements.
+`SNOWFLAKE_RAW_SCHEMA` and `DATABRICKS_RAW_SCHEMA`. Both loaders have run against real accounts
+(see [`results/semantics/`](../../results/semantics/)); the offline tests use a fake that interprets
+the generated statements.
 
 Portability rules the models follow, so a new model should too: no `::` casts (use
 `cast(... as ...)` and `{{ dbt.type_int() }}`), no `to_char`, `isodow`, `doy` or
@@ -246,11 +247,12 @@ this open; this is the explicitly-parameterized version the plan asked for.
 `nps = (promoters - detractors) / responses × 100` on the 1–5 scale with
 `5 = promoter`, `4/3 = passive`, `2/1 = detractor`.
 
-## Scope boundary
+## MCP metric tools
 
-Additive only. This layer never modifies `ccai_mcp/`, `rag/`, or the OLTP
-schema/seed — the MCP metric-tool surface (a `query_metric` tool over these
-declarations) is the next phase.
+The metric tools that serve these declarations are built: `query_metric` and
+`ask_the_analyst` in `ccai_mcp/metrics.py`, which shell out to `mf`, and
+`explain_change` in `ccai_mcp/change.py`. This layer still never modifies the
+OLTP schema or seed.
 
 ## Data notes
 

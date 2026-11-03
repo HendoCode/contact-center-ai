@@ -13,7 +13,7 @@ PYTHON := uv run python
 LANCE_GROUP = $(if $(filter lancedb,$(RETRIEVER_BACKEND)),--group lance)
 
 # The L3 stack lives in the `app` Compose profile, so a bare `docker compose up -d`
-# still starts only db and ollama.
+# starts only db, ollama, open-webui and structurizr.
 COMPOSE_APP := docker compose --profile app
 
 # `make demo` defaults to the local, keyless path: chat on Ollama (llama3.2) and embeddings

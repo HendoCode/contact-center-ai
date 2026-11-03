@@ -4,8 +4,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this project is
 
+A governed semantic layer for a synthetic credit-union contact center, served to AI assistants through one
+MCP server. dbt + MetricFlow declare 47 metrics over a star schema; the server exposes seven read-only tools,
+three metric tools (`query_metric`, `ask_the_analyst`, `explain_change`) and four evidence tools over call
+transcripts and CSAT (`search_transcripts`, `get_call_summary`, `get_transcript`, `query_csat`).
+README "What it does" is the canonical description, and `docs/ROADMAP.md` is the only list of future work.
+
 A cleanroom portfolio mirror of active consulting work for a financial institution (credit union, confidential).
-The real engagement involves call center supervisors querying member call recordings, transcripts, and CSAT
+The real engagement involves call center supervisors querying member call transcripts and CSAT
 survey data using natural language. This repo uses synthetic data and is safe for public GitHub.
 
 ## Fictional client context
@@ -20,7 +26,7 @@ survey data using natural language. This repo uses synthetic data and is safe fo
 
 ```bash
 # Local dev setup (run once)
-docker compose up -d                          # Start pgvector + Ollama (if using it)
+docker compose up -d                          # Start Postgres, Ollama, Open WebUI and Structurizr
 uv venv --python 3.12                         # Create virtualenv (uv manages Python version)
 uv sync --extra dev                           # Install exact versions from uv.lock
 # Pull Ollama models (only needed when LLM_PROVIDER=ollama)
@@ -63,13 +69,13 @@ ccai_mcp/server.py (stdio; HTTP opt-in) → 7 tools exposed to MCP clients
 
 **Data flow across files:**
 - `data/synthetic/generate_data.py` outputs `transcripts.json` (1,540 calls with full_text: 1,250 baseline calls plus the calls for four dated events), `csat.json` (survey scores 1–5), and the OLTP JSON files loaded by `olap/seed.py`.
-- `rag/embeddings.py` owns pgvector setup and the shared `get_embeddings()`; `retrieval/` (`get_retriever()`, `Hit`, `Retriever`) is the only entry point for search/ingest — `retrieval/pgvector_backend.py` is the sole caller of `get_vector_store()` apart from `--reset`. To swap from OpenAI embeddings to Anthropic/Gemini, only this file needs to change.
+- `rag/embeddings.py` owns pgvector setup and the shared `get_embeddings()`; `retrieval/` (`get_retriever()`, `Hit`, `Retriever`) is the only entry point for search/ingest — `retrieval/pgvector_backend.py` is the sole caller of `get_vector_store()` apart from `--reset`. A new embedding provider goes in this file.
 - `rag/pipeline.py` owns ingestion (`--ingest`) and querying (`rag_query()`). Ingestion upserts by `call_id`, so re-running `--ingest` is idempotent (rows ingested before this change have UUID ids and need `--reset` first).
 - `ccai_mcp/tools.py` implements the RAG/CSAT tools (`search_transcripts`, `get_call_summary`, `get_transcript`, `query_csat`). `search_transcripts` goes through `rag_query()` and `get_call_summary` uses `get_retriever().get_by_id()`; `query_csat` reads the Postgres `f_csat` fact (falling back to the `csat_survey` source), not `csat.json`.
 - `ccai_mcp/metrics.py` implements the semantic-layer tools (`query_metric`, `ask_the_analyst`), which shell out to the committed `mf` (MetricFlow) CLI over the `metrics.yml` catalog.
 - `ccai_mcp/server.py` is a thin router: it receives MCP tool calls over stdio and dispatches to `ccai_mcp/tools.py`, `ccai_mcp/metrics.py` and `ccai_mcp/change.py` (the `explain_change` tool: a metric before and after a change, plus the calls in between).
 
-**Auth:** No authentication logic exists in Python code. In production, Easy Auth (Entra) on Azure Container Apps intercepts all requests before they reach the server; the Python app sees authenticated traffic only. `AZURE_TENANT_ID` / `AZURE_CLIENT_ID` env vars are used by Terraform, not by the app.
+**Auth:** Production identity is designed as infrastructure: Easy Auth (Entra) on Azure Container Apps, which intercepts requests before they reach the server (Terraform validated in CI; not deployed). The HTTP transport (`ccai_mcp/http_transport.py`) has demo-grade guards of its own: a static bearer token (`MCP_AUTH_TOKEN`), or Cloudflare Access JWT verification. `AZURE_TENANT_ID` / `AZURE_CLIENT_ID` env vars are used by Terraform, not by the app.
 
 **S3 ingestion** is stubbed — `pipeline.py` raises `NotImplementedError` for the `"s3"` source path.
 
@@ -77,8 +83,8 @@ ccai_mcp/server.py (stdio; HTTP opt-in) → 7 tools exposed to MCP clients
 
 - **CSAT is searchable only on the LanceDB retriever.** `query_csat()` reads the Postgres `f_csat` fact (SQL-backed). With `RETRIEVER_BACKEND=lancedb`, `--ingest` also copies each call's `csat_survey` score onto the Lance table as typed columns (`csat_score`, `surveyed_at`; no re-embedding), so `search_transcripts` takes `min_csat` / `max_csat` and prefilters to those calls. pgvector holds no scores and refuses the filter. CSAT text itself is still not embedded.
 - **Chat provider swaps are controlled by `LLM_PROVIDER` env var** (`"openai"`, default, or `"ollama"`, `"anthropic"`, `"fireworks"`, `"vllm"`). `get_llm(provider: str | None = None)` in `rag/pipeline.py` takes an explicit provider override so evals can loop providers in one process. The `"openai"` branch is any OpenAI-compatible chat endpoint — its `LLM_BASE_URL` (default `https://openrouter.ai/api/v1`) and `LLM_MODEL` (default low-cost `z-ai/glm-5.3-flash`) are env-configurable; the key is read from `OPENAI_API_KEY`. Fireworks and vLLM go through the OpenAI-compatible client (`FIREWORKS_API_KEY`/`FIREWORKS_MODEL`, `VLLM_BASE_URL`/`VLLM_MODEL`); Anthropic uses `ANTHROPIC_API_KEY`/`ANTHROPIC_MODEL`.
-- **Embeddings are decoupled via `EMBEDDING_PROVIDER`** (falling back to `LLM_PROVIDER`, so an unset value keeps the old single-provider behavior). OpenRouter currently serves **no embedding models**, so an OpenRouter chat setup must pair with `EMBEDDING_PROVIDER=ollama` (local, free `nomic-embed-text`) or an OpenAI-compatible `EMBEDDING_BASE_URL`/`EMBEDDING_MODEL`. To add other providers (Anthropic, Vertex AI, etc.), only `rag/embeddings.py` and the LLM init in `rag/pipeline.py` need to change.
-- **MCP server is stdio by default**; streamable HTTP is opt-in (`MCP_TRANSPORT=http` or `--http`, `ccai_mcp/http_transport.py`) for clients on other machines, bound to loopback unless `MCP_AUTH_TOKEN` is set. Claude Desktop and other local clients can still connect via process I/O. Azure runs the HTTP mode behind Easy Auth (Entra).
+- **Embeddings are decoupled via `EMBEDDING_PROVIDER`** (falling back to `LLM_PROVIDER`, so an unset value keeps the old single-provider behavior). OpenRouter currently serves **no embedding models**, so an OpenRouter chat setup must pair with `EMBEDDING_PROVIDER=ollama` (local, free `nomic-embed-text`) or an OpenAI-compatible `EMBEDDING_BASE_URL`/`EMBEDDING_MODEL`. A new embedding provider goes in `rag/embeddings.py`, and a new chat provider in `get_llm()` in `rag/pipeline.py`.
+- **MCP server is stdio by default**; streamable HTTP is opt-in (`MCP_TRANSPORT=http` or `--http`, `ccai_mcp/http_transport.py`) for clients on other machines, bound to loopback unless `MCP_AUTH_TOKEN` is set. Claude Desktop and other local clients can still connect via process I/O. The HTTP mode is designed to run on Azure Container Apps behind Easy Auth (Entra); the Terraform is validated in CI and has not been deployed.
 
 ## Environment variables
 
@@ -187,6 +193,6 @@ Deployed via GitHub Actions → GitHub Pages at https://hendocode.github.io/cont
 
 ## What's built vs. what's next
 
-**Built:** synthetic data generator, full RAG ingest/retrieve/respond pipeline, pgvector + OpenAI integration, Ollama as local provider alternative (no API key), 7-tool MCP server (RAG/CSAT + semantic-layer metric tools + change analysis), Terraform for Azure (`infra/azure`: Container Apps + PostgreSQL Flexible Server + ADLS), Docker Compose for local dev.
+**Built:** the `docs/MAP.md` capability table has the status of each part. In short: the synthetic data generator and OLTP seed; the semantic layer (dbt + MetricFlow, 47 metrics, Postgres/Snowflake/Databricks targets, parity runs in `results/semantics/`); the 7-tool MCP server over stdio or streamable HTTP; transcript ingest and retrieval on LanceDB (default, with CSAT score filters) and pgvector as the rollback and benchmark peer; five chat providers; the LangGraph agent with LangSmith tracing and evals; Docker Compose for local dev; Terraform for Azure (`infra/azure`: Container Apps + PostgreSQL Flexible Server + ADLS), validated in CI and not deployed.
 
-**Not yet implemented:** S3 ingestion, CSAT → vector store (currently SQL-backed via `f_csat`, not embedded), observability, end-to-end deployment of the CI workflow.
+**Not yet built:** listed only in `docs/ROADMAP.md`.

@@ -1,14 +1,29 @@
 # contact-center-ai
 
-A RAG pipeline and MCP server that gives contact center supervisors natural language access to call recordings, transcripts, and CSAT survey data.
-
-Built to be **provider-agnostic** (swap OpenAI for Anthropic or Gemini via LangChain) and **reusable** — the MCP server is designed as a shared enterprise tool, not tied to a single team or use case.
+A governed semantic layer for a synthetic credit-union contact center, served to AI assistants
+through one MCP server. It runs on synthetic data only.
 
 ## What it does
 
-- Ingests call transcripts into a vector store (pgvector, or LanceDB as a peer) and CSAT survey results into Postgres
-- Exposes a RAG-powered query interface: ask questions like *"what were the most common complaints last week?"* or *"show me calls where the member mentioned fraud"*
-- Serves these capabilities as MCP tools so any GenAI client (Claude, OpenAI, Gemini) can consume them without rebuilding the data layer
+dbt and MetricFlow declare 47 metrics over a star schema. The schema is built from an OLTP ledger,
+call records and CSAT surveys. Each ambiguous business word ("rate", "balance", "fee", "LCV") maps to
+named metrics filtered by line of business, so an assistant asks which one you mean instead of
+returning one blended number.
+
+One MCP server exposes the layer as seven read-only tools:
+
+- **Metric tools:** `query_metric`, `ask_the_analyst`, and `explain_change`, which explains why a
+  metric moved around a logged change and cites the calls behind it.
+- **Evidence tools** over the call transcripts and CSAT: `search_transcripts`, `get_call_summary`,
+  `get_transcript`, `query_csat`.
+
+Claude, Gemini, Cursor, Open WebUI and a LangGraph agent all use the same server. Numbers come from
+the metric layer, and the words come from the calls.
+
+The quickest look is the change-analysis demo. `make demo-change-replay` prints the recorded run
+with no model, database or network. `make demo-change` runs it live after `make up dev-data`.
+
+Future work is listed in one place: [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Architecture
 
@@ -19,38 +34,59 @@ table; the diagrams' source is `docs/architecture/workspace.dsl`.
 Synthetic transcripts / CSAT / member ledger   (S3 source: stubbed)
          │
          ▼
-  Ingestion pipeline (LangChain; Ollama or OpenAI-compatible embeddings)
+  OLTP schema + seed ─► dbt star schema + 47 MetricFlow metrics
+  Transcript ingest (Ollama or OpenAI-compatible embeddings) ─► LanceDB (default) or pgvector
          │
          ▼
-   pgvector (PostgreSQL) or LanceDB  ·  dbt marts + MetricFlow metrics
-         │
-         ▼
-   MCP Server (Python)
+   MCP Server (Python, stdio or streamable HTTP)
+   ├── query_metric(metrics)
+   ├── ask_the_analyst(question)
+   ├── explain_change(metric, filters, change_point)
    ├── search_transcripts(query)
    ├── get_call_summary(call_id)
    ├── get_transcript(call_id)
-   ├── query_csat(score range, category, dates)
-   ├── query_metric(metrics)
-   ├── ask_the_analyst(question)
-   └── explain_change(metric, filters, change_point)
+   └── query_csat(score range, category, dates)
          │
          ▼
   LangGraph agent, or any MCP-compatible client
-  (Claude Desktop, Cursor, etc.)
+  (Claude, Gemini, Cursor, Open WebUI)
 ```
 
-**Auth:** Microsoft Entra via Easy Auth on Azure Container Apps — governs which teams and identities can access the server in production.
+### Where the transcripts live
+
+LanceDB is the default transcript store. pgvector stays filled as the rollback and benchmark
+peer (`RETRIEVER_BACKEND=pgvector`). CSAT-filtered, full-text and hybrid search and versioned
+rollback need LanceDB.
+
+| Run mode | Transcript store | Notes |
+|---|---|---|
+| Host: `make dev-data`, `python -m ccai_mcp.server`, Claude Desktop | LanceDB in `data/lance` | needs `uv sync --group lance` |
+| Compose `app` profile: `make demo`, `mcp-server`, `jupyter` | LanceDB on the `lance-data` volume | pgvector is ingested too, for rollback |
+| Azure `mcp-server` Container App | LanceDB on ADLS (`az://` URI) | Terraform validated in CI; not deployed |
+| Benchmark or rollback | pgvector | `RETRIEVER_BACKEND=pgvector` |
+
+**Auth:** the HTTP transport has demo-grade guards: a static bearer token (`MCP_AUTH_TOKEN`) or
+Cloudflare Access JWT verification. On Azure the design puts the server on Container Apps behind
+Microsoft Entra Easy Auth; that infrastructure is validated in CI and has not been deployed.
 
 ## Stack
 
-- **Python 3.12** (managed by uv)
-- **LangChain** — orchestration and LLM abstraction
-- **pgvector** — vector similarity search inside PostgreSQL
-- **OpenAI** — embeddings and completions (default; swappable)
-- **Ollama** — local embeddings and completions, no API key required (optional)
-- **Python MCP SDK** — MCP server implementation
-- **Terraform** — Azure infrastructure (Container Apps + PostgreSQL Flexible Server + ADLS)
-- **Microsoft Entra** — authentication (production)
+- **Semantic layer:** dbt Core 1.12 and MetricFlow 0.15 on Postgres, with Snowflake and
+  Databricks targets; an Apache Ossie export of the metric definitions
+- **Transcript stores:** LanceDB 0.39 (default; DuckDB reads it for ad hoc SQL) and pgvector on
+  PostgreSQL 16
+- **Models:** LangChain; chat through an OpenAI-compatible client (OpenRouter by default), Ollama,
+  Anthropic, Fireworks or vLLM; embeddings through Ollama or an OpenAI-compatible endpoint
+- **MCP:** the Python MCP SDK, over stdio or streamable HTTP, optionally behind Cloudflare Tunnel
+  and Access
+- **Agent and evals:** LangGraph, LangSmith tracing and live evals, an offline eval gate in CI
+- **Local runtime:** Python 3.12 managed by uv; Docker Compose for Postgres, Ollama, the demo
+  stack, Open WebUI, JupyterLab and Structurizr
+- **Infrastructure:** Terraform for Azure (Container Apps, PostgreSQL Flexible Server, ADLS,
+  Entra Easy Auth) and a Snowflake root
+
+**Defaults:** chat goes through the OpenAI-compatible client to OpenRouter (`z-ai/glm-5.3-flash`);
+embeddings use Ollama `nomic-embed-text`; `make demo` runs both on Ollama.
 
 ## Quick start
 
@@ -72,12 +108,12 @@ cd contact-center-ai
 cp .env.example .env
 # Edit .env — set OPENAI_API_KEY, or set LLM_PROVIDER=ollama
 
-# Start PostgreSQL with pgvector (and Ollama, if using it)
+# Start Postgres, Ollama, Open WebUI and Structurizr
 docker compose up -d
 
 # Create virtualenv and install dependencies
 uv venv --python 3.12
-uv sync --extra dev
+uv sync --extra dev --group dbt --group lance
 
 # Build all local data: synthetic JSON, OLTP schema and load, vector-store ingest,
 # and the dbt marts (idempotent; one line per step, stops with the fix on failure)
@@ -112,18 +148,40 @@ declares a vLLM server.
 
 ## Connecting a client
 
-Once the MCP server is running locally, add it to your Claude Desktop config:
+Claude Desktop starts the server itself over stdio. Add this to `claude_desktop_config.json`,
+replacing `/path/to/contact-center-ai`. The `dbt` group installs the `mf` CLI that the metric
+tools call, and the `lance` group installs the default transcript store. Run `make up dev-data`
+first.
 
 ```json
 {
   "mcpServers": {
     "contact-center": {
       "command": "uv",
-      "args": ["run", "--directory", "/path/to/contact-center-ai", "python", "-m", "ccai_mcp.server"]
+      "args": [
+        "run",
+        "--directory",
+        "/path/to/contact-center-ai",
+        "--group",
+        "dbt",
+        "--group",
+        "lance",
+        "python",
+        "-m",
+        "ccai_mcp.server"
+      ],
+      "env": {
+        "DATABASE_URL": "postgresql://postgres:postgres@localhost:5432/contactcenter",
+        "LLM_PROVIDER": "ollama",
+        "EMBEDDING_PROVIDER": "ollama"
+      }
     }
   }
 }
 ```
+
+[ccai_mcp/README.md](ccai_mcp/README.md) covers the other clients (Claude and Gemini custom
+connectors, Cursor, Claude Code) and serving the tools over HTTP.
 
 ## Swapping LLM providers
 
@@ -177,23 +235,28 @@ EMBEDDING_PROVIDER=ollama
 OLLAMA_EMBEDDING_MODEL=nomic-embed-text
 ```
 
-### OpenAI (default)
+### OpenAI direct
 
 ```bash
-LLM_PROVIDER=openai   # or omit — openai is the default
+LLM_PROVIDER=openai
 OPENAI_API_KEY=sk-...
+LLM_BASE_URL=https://api.openai.com/v1
+LLM_MODEL=<an OpenAI chat model id>
+EMBEDDING_PROVIDER=openai
 EMBEDDING_MODEL=text-embedding-3-small      # embedding model id (OpenAI-compatible)
 EMBEDDING_BASE_URL=https://api.openai.com/v1  # embedding endpoint (default)
 ```
 
-The pipeline is also designed so you can add other LangChain-supported providers (Anthropic, Google Vertex AI, etc.) by extending `rag/embeddings.py` and `rag/pipeline.py`.
+`LLM_PROVIDER` also accepts `anthropic`, `fireworks` and `vllm`; `.env.example` lists their
+variables. A new chat provider goes in `get_llm()` in `rag/pipeline.py`, and a new embedding
+provider in `rag/embeddings.py`.
 
-## Production deployment
+## Azure deployment
 
-See `infra/azure/` for the Azure infrastructure (Container Apps, PostgreSQL Flexible Server, ADLS)
-and its README for the bootstrap, plan and apply steps. Entra auth is configured as Easy Auth on
-the Container App — see `infra/azure/modules/apps/main.tf`. `infra/terraform/` is the deprecated
-single-file App Service version.
+`infra/azure/` holds the Terraform for Azure (Container Apps, PostgreSQL Flexible Server, ADLS)
+and its README has the bootstrap, plan and apply steps. Entra auth is configured as Easy Auth on
+the Container App (`infra/azure/modules/apps/main.tf`). CI validates the Terraform; it has not
+been applied, and no workflow builds the server image yet.
 
 ## Notes
 

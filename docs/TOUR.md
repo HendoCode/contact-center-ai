@@ -599,9 +599,7 @@ Grounded in `olap/dbt/models/marts/semantic/metrics.yml`:
 
 ## Known limits and not built yet
 
-- **Not built yet:** fine-tune F2–F6; S3 (AWS) ingestion
-  (`rag.pipeline --source s3` raises `NotImplementedError`); CSAT in the vector store; the agent
-  talking to the MCP server over HTTP (it still spawns it over stdio); an agent HTTP endpoint (L4).
+- **Not built yet:** listed in [ROADMAP.md](ROADMAP.md).
 - **Results:** `results/retrieval/`, `results/evals/` and `results/semantics/` hold real runs. The
   numbers in `olap/dbt/README.md` come from a seeded local run, not from `results/`.
 - **Never run against a real account:** every Terraform `apply` beyond what you applied yourself.
