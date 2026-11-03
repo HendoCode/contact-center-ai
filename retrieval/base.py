@@ -31,6 +31,7 @@ LanceDB backend stores: it is filled from the Postgres `csat_survey` table after
 integers in 1-5, and `{"csat_score": None}` selects the calls without a survey.
 """
 
+import hashlib
 import os
 from datetime import date, datetime, timedelta
 from dataclasses import dataclass, field
@@ -143,6 +144,18 @@ def validate_where(where: dict | None) -> list[tuple[str, str, object]]:
                 op, value = _normalize_bound(op, value)
             triples.append((fld, op, list(value) if op == "in" else value))
     return triples
+
+
+def content_hash(text: str) -> str:
+    """sha256 of a document's text: the key a stored vector is matched on."""
+    return hashlib.sha256(text.encode()).hexdigest()
+
+
+def embedding_model_id(embeddings) -> str:
+    """`provider:model` naming the model behind `embeddings` (a cached wrapper reports the inner one)."""
+    provider = os.getenv("EMBEDDING_PROVIDER", os.getenv("LLM_PROVIDER", "openai")).lower()
+    model = getattr(embeddings, "model", None) or type(embeddings).__name__
+    return f"{provider}:{model}"
 
 
 DEFAULT_BACKEND = "lancedb"

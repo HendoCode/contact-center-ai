@@ -1,4 +1,7 @@
-"""On-disk document embedding cache shared by `make ingest`, `make bench` and the Lance check.
+"""On-disk document embedding cache shared by `make bench` and the Lance check, and read by `make ingest`.
+
+`make ingest` first takes vectors the Lance table already holds for the same model (see
+`rag.pipeline`), so the cache only matters there when the table is empty or absent.
 
 One JSONL file per embedding model under `.cache/embeddings/`, each line
 `{"h": sha256(text), "v": vector}`, so a rerun embeds only text it has not seen. On a CPU
@@ -9,24 +12,20 @@ vectors go to `.cache/embeddings/`.
 
 from __future__ import annotations
 
-import hashlib
 import json
-import os
 import re
 import time
 from collections.abc import Callable, Iterable
 from pathlib import Path
+
+from retrieval.base import content_hash, embedding_model_id
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 CACHE_DIR = REPO_ROOT / ".cache" / "embeddings"
 LEGACY_CACHE_DIR = REPO_ROOT / ".cache" / "bench-embeddings"
 
 
-def embedding_model(embeddings) -> str:
-    """`provider:model`, the cache key for an embedding model."""
-    provider = os.getenv("EMBEDDING_PROVIDER", os.getenv("LLM_PROVIDER", "openai")).lower()
-    model = getattr(embeddings, "model", None) or type(embeddings).__name__
-    return f"{provider}:{model}"
+embedding_model = embedding_model_id  # `provider:model`, the cache key for an embedding model
 
 
 def cache_file_for(embeddings) -> Path:
@@ -34,8 +33,7 @@ def cache_file_for(embeddings) -> Path:
     return CACHE_DIR / (re.sub(r"[^A-Za-z0-9_.-]+", "_", embedding_model(embeddings)) + ".jsonl")
 
 
-def _text_key(text: str) -> str:
-    return hashlib.sha256(text.encode()).hexdigest()
+_text_key = content_hash
 
 
 def embed_progress(label: str = "bench") -> Callable[[int, int], None]:
@@ -65,6 +63,7 @@ class CachedEmbeddings:
 
     def __init__(self, inner, cache_file: Path | None = None, label: str = "bench"):
         self.inner = inner
+        self.model = getattr(inner, "model", None)  # so `embedding_model_id` names the inner model
         self.label = label
         self._docs: dict[str, list[float]] = {}
         self._queries: dict[str, list[float]] = {}
@@ -78,6 +77,11 @@ class CachedEmbeddings:
                     for line in path.read_text().splitlines():
                         row = json.loads(line)
                         self._disk[row["h"]] = row["v"]
+
+    def preload(self, vectors: dict[str, list[float]]) -> int:
+        """Take ready-made `{text: vector}` (for example vectors a store already holds); returns how many."""
+        self._docs.update(vectors)
+        return len(vectors)
 
     def warm_documents(self, texts: Iterable[str], batch: int = 64,
                        progress: Callable[[int, int], None] | None = None) -> tuple[int, float]:

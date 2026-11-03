@@ -30,7 +30,8 @@ def test_seed_is_the_writer_and_ingests_both_stores():
     script = "\n".join(seed["command"])
     assert "RETRIEVER_BACKEND=pgvector python -m rag.pipeline --ingest" in script
     assert "RETRIEVER_BACKEND=lancedb python -m rag.pipeline --ingest" in script
-    assert script.index("pgvector python") < script.index("lancedb python")
+    # LanceDB first: it holds the vectors the pgvector run then reuses.
+    assert script.index("lancedb python") < script.index("pgvector python")
 
 
 def test_backend_and_uri_are_not_interpolated_from_env():

@@ -21,8 +21,11 @@ history; this module names the versions that matter and makes them usable:
   oldest tag and only history before it goes. Tags not named `seed-*` are never expired, and
   while one exists, history older than it is kept for it.
 
-Out of scope here: swapping the embedding model. A new dimension is refused by ingest
-(`lancedb_backend.ingest`), so that workflow needs a second vector column or table.
+* **Embedding-model change.** When ingest replaces vectors made by another model
+  (`lancedb_backend.ingest`), it first tags the version being replaced `pre-model-change-<n>`
+  unless that version already carries a tag (a `seed-*` tag from the previous ingest usually does).
+  Rolling back to such a tag restores that model's vectors, in their own dimension; query with the
+  matching `EMBEDDING_MODEL` afterwards. These tags are not `seed-*`, so retention never expires them.
 
     python -m retrieval.lance_versions list
     python -m retrieval.lance_versions rollback TAG
@@ -64,6 +67,22 @@ def seed_tag_name(label: str, taken: set[str]) -> str:
     while name in taken:
         n += 1
         name = f"{base}-{n}"
+    return name
+
+
+MODEL_CHANGE_PREFIX = "pre-model-change-"
+
+
+def tag_before_model_change(table) -> str | None:
+    """Tag the newest version `pre-model-change-<n>` unless it already has a tag; returns the name."""
+    if tags_by_version(table).get(table.version):
+        return None
+    taken = set(table.tags.list())
+    n = 1
+    while f"{MODEL_CHANGE_PREFIX}{n}" in taken:
+        n += 1
+    name = f"{MODEL_CHANGE_PREFIX}{n}"
+    table.tags.create(name, table.version)
     return name
 
 

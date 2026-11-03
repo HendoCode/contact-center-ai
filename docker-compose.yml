@@ -115,8 +115,15 @@ services:
   # One-shot: OLTP schema, deterministic synthetic data, load into Postgres, embed the
   # transcripts into the vector store. Every step is idempotent, so a re-run changes nothing.
   # Transcripts are ingested into both stores: LanceDB (the one the readers use, on the
-  # lance-data volume) and pgvector (kept filled so rolling back is one setting). The second
-  # run reuses the embedding cache the first one wrote, so it adds seconds.
+  # lance-data volume) and pgvector (kept filled so rolling back is one setting). LanceDB goes
+  # first because the Lance table is the durable home of the vectors: each row records the
+  # sha256 of its text and the embedding model, and an ingest embeds only transcripts whose
+  # (call_id, text, model) it does not already hold. So the first seed embeds everything (about
+  # 45 minutes on 2 cores with the local Ollama model), the pgvector run after it reuses those
+  # vectors, and a recreate or rebuild of this service with unchanged transcripts and the same
+  # model makes no embedding call and finishes in seconds. A new or edited transcript is embedded
+  # alone. A changed embedding model re-embeds everything into the same table after tagging the
+  # old version (`make lance-rollback TAG=...` restores it).
   seed:
     <<: *app
     command:
@@ -126,8 +133,8 @@ services:
         olap/oltp/apply.sh
         python data/synthetic/generate_data.py
         python olap/seed.py
-        RETRIEVER_BACKEND=pgvector python -m rag.pipeline --ingest
         RETRIEVER_BACKEND=lancedb python -m rag.pipeline --ingest
+        RETRIEVER_BACKEND=pgvector python -m rag.pipeline --ingest
     volumes:
       - lance-data:/app/data/lance
     depends_on:

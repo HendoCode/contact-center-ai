@@ -62,7 +62,7 @@ rollback need LanceDB.
 | Run mode | Transcript store | Notes |
 |---|---|---|
 | Host: `make dev-data`, `python -m ccai_mcp.server`, Claude Desktop | LanceDB in `data/lance` | needs `uv sync --group lance` |
-| Compose `app` profile: `make demo`, `mcp-server`, `jupyter` | LanceDB on the `lance-data` volume | pgvector is ingested too, for rollback |
+| Compose `app` profile: `make demo`, `mcp-server`, `jupyter` | LanceDB on the `lance-data` volume | pgvector is ingested too, for rollback; a re-seed with unchanged transcripts and model embeds nothing (vectors persist in the Lance table) |
 | Azure `mcp-server` Container App | LanceDB on ADLS (`az://` URI) | Terraform validated in CI; not deployed |
 | Benchmark or rollback | pgvector | `RETRIEVER_BACKEND=pgvector` |
 
