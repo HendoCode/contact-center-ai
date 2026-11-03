@@ -60,4 +60,4 @@ raises `NotImplementedError`).
 | Warehouse portability | The same metrics on Postgres, Snowflake and Databricks: loaders, dbt targets, a parity check, an Apache Ossie export | built; parity run on all three targets | `make parity`; `make load-snowflake`; `make dbt-build WAREHOUSE=snowflake` |
 | Cloud deployment | Terraform for Azure (Container Apps behind Entra Easy Auth, PostgreSQL, ADLS, optional GPU VM and Databricks) and a Snowflake root | validated in CI; not deployed | `infra/azure/` |
 | Model choice and fine-tuning | Five chat providers behind one switch; the fine-tune dataset; a vLLM service | partial: providers built, fine-tune dataset only, vLLM declared | `LLM_PROVIDER`; `make finetune-data`; Compose `gpu` profile |
-| Real call data in | Reading recordings and transcripts from S3; CSAT in the vector store | stub | `python -m rag.pipeline --source s3` |
+| Real call data in | Reading transcripts from S3 (recordings are not processed); CSAT text in the vector store | stub | `python -m rag.pipeline --source s3` |

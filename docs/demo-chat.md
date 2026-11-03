@@ -1,4 +1,4 @@
-# Demo chat: a supervisor, six tools, five ambiguous words
+# Demo chat: a supervisor, six of the seven tools, five ambiguous words
 
 A sample conversation between a call-center supervisor and the MCP server, to show what each
 tool returns and how the semantic layer settles words like "rate", "balance" and "LTV". It

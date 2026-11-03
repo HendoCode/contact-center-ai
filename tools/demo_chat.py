@@ -262,7 +262,7 @@ def render(cap: dict) -> str:
     rate_in_call = f"{member['note_rate']}%" in rates_call.text
     principal_in_call = f"${_money(member['principal'])}" in rates_call.text
 
-    parts = [f"""# Demo chat: a supervisor, six tools, five ambiguous words
+    parts = [f"""# Demo chat: a supervisor, six of the seven tools, five ambiguous words
 
 A sample conversation between a call-center supervisor and the MCP server, to show what each
 tool returns and how the semantic layer settles words like "rate", "balance" and "LTV". It

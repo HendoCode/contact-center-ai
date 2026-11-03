@@ -1,5 +1,7 @@
 # Fine-tune or retrieve (W1)
 
+> Design note as of 2026-10-02. It records the plan at that date and is not updated as the code changes. The current state is in [MAP.md](../MAP.md).
+
 D0.1, 2026-10-02. Feeds F1–F6. Checked against TRL 1.14.1, PEFT 0.21.2, vLLM 0.30.0, Fireworks' tunable-model list (2026-09-30), and generator output at `6775cb4`.
 
 **Corpus limits.**
