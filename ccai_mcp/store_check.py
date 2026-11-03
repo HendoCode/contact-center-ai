@@ -10,6 +10,7 @@ import logging
 import os
 
 from retrieval import get_retriever
+from retrieval.base import backend_name
 
 logger = logging.getLogger("ccai_mcp.store")
 
@@ -18,7 +19,7 @@ def store_problem() -> str | None:
     """None when the configured store holds at least one transcript, else a short reason."""
     if (os.getenv("MCP_STORE_CHECK") or "").strip().lower() in ("off", "0", "false", "no"):
         return None
-    backend = (os.getenv("RETRIEVER_BACKEND") or "pgvector").lower()
+    backend = backend_name()
     try:
         rows = get_retriever().count()
     except Exception as exc:  # unreadable for any reason: missing package, bad URI, no database

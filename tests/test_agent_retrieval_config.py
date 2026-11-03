@@ -33,7 +33,7 @@ def test_unknown_mode_is_refused(monkeypatch):
 
 
 @pytest.mark.parametrize("env, message", [
-    ({"AGENT_RETRIEVAL_MODE": "hybrid"}, "AGENT_RETRIEVAL_MODE=hybrid needs RETRIEVER_BACKEND=lancedb (pgvector serves vector search only)"),
+    ({"RETRIEVER_BACKEND": "pgvector", "AGENT_RETRIEVAL_MODE": "hybrid"}, "AGENT_RETRIEVAL_MODE=hybrid needs RETRIEVER_BACKEND=lancedb (pgvector serves vector search only)"),
     ({"AGENT_RETRIEVAL_MODE": "bm25"}, "AGENT_RETRIEVAL_MODE='bm25': use vector, fts or hybrid"),
     ({"AGENT_RETRIEVAL_K": "0"}, "AGENT_RETRIEVAL_K='0': a positive whole number"),
 ])
@@ -41,6 +41,10 @@ def test_preflight_refuses_what_cannot_run(env, message):
     with pytest.raises(PreflightError) as err:
         preflight.check_retrieval(env)
     assert str(err.value) == message
+
+
+def test_preflight_defaults_to_lancedb():
+    assert preflight.check_retrieval({"AGENT_RETRIEVAL_MODE": "hybrid"}) == "search: lancedb, hybrid, k=5"
 
 
 def test_preflight_accepts_lance_hybrid():

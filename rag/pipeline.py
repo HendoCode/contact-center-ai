@@ -17,6 +17,7 @@ from pathlib import Path
 from langchain_core.documents import Document
 
 from retrieval import Hit, get_retriever
+from retrieval.base import backend_name
 
 
 # ── LLM ───────────────────────────────────────────────────────────────────────
@@ -395,7 +396,7 @@ if __name__ == "__main__":
 
     try:
         if args.reset:
-            if os.getenv("RETRIEVER_BACKEND", "pgvector").lower() == "lancedb":
+            if backend_name() == "lancedb":
                 get_retriever().reset()
             else:
                 from rag.embeddings import get_vector_store

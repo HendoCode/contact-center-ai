@@ -14,7 +14,7 @@ Streamable HTTP for clients on other machines (opt in; see ccai_mcp/README.md):
 Production (Azure App Service):
     - Auth handled by Entra via App Service Easy Auth for MCP
     - See: https://learn.microsoft.com/en-us/azure/app-service/configure-authentication-mcp
-    - Infra: infra/terraform/main.tf
+    - Infra: infra/azure/ (Container Apps; Easy Auth in infra/azure/modules/apps/main.tf)
 """
 
 import argparse

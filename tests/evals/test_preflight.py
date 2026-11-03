@@ -215,7 +215,7 @@ def test_dev_data_runs_every_step_in_order(tmp_path):
         ["[1/5] generate", "[2/5] schema  ", "[3/5] load    ", "[4/5] ingest  ", "[5/5] dbt     "]
     assert log.read_text().splitlines() == [
         "uv run python data/synthetic/generate_data.py", "apply", "uv run python olap/seed.py",
-        "uv run python -m rag.pipeline --ingest",
+        "uv run --group lance python -m rag.pipeline --ingest",
         "uv run --group dbt dbt build --project-dir olap/dbt --profiles-dir olap/dbt --target dev"]
     log.unlink()
     res = subprocess.run([str(shadow / "tools" / "dev-data.sh")], capture_output=True, text=True,

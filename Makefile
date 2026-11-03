@@ -10,8 +10,9 @@
 .PHONY: up down seed ingest test lint check-public demo demo-change demo-change-replay notebooks strip-notebooks bench evals evals-live evals-compare evals-export evals-retrieval-experiment finetune-data finetune-label load-snowflake load-databricks load-dry-run dbt-build dbt-build-dev dev-data lance-azure-check lance-versions lance-rollback lance-prune parity
 
 PYTHON := uv run python
-# RETRIEVER_BACKEND=lancedb needs the lance dependency group wherever the store is read or written.
-LANCE_GROUP = $(if $(filter lancedb,$(RETRIEVER_BACKEND)),--group lance)
+# LanceDB is the default transcript store and needs the lance dependency group wherever the
+# store is read or written; RETRIEVER_BACKEND=pgvector (rollback, benchmark peer) does not.
+LANCE_GROUP = $(if $(filter pgvector,$(RETRIEVER_BACKEND)),,--group lance)
 
 # The L3 stack lives in the `app` Compose profile, so a bare `docker compose up -d`
 # still starts only db and ollama.
