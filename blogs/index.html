@@ -19,13 +19,15 @@
     <title>Series Overview | Anchoring AI — HendoCode</title>
     <meta name="description"
           content="Anchoring AI is a growing blog series about building
-a real RAG pipeline, MCP server, and observability stack for a call
-center — from synthetic data to production infrastructure.">
+a governed semantic layer and transcript search for a credit-union
+contact center, and serving both to AI assistants through one MCP
+server.">
     <meta property="og:title" content="Series Overview">
     <meta property="og:description"
           content="Anchoring AI is a growing blog series about building
-a real RAG pipeline, MCP server, and observability stack for a call
-center — from synthetic data to production infrastructure.">
+a governed semantic layer and transcript search for a credit-union
+contact center, and serving both to AI assistants through one MCP
+server.">
     <meta property="og:type" content="article">
     <meta name="twitter:card" content="summary">
     <meta name="twitter:title" content="Series Overview">
@@ -579,8 +581,8 @@ center — from synthetic data to production infrastructure.">
     <header class="post-header">
                 <div class="series-eyebrow">Anchoring AI</div>
                 <h1>Series Overview</h1>
-        <p class="post-subtitle">Building a production RAG system from
-scratch — an ongoing series</p>
+        <p class="post-subtitle">Building a governed semantic layer for
+a contact center and serving it to AI assistants — an ongoing series</p>
                 <div class="byline">
             Stephen Henderson &middot; 2026
         </div>
@@ -595,10 +597,12 @@ scratch — an ongoing series</p>
         credit union. The data is synthetic. The architecture decisions,
         trade-offs, and lessons are real.</p>
         <p>The series follows a <strong>build-with-me</strong> arc: each
-        post adds a layer to the system. By the end, we’ll have a RAG
-        pipeline, an MCP server, object storage ingestion, a REST API,
-        Azure infrastructure, a Grafana observability stack, and a
-        validation framework — all grounded in a real use case.</p>
+        post adds a layer to the system. Posts 01–04 built the
+        transcript pipeline and the first MCP server. Posts 05–12 follow
+        what the system has become since: a semantic layer of 47
+        governed metrics, LanceDB as the transcript store, metric and
+        evidence tools served to AI assistants over MCP, evals for the
+        agent that uses them, and the coding agents that build it.</p>
         <p>The repo lives at <a
         href="https://github.com/HendoCode/contact-center-ai">github.com/HendoCode/contact-center-ai</a>.</p>
         <hr />
@@ -644,51 +648,59 @@ scratch — an ongoing series</p>
         <tr>
         <td><a href="./05-real-data-in/">05</a></td>
         <td><strong>Real Data In</strong></td>
-        <td>MinIO, S3-compatible object storage, implementing the S3
-        ingest stub, deduplication</td>
+        <td>The OLTP ledger behind the metrics: the Postgres schema and
+        seed, loaders that put the same rows into Snowflake and
+        Databricks, and a parity check that the metrics agree on all
+        three</td>
         </tr>
         <tr>
         <td><a href="./06-built-to-last/">06</a></td>
         <td><strong>Built to Last</strong></td>
-        <td>Terraform/OpenTofu on Azure, App Service, PostgreSQL
-        Flexible, Entra Easy Auth pattern</td>
+        <td>LanceDB as the transcript store: a benchmark against
+        pgvector on 100,000 calls, CSAT score filters, and versioning
+        with tags, rollback and retention</td>
         </tr>
         <tr>
         <td><a href="./07-the-developers-toolkit/">07</a></td>
         <td><strong>The Developer’s Toolkit</strong></td>
-        <td>REST API + OpenAPI/Swagger, PyCharm debugging, Junie for
-        tests and PEP8, HTTP Request files</td>
+        <td>The local stack: Docker Compose profiles, one command to
+        build all local data, notebooks, architecture diagrams from one
+        model, and Terraform for Azure Container Apps checked in CI</td>
         </tr>
         <tr>
         <td><a href="./08-what-should-we-measure/">08</a></td>
         <td><strong>What Should We Measure?</strong></td>
-        <td>LLM and RAG-specific metrics, Grafana + OpenTelemetry
-        landscape, dashboard design</td>
+        <td>The semantic layer: dbt and MetricFlow over a star schema,
+        47 governed metrics, and how one word like “rate” maps to
+        several named metrics</td>
         </tr>
         <tr>
         <td><a href="./09-wiring-it-up/">09</a></td>
         <td><strong>Wiring It Up</strong></td>
-        <td>OpenTelemetry instrumentation, docker-compose additions,
-        live Grafana dashboards</td>
+        <td>Serving the semantic layer over MCP: the metric tools,
+        <code>explain_change</code> with cited calls, streamable HTTP,
+        and connecting Claude, Gemini, Cursor and Open WebUI to the same
+        server</td>
         </tr>
         <tr>
         <td><a href="./10-trust-but-verify/">10</a></td>
         <td><strong>Trust, but Verify</strong></td>
-        <td>Validation strategies, drift detection, CSAT as a
-        ground-truth signal, SLOs for AI systems</td>
+        <td>Evals for the agent and the tools: a golden set, an offline
+        gate in CI, live runs traced in LangSmith, and what the first
+        live run measured</td>
         </tr>
         <tr>
         <td><a href="./11-whats-next/">11</a></td>
         <td><strong>What’s Next</strong></td>
-        <td>Coding agents, LangGraph, Azure AI Foundry — comparing what
-        we built with the emerging landscape</td>
+        <td>The LangGraph agent that asks which metric you mean before
+        it answers, and the work still on the roadmap</td>
         </tr>
         <tr>
         <td><a href="./12-agent-harness/">12</a></td>
         <td><strong>The Agent Harness</strong></td>
-        <td>Claude Code and the Pi coding agent, with firstmate
-        orchestrating parallel agent sessions: what changes when an
-        agent owns a task end to end</td>
+        <td>Coding agents working on this codebase, from task prompt to
+        reviewed pull request, and what changes when an agent owns a
+        task end to end</td>
         </tr>
         </tbody>
         </table>

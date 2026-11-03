@@ -1,9 +1,9 @@
 # OLTP foundation — Meridian Valley Credit Union
 
-Phase 1 of the semantic-layer demo: the PostgreSQL schema, the deterministic
-synthetic seed generator, and the loader. This layer is **additive** — it does
-not touch `ccai_mcp/` or `rag/`, and `transcripts.json` / `csat.json` keep
-their exact shapes so RAG ingest and `query_csat()` work unchanged.
+The OLTP foundation of the semantic layer: the PostgreSQL schema, the
+deterministic synthetic seed generator, and the loader. The dbt models in
+`olap/dbt/` build the star schema and metrics from these tables, and
+`query_csat()` reads the resulting `f_csat` fact.
 
 ## Quick start
 

@@ -1,6 +1,6 @@
 # Anchoring AI — Blog Series
 
-A growing series on building a production RAG system from scratch. Each post adds a layer; the reader builds along.
+A growing series on building a governed semantic layer for a contact center and serving it to AI assistants over MCP. Each post adds a layer; the reader builds along.
 
 **Series title:** Anchoring AI — *because RAG grounds LLM answers in retrieved evidence, and this series is about AI that's stable and trustworthy, not demo-ware.*
 

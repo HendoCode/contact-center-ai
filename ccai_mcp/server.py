@@ -1,8 +1,8 @@
 """
 MCP server entry point.
 
-Exposes call center RAG capabilities as MCP tools consumable by any
-MCP-compatible client (Claude Desktop, custom GenAI apps, etc.).
+Exposes the semantic layer (metric tools) and the call transcripts and CSAT
+(evidence tools) as seven read-only MCP tools for any MCP-compatible client.
 
 Local dev (stdio, the default):
     python -m ccai_mcp.server
@@ -11,10 +11,9 @@ Streamable HTTP for clients on other machines (opt in; see ccai_mcp/README.md):
     python -m ccai_mcp.server --http          # or MCP_TRANSPORT=http
     -> http://127.0.0.1:8000/mcp; a non-loopback MCP_SERVER_HOST requires MCP_AUTH_TOKEN
 
-Production (Azure App Service):
-    - Auth handled by Entra via App Service Easy Auth for MCP
-    - See: https://learn.microsoft.com/en-us/azure/app-service/configure-authentication-mcp
-    - Infra: infra/azure/ (Container Apps; Easy Auth in infra/azure/modules/apps/main.tf)
+Azure (designed; Terraform validated in CI, not deployed):
+    - Azure Container Apps running the HTTP mode, with Entra auth as Easy Auth on the app
+    - Infra: infra/azure/modules/apps/main.tf
 """
 
 import argparse
