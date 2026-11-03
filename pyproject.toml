@@ -5,22 +5,24 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "contact-center-ai"
 version = "0.1.0"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 dependencies = [
     "langchain>=1.4.3",
     "langchain-openai>=0.2.0",
     "langchain-anthropic>=0.2.0",
     "langchain-ollama>=0.2.0",
-    "langchain-community>=0.3.0",
     "langchain-postgres>=0.0.9",
     "pgvector>=0.3.0",
     "psycopg2-binary>=2.9.9",
     "mcp>=2.0.0,<3",
     "jsonschema>=4.20.0",
-    "boto3>=1.35.0",
     "python-dotenv>=1.0.0",
     "pydantic>=2.0.0",
     "faker>=26.0.0",
+    "pyyaml>=6.0",
+    "pyjwt[crypto]>=2.8.0",
+    "starlette>=0.40.0",
+    "uvicorn>=0.30.0",
 ]
 
 [tool.setuptools.packages.find]
@@ -53,6 +55,10 @@ snowflake = [
 ]
 databricks = [
     "dbt-databricks==1.12.6",
+]
+# Reserved for the stubbed S3 ingestion path in rag/pipeline.py; nothing imports it yet.
+s3 = [
+    "boto3>=1.35.0",
 ]
 lance = [
     "duckdb>=1.5.6",

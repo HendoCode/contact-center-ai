@@ -117,13 +117,33 @@ def test_ask_the_analyst_returns_grounded_answer(monkeypatch):
         assert f"- {name} —" in out  # one description line per metric
 
 
+def _csat_rows(category: str | None = None) -> list[int]:
+    """Scores straight from the seeded OLTP source, independent of the tool under test."""
+    import psycopg2
+    sql = ("SELECT c.score FROM csat_survey AS c "
+           "JOIN interaction AS i ON i.interaction_id = c.interaction_id")
+    params: tuple = ()
+    if category:
+        sql += " WHERE i.category_code = %s"
+        params = (category,)
+    with psycopg2.connect(CONNECTION_STRING) as conn, conn.cursor() as cur:
+        cur.execute(sql, params)
+        return [row[0] for row in cur.fetchall()]
+
+
+@pytest.mark.integration
 def test_query_csat_reads_postgres():
     if not _db_available():
         pytest.skip("Postgres unavailable")
+    scores = _csat_rows()
+    if not scores:
+        pytest.skip("csat_survey is empty; run make dev-data")
     out = query_csat()
-    assert "943 responses" in out
-    assert "Average score: 4.09/5" in out
+    assert f"{len(scores)} responses" in out
+    assert f"Average score: {sum(scores) / len(scores):.2f}/5" in out
 
-    scoped = query_csat(category="escrow_analysis")
-    assert "10 responses" in scoped
-    assert "3.00/5" in scoped
+    category = "escrow_analysis"
+    scoped_scores = _csat_rows(category)
+    scoped = query_csat(category=category)
+    assert f"{len(scoped_scores)} responses" in scoped
+    assert f"{sum(scoped_scores) / len(scoped_scores):.2f}/5" in scoped

@@ -4,13 +4,15 @@
 # "Anchoring AI" post commands. `test` / `lint` / `check-public` are the CI
 # gates. `bench` is the R3 retrieval benchmark. `demo` is the L3 Compose demo.
 # `evals` is the L2 agent golden set offline (a CI gate); `evals-live` is the same set
-# against real models, uploaded to LangSmith.
+# against real models, uploaded to LangSmith. Every target is declared in `.PHONY` below;
+# the comment above each one says what it does.
 
 .PHONY: up down seed ingest test lint check-public demo demo-change demo-change-replay notebooks strip-notebooks bench evals evals-live evals-compare evals-export evals-retrieval-experiment finetune-data finetune-label load-snowflake load-databricks load-dry-run dbt-build dbt-build-dev dev-data lance-azure-check lance-versions lance-rollback lance-prune parity
 
 PYTHON := uv run python
-# RETRIEVER_BACKEND=lancedb needs the lance dependency group wherever the store is read or written.
-LANCE_GROUP = $(if $(filter lancedb,$(RETRIEVER_BACKEND)),--group lance)
+# LanceDB is the default transcript store and needs the lance dependency group wherever the
+# store is read or written; RETRIEVER_BACKEND=pgvector (rollback, benchmark peer) does not.
+LANCE_GROUP = $(if $(filter pgvector,$(RETRIEVER_BACKEND)),,--group lance)
 
 # The L3 stack lives in the `app` Compose profile, so a bare `docker compose up -d`
 # starts only db, ollama, open-webui and structurizr.
@@ -69,7 +71,7 @@ strip-notebooks:
 up:
 	docker compose up -d
 
-# `--profile '*'` so profiled services (app, ui, gpu) come down too; a bare `down` skips them.
+# `--profile '*'` so profiled services (app, tunnel, gpu) come down too; a bare `down` skips them.
 down:
 	docker compose --profile '*' down
 
@@ -190,8 +192,8 @@ evals:
 	uv run --group agent python -m evals.run
 
 # The same set against the real models and MCP tools, as a LangSmith experiment with an
-# LLM-as-judge through OpenRouter; writes results/evals/. Needs the stack (`make up seed
-# ingest`, dbt build). Costs API money. LANGSMITH_API_KEY and the OpenRouter OPENAI_API_KEY
+# LLM-as-judge (Anthropic by default, EVAL_JUDGE_PROVIDER=openai for an OpenAI-compatible
+# endpoint); writes results/evals/. Needs the stack (`make up dev-data`). Costs API money. LANGSMITH_API_KEY and the OpenRouter OPENAI_API_KEY
 # come from 1Password through tools/evals-live-run.sh: set LANGSMITH_KEY_REF and
 # EVALS_OPENAI_KEY_REF to your op:// references. It checks the prerequisites and prints a
 # cost estimate first. Pass flags with ARGS, e.g. ARGS="--limit 5" for a smoke run.

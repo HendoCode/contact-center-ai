@@ -62,7 +62,7 @@ Ruff linting and the shared task targets live in the root `Makefile` and `pyproj
 ```
 generate_data.py → transcripts.json + csat.json
                         ↓
-pipeline.py --ingest → embed (OpenAI default / Ollama local) → pgvector (PostgreSQL); the Compose stack also ingests LanceDB and reads that (RETRIEVER_BACKEND=lancedb)
+pipeline.py --ingest → embed (OpenAI default / Ollama local) → LanceDB (default store; RETRIEVER_BACKEND=pgvector selects pgvector in PostgreSQL, the rollback and benchmark peer)
                         ↓
 ccai_mcp/server.py (stdio; HTTP opt-in) → 7 tools exposed to MCP clients
 ```
@@ -81,7 +81,7 @@ ccai_mcp/server.py (stdio; HTTP opt-in) → 7 tools exposed to MCP clients
 
 ## Key design constraints
 
-- **CSAT is searchable only on the LanceDB retriever.** `query_csat()` reads the Postgres `f_csat` fact (SQL-backed). With `RETRIEVER_BACKEND=lancedb`, `--ingest` also copies each call's `csat_survey` score onto the Lance table as typed columns (`csat_score`, `surveyed_at`; no re-embedding), so `search_transcripts` takes `min_csat` / `max_csat` and prefilters to those calls. pgvector holds no scores and refuses the filter. CSAT text itself is still not embedded.
+- **CSAT is searchable only on the LanceDB retriever.** `query_csat()` reads the Postgres `f_csat` fact (SQL-backed). With the default `RETRIEVER_BACKEND=lancedb`, `--ingest` also copies each call's `csat_survey` score onto the Lance table as typed columns (`csat_score`, `surveyed_at`; no re-embedding), so `search_transcripts` takes `min_csat` / `max_csat` and prefilters to those calls. pgvector holds no scores and refuses the filter. CSAT text itself is still not embedded.
 - **Chat provider swaps are controlled by `LLM_PROVIDER` env var** (`"openai"`, default, or `"ollama"`, `"anthropic"`, `"fireworks"`, `"vllm"`). `get_llm(provider: str | None = None)` in `rag/pipeline.py` takes an explicit provider override so evals can loop providers in one process. The `"openai"` branch is any OpenAI-compatible chat endpoint — its `LLM_BASE_URL` (default `https://openrouter.ai/api/v1`) and `LLM_MODEL` (default low-cost `z-ai/glm-5.3-flash`) are env-configurable; the key is read from `OPENAI_API_KEY`. Fireworks and vLLM go through the OpenAI-compatible client (`FIREWORKS_API_KEY`/`FIREWORKS_MODEL`, `VLLM_BASE_URL`/`VLLM_MODEL`); Anthropic uses `ANTHROPIC_API_KEY`/`ANTHROPIC_MODEL`.
 - **Embeddings are decoupled via `EMBEDDING_PROVIDER`** (falling back to `LLM_PROVIDER`, so an unset value keeps the old single-provider behavior). OpenRouter currently serves **no embedding models**, so an OpenRouter chat setup must pair with `EMBEDDING_PROVIDER=ollama` (local, free `nomic-embed-text`) or an OpenAI-compatible `EMBEDDING_BASE_URL`/`EMBEDDING_MODEL`. A new embedding provider goes in `rag/embeddings.py`, and a new chat provider in `get_llm()` in `rag/pipeline.py`.
 - **MCP server is stdio by default**; streamable HTTP is opt-in (`MCP_TRANSPORT=http` or `--http`, `ccai_mcp/http_transport.py`) for clients on other machines, bound to loopback unless `MCP_AUTH_TOKEN` is set. Claude Desktop and other local clients can still connect via process I/O. The HTTP mode is designed to run on Azure Container Apps behind Easy Auth (Entra); the Terraform is validated in CI and has not been deployed.
@@ -97,7 +97,7 @@ MCP_AUTH_UPSTREAM=false  # "true" lets a non-loopback bind skip the token when A
 MCP_STORE_CHECK=on       # "off" skips the /healthz check that the configured transcript store is non-empty and readable
 MCP_PUBLISH_HOST=127.0.0.1  # Compose `mcp-server` only: host interface the port is published on
 MCP_SERVER_URL=http://127.0.0.1:8000/mcp   # client side: `python -m ccai_mcp.http_smoke` reads it
-RETRIEVER_BACKEND=pgvector  # retrieval backend behind get_retriever(): "pgvector" (default) | "lancedb" (needs `uv sync --group lance`); Compose hard-codes lancedb on a `lance-data` volume
+RETRIEVER_BACKEND=lancedb  # retrieval backend behind get_retriever(): "lancedb" (default; needs `uv sync --group lance`) | "pgvector" (rollback and benchmark peer); Compose hard-codes lancedb on a `lance-data` volume
 LANCE_URI=data/lance        # LanceDB location: local dir (gitignored) or az:// / s3:// URI; embedded, no server
 LLM_PROVIDER=openai      # chat provider: "openai" (OpenAI-compatible) | "ollama" | "anthropic" | "fireworks" | "vllm"
 OPENAI_API_KEY=          # required for the OpenAI-compatible chat branch (e.g. OpenRouter)

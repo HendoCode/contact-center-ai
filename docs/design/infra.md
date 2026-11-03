@@ -83,6 +83,6 @@ I1 splits into one PR per root or module.
 - **I1d · `apps`.** Containers wait on M1 and L4. **Stephen runs:** the Entra app registration and `az acr build`.
 - **I1e · `compute-gpu`.** Depends on F4's cloud-init. **Stephen runs:** the quota request, plus VM start and stop.
 - **I1f · `databricks`.**
-- **I1g · `envs/dev`.** Composition, `.gitignore`, and a Terraform CI job. Deprecate `infra/terraform/` once `apps` lands.
+- **I1g · `envs/dev`.** Composition, `.gitignore`, and a Terraform CI job. The earlier `infra/terraform/` has been deleted.
 - **I-SF** (refined). The `envs/snowflake` root, role aliases, and the resource monitor. Plan only.
 - **I-UP · azurerm 5.x** (**new**, unscheduled). Upgrade when Stephen approves.

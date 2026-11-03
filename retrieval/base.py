@@ -145,23 +145,31 @@ def validate_where(where: dict | None) -> list[tuple[str, str, object]]:
     return triples
 
 
+DEFAULT_BACKEND = "lancedb"
+
+
+def backend_name() -> str:
+    """The configured transcript store: RETRIEVER_BACKEND, else LanceDB (pgvector is opt-in)."""
+    return (os.getenv("RETRIEVER_BACKEND") or DEFAULT_BACKEND).lower()
+
+
 def store_snapshot() -> dict | None:
     """Provenance of the store the default retriever reads, for results JSON `params.store`.
 
     A versioned store (LanceDB) names the table version and tag the run read, so the run can be
     replayed with `LanceDBRetriever(as_of=...)`. Other backends have no version: None.
     """
-    if os.getenv("RETRIEVER_BACKEND", "pgvector").lower() != "lancedb":
+    if backend_name() != "lancedb":
         return None
     return get_retriever().snapshot()
 
 
 def get_retriever(backend: str | None = None, embeddings=None) -> Retriever:
-    """Return the backend named by `backend` or RETRIEVER_BACKEND (default "pgvector").
+    """Return the backend named by `backend` or RETRIEVER_BACKEND (default "lancedb").
 
     `embeddings` overrides the shared `get_embeddings()` model (ingest passes a cached one).
     """
-    backend = (backend or os.getenv("RETRIEVER_BACKEND", "pgvector")).lower()
+    backend = (backend or backend_name()).lower()
     if backend == "pgvector":
         from retrieval.pgvector_backend import PgVectorRetriever
         if embeddings is None:

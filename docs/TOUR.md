@@ -291,7 +291,7 @@ for mode in ('vector', 'fts', 'hybrid'):
     print(mode, [(h.call_id, round(h.score, 3), h.metadata['category']) for h in hits])"
 ```
 
-Swap `RETRIEVER_BACKEND=pgvector` (the default, after `make ingest`) and `mode='vector'` gives the
+Swap `RETRIEVER_BACKEND=pgvector` (the rollback and benchmark peer, after `RETRIEVER_BACKEND=pgvector make ingest`) and `mode='vector'` gives the
 same shape of answer; `mode='fts'` raises `NotImplementedError`, because the pgvector backend is
 vector-only. For this doc the LanceDB half was run on the real 1,250-call corpus with the
 fixture's offline embedding in place of Ollama: ingest twice gave 1,250 rows both times, and all
@@ -420,7 +420,6 @@ LLM_PROVIDER=anthropic ANTHROPIC_MODEL=claude-sonnet-5-5 make finetune-label ARG
   composing `modules/snowflake`. Costly pieces are off by default (`enable_gpu`,
   `enable_databricks`, `enable_mcp_server`, `enable_agent_api`). CI runs `terraform fmt -check`,
   `validate` with `-backend=false`, and `tflint`; `validate` passes on all three roots today.
-  `infra/terraform/` is the deprecated single-file version.
 - **Fine-tune**: only F1, the dataset, is built (`models/finetune/`). LoRA SFT, the Fireworks
   fine-tune, vLLM serving, the load test and the fine-tune-vs-retrieve evals (F2–F6) are designed
   in `docs/design/finetune.md` and **not built yet**. The `vllm` Compose service (`gpu` profile)
@@ -524,7 +523,7 @@ Azure backend, under its own state key. Cross-cloud traffic is the few MB of loa
 ### LanceDB
 
 - **Where:** `retrieval/lancedb_backend.py` behind the same `Retriever` protocol as pgvector;
-  `RETRIEVER_BACKEND=lancedb` swaps it everywhere (ingest, MCP tools, the agent's `ground` node).
+  LanceDB is the default (`RETRIEVER_BACKEND=pgvector` swaps back) everywhere (ingest, MCP tools, the agent's `ground` node).
 - **Embedded:** no server and no Compose service. `LANCE_URI` is a local directory or an
   `az://`/`s3://` URI on the same code path (only local has been run).
 - **Three search modes** where pgvector has one: vector (cosine), native FTS (BM25), and hybrid
@@ -604,4 +603,3 @@ Grounded in `olap/dbt/models/marts/semantic/metrics.yml`:
   numbers in `olap/dbt/README.md` come from a seeded local run, not from `results/`.
 - **Never run against a real account:** every Terraform `apply` beyond what you applied yourself.
 - The corpus is templated, so retrieval quality numbers will not transfer to real transcripts.
-- `infra/terraform/` still describes the original App Service setup; `infra/azure/` replaces it.
