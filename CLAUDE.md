@@ -56,7 +56,7 @@ Ruff linting and the shared task targets live in the root `Makefile` and `pyproj
 ```
 generate_data.py → transcripts.json + csat.json
                         ↓
-pipeline.py --ingest → embed (OpenAI default / Ollama local) → pgvector (PostgreSQL)
+pipeline.py --ingest → embed (OpenAI default / Ollama local) → pgvector (PostgreSQL); the Compose stack also ingests LanceDB and reads that (RETRIEVER_BACKEND=lancedb)
                         ↓
 ccai_mcp/server.py (stdio; HTTP opt-in) → 7 tools exposed to MCP clients
 ```
@@ -90,7 +90,7 @@ MCP_AUTH_TOKEN=          # static bearer token for the HTTP transport (demo-grad
 MCP_AUTH_UPSTREAM=false  # "true" lets a non-loopback bind skip the token when Azure Easy Auth fronts it and Container Apps `CONTAINER_APP_*` vars are present
 MCP_PUBLISH_HOST=127.0.0.1  # Compose `mcp-server` only: host interface the port is published on
 MCP_SERVER_URL=http://127.0.0.1:8000/mcp   # client side: `python -m ccai_mcp.http_smoke` reads it
-RETRIEVER_BACKEND=pgvector  # retrieval backend behind get_retriever(): "pgvector" (default) | "lancedb" (needs `uv sync --group lance`)
+RETRIEVER_BACKEND=pgvector  # retrieval backend behind get_retriever(): "pgvector" (default) | "lancedb" (needs `uv sync --group lance`); Compose hard-codes lancedb on a `lance-data` volume
 LANCE_URI=data/lance        # LanceDB location: local dir (gitignored) or az:// / s3:// URI; embedded, no server
 LLM_PROVIDER=openai      # chat provider: "openai" (OpenAI-compatible) | "ollama" | "anthropic" | "fireworks" | "vllm"
 OPENAI_API_KEY=          # required for the OpenAI-compatible chat branch (e.g. OpenRouter)
