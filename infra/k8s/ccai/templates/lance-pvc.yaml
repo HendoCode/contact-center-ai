@@ -1,0 +1,23 @@
+{{- if include "ccai.lanceOnPvc" . }}
+{{- $p := .Values.lance.persistence }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "ccai.component" (dict "root" . "name" "lance") }}
+  labels:
+    {{- include "ccai.labels" . | nindent 4 }}
+    app.kubernetes.io/component: lance
+  {{- if $p.keep }}
+  annotations:
+    helm.sh/resource-policy: keep
+  {{- end }}
+spec:
+  accessModes:
+    - {{ $p.accessMode }}
+  {{- with $p.storageClass }}
+  storageClassName: {{ . | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ $p.size }}
+{{- end }}

@@ -7,7 +7,7 @@
 # against real models, uploaded to LangSmith. Every target is declared in `.PHONY` below;
 # the comment above each one says what it does.
 
-.PHONY: up down seed ingest test lint check-public demo demo-change demo-change-replay notebooks strip-notebooks bench evals evals-live evals-compare evals-export evals-retrieval-experiment finetune-data finetune-label load-snowflake load-databricks load-dry-run dbt-build dbt-build-dev dev-data lance-azure-check lance-versions lance-rollback lance-prune parity
+.PHONY: up down seed ingest test lint check-public demo demo-change demo-change-replay notebooks strip-notebooks bench evals evals-live evals-compare evals-export evals-retrieval-experiment finetune-data finetune-label load-snowflake load-databricks load-dry-run dbt-build dbt-build-dev dev-data lance-azure-check lance-versions lance-rollback lance-prune parity k8s-check
 
 PYTHON := uv run python
 # LanceDB is the default transcript store and needs the lance dependency group wherever the
@@ -94,6 +94,12 @@ test:
 
 lint:
 	uv run ruff check .
+
+# The Helm chart's offline checks (CI runs them): helm lint, then helm template and kubeconform
+# for the default values, infra/k8s/values-aks.yaml and an Ingress plus external-Postgres case.
+# Needs helm and kubeconform on PATH.
+k8s-check:
+	tools/k8s-check.sh
 
 check-public:
 	tools/check_public.sh

@@ -79,7 +79,7 @@ jobs:
         run: terraform fmt -check -recursive
       - name: validate (no backend)
         run: |
-          for root in bootstrap envs/dev envs/snowflake; do
+          for root in bootstrap envs/dev envs/aks envs/snowflake; do
             (cd "$root" && terraform init -backend=false -input=false && terraform validate)
           done
       - uses: terraform-linters/setup-tflint@v4
@@ -95,3 +95,17 @@ jobs:
         run: |
           tflint --init --config="$PWD/.tflint.hcl"
           tflint --recursive --config="$PWD/.tflint.hcl"
+
+  helm:
+    name: helm (lint, template, kubeconform)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+        with:
+          version: v4.3.1
+      - name: Install kubeconform
+        run: |
+          curl -fsSL https://github.com/yannh/kubeconform/releases/download/v0.8.0/kubeconform-linux-amd64.tar.gz \
+            | tar -xz -C /usr/local/bin kubeconform
+      - run: make k8s-check

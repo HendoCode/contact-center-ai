@@ -1,0 +1,37 @@
+{{- if .Values.ingress.enabled }}
+{{- $svc := include "ccai.component" (dict "root" . "name" "mcp") }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ $svc }}
+  labels:
+    {{- include "ccai.labels" . | nindent 4 }}
+    app.kubernetes.io/component: mcp-server
+  {{- with .Values.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- with .Values.ingress.className }}
+  ingressClassName: {{ . }}
+  {{- end }}
+  {{- with .Values.ingress.tls }}
+  tls:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  rules:
+    {{- range .Values.ingress.hosts }}
+    - host: {{ .host | quote }}
+      http:
+        paths:
+          {{- range .paths }}
+          - path: {{ .path }}
+            pathType: {{ .pathType }}
+            backend:
+              service:
+                name: {{ $svc }}
+                port:
+                  name: http
+          {{- end }}
+    {{- end }}
+{{- end }}

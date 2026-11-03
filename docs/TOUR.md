@@ -32,7 +32,7 @@ data/synthetic/generate_data.py  (seed 42)
                              └─► agent/     LangGraph graph, tools bound via langchain.mcp
                                    └─► evals/  golden set: offline gate (make evals) + LangSmith (make evals-live)
 chat models: rag/pipeline.py get_llm()      (LLM_PROVIDER = openai | ollama | anthropic | fireworks | vllm)
-infra: docker-compose.yml (local, no bill)  ·  infra/azure/ Terraform (Azure + a Snowflake root)
+infra: docker-compose.yml (local, no bill)  ·  infra/azure/ Terraform (Azure + a Snowflake root)  ·  infra/k8s/ Helm chart
 ```
 
 The seven MCP tools: `search_transcripts`, `get_call_summary`, `get_transcript`, `query_csat` (evidence tools),
@@ -417,10 +417,14 @@ LLM_PROVIDER=anthropic ANTHROPIC_MODEL=claude-sonnet-5-5 make finetune-label ARG
 ## D. Read the code
 
 - **Terraform** (`infra/azure/`): `bootstrap` (state storage, Key Vault, subscription budget),
-  `envs/dev` composing `modules/{core,data,apps,compute-gpu,databricks}`, and `envs/snowflake`
-  composing `modules/snowflake`. Costly pieces are off by default (`enable_gpu`,
-  `enable_databricks`, `enable_mcp_server`, `enable_agent_api`). CI runs `terraform fmt -check`,
-  `validate` with `-backend=false`, and `tflint`; `validate` passes on all three roots today.
+  `envs/dev` composing `modules/{core,data,apps,compute-gpu,databricks}`, `envs/aks` composing
+  `modules/{core,data,aks}`, and `envs/snowflake` composing `modules/snowflake`. Costly pieces are
+  off by default (`enable_gpu`, `enable_databricks`, `enable_mcp_server`, `enable_agent_api`). CI
+  runs `terraform fmt -check`, `validate` with `-backend=false`, and `tflint`; `validate` passes
+  on all four roots today.
+- **Helm chart** (`infra/k8s/ccai`): the MCP server stack on Kubernetes, with AKS values beside
+  it. `make k8s-check` lints it and validates the rendered manifests with kubeconform;
+  `infra/k8s/README.md` is the deploy guide.
 - **Fine-tune**: only F1, the dataset, is built (`models/finetune/`). LoRA SFT, the Fireworks
   fine-tune, vLLM serving, the load test and the fine-tune-vs-retrieve evals (F2–F6) are designed
   in `docs/design/finetune.md` and **not built yet**. The `vllm` Compose service (`gpu` profile)

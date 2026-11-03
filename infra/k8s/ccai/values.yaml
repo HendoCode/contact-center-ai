@@ -1,0 +1,276 @@
+# Default values: a single-namespace install on any cluster, with Postgres and Ollama in the
+# chart and the Lance dataset on a PersistentVolumeClaim. The AKS example overrides these in
+# ../values-aks.yaml. infra/k8s/README.md is the deploy guide.
+
+# The one app image (the repo's Dockerfile). Every app container runs it with a different
+# command, as the Compose app services do. No workflow publishes it yet: build it and push it to
+# your registry, or load it into a local cluster (`kind load docker-image ccai-app:local`).
+image:
+  repository: ccai-app
+  tag: local
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+nameOverride: ""
+fullnameOverride: ""
+
+# A Secret you create before installing; the chart never creates or templates secret values.
+# Every key in it becomes an environment variable in the app containers (envFrom), so provider
+# keys go in the same Secret. Keys the chart itself reads:
+#   MCP_AUTH_TOKEN     required: the bearer token the HTTP server checks (`openssl rand -hex 32`)
+#   POSTGRES_PASSWORD  required: the in-chart Postgres password, or the external database's.
+#                      DATABASE_URL is built from it, so use URL-safe characters (hex is safe).
+# Optional, read by the app when present: OPENAI_API_KEY, ANTHROPIC_API_KEY, FIREWORKS_API_KEY,
+# LANGSMITH_API_KEY, AZURE_STORAGE_ACCOUNT_KEY (az:// Lance without workload identity).
+secrets:
+  name: ccai-secrets
+
+# Plain settings for every app container (a ConfigMap, envFrom). Any variable from .env.example
+# that is not a secret belongs here. RETRIEVER_BACKEND (retrieverBackend), LANCE_URI, DATABASE_URL, DBT_* and
+# OLLAMA_BASE_URL are set by the chart from the sections below; a value here for one of those
+# is overridden.
+config:
+  LLM_PROVIDER: ollama
+  EMBEDDING_PROVIDER: ollama
+  OLLAMA_MODEL: llama3.2
+  OLLAMA_EMBEDDING_MODEL: nomic-embed-text
+
+serviceAccount:
+  create: true
+  # Defaults to the release fullname.
+  name: ""
+  # Workload identity on AKS: azure.workload.identity/client-id: <app identity client ID>.
+  annotations: {}
+  automountServiceAccountToken: false
+
+# Added to every app pod (seed, dbt, mcp-server). AKS workload identity needs
+# azure.workload.identity/use: "true" here.
+podLabels: {}
+podAnnotations: {}
+
+# App pods. The image runs as root and writes under /app (generated data, dbt target, logs),
+# so no runAsNonRoot here; privilege escalation and every capability are dropped instead.
+podSecurityContext:
+  seccompProfile:
+    type: RuntimeDefault
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop: [ALL]
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# ── Postgres ──────────────────────────────────────────────────────────────────
+# The OLTP tables, the dbt marts the metric tools query, the CSAT fact and the pgvector peer.
+
+postgresql:
+  # false: use externalDatabase below (Azure Database for PostgreSQL Flexible Server, say).
+  enabled: true
+  image:
+    repository: pgvector/pgvector
+    tag: pg16
+    pullPolicy: IfNotPresent
+  database: contactcenter
+  user: postgres
+  port: 5432
+  persistence:
+    size: 8Gi
+    # Empty uses the cluster's default StorageClass.
+    storageClass: ""
+  # /dev/shm for parallel index builds (the Compose service sets shm_size: 1gb for the same reason).
+  shmSize: 1Gi
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      memory: 2Gi
+
+# Used when postgresql.enabled is false. The password is POSTGRES_PASSWORD in the Secret above.
+# The server must allow the pgvector extension (`CREATE EXTENSION vector`).
+externalDatabase:
+  host: ""
+  port: 5432
+  database: contactcenter
+  user: postgres
+  # Appended to DATABASE_URL and exported as PGSSLMODE. Azure Flexible Server rejects plaintext.
+  sslmode: require
+
+# ── Ollama ────────────────────────────────────────────────────────────────────
+# Local embeddings (nomic-embed-text) and, with LLM_PROVIDER=ollama, local chat. Disable it when
+# config points both providers at an OpenAI-compatible endpoint; set OLLAMA_BASE_URL in config to
+# use an Ollama server outside the chart.
+
+ollama:
+  enabled: true
+  image:
+    repository: ollama/ollama
+    tag: 0.40.5
+    pullPolicy: IfNotPresent
+  port: 11434
+  # The data Job pulls OLLAMA_EMBEDDING_MODEL, and OLLAMA_MODEL when LLM_PROVIDER is ollama,
+  # before it ingests. Pulls are idempotent and land on the model volume.
+  pullModels: true
+  persistence:
+    size: 10Gi
+    storageClass: ""
+  resources:
+    requests:
+      cpu: "1"
+      memory: 2Gi
+    limits:
+      memory: 6Gi
+
+# ── Transcript store (LanceDB) ────────────────────────────────────────────────
+
+# The store the readers use. lancedb is the default; pgvector is the rollback store, kept filled
+# by the seed step (seed.pgvector) as in Compose. CSAT filters and hybrid search need lancedb.
+retrieverBackend: lancedb
+
+lance:
+  # Empty: the dataset lives on the PVC below, mounted at /app/data/lance in the data Job (the
+  # writer) and the mcp-server pods (the readers).
+  # An object-store URI such as az://lance puts it in ADLS instead and no PVC is created; set
+  # AZURE_STORAGE_ACCOUNT_NAME in config and give the pods workload identity or
+  # AZURE_STORAGE_ACCOUNT_KEY in the Secret.
+  uri: ""
+  persistence:
+    size: 5Gi
+    storageClass: ""
+    # ReadWriteOnce attaches to one node, so the data Job and the readers must land on the same
+    # node. On a multi-node cluster use a ReadWriteMany class (Azure Files) or an az:// uri.
+    accessMode: ReadWriteOnce
+    # Kept on `helm uninstall` (helm.sh/resource-policy: keep); delete the PVC by hand to drop it.
+    keep: true
+
+# ── Data Job ──────────────────────────────────────────────────────────────────
+# One Job runs the two Compose one-shots in order: the seed step as an init container, then
+# `dbt build`. Its name carries the release revision, so every `helm install` and `upgrade` runs
+# it once more and Helm deletes the previous revision's Job; `helm rollback` re-applies the
+# earlier revision's Job, which runs again with that revision's values. Every step is idempotent,
+# and a re-seed with unchanged transcripts and model embeds nothing. Each step records a row in
+# Postgres (deploy.job_run) when it finishes; the mcp-server pods wait for a dbt row.
+
+dataJob:
+  backoffLimit: 2
+  # The first ingest embeds 1,540 transcripts: about 45 minutes on 2 CPU cores with Ollama.
+  activeDeadlineSeconds: 9000
+  # null keeps finished Jobs (and their logs) until the next revision replaces them.
+  ttlSecondsAfterFinished: null
+  # Extra volumes for the pod, and mounts for the seed step.
+  extraVolumes: []
+  extraVolumeMounts: []
+
+seed:
+  # Schema, synthetic data, OLTP load and transcript ingest. false skips the step on this
+  # revision; the readers then start on the data an earlier revision left.
+  enabled: true
+  # Also ingest into pgvector (reusing the Lance vectors), so RETRIEVER_BACKEND=pgvector is a
+  # rollback setting, as in Compose.
+  pgvector: true
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      memory: 4Gi
+
+dbt:
+  # `dbt build`: the star schema and its data tests. false leaves the marts as they are and the
+  # readers stop waiting for a dbt row.
+  enabled: true
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      memory: 2Gi
+
+# ── MCP server ────────────────────────────────────────────────────────────────
+
+mcpServer:
+  replicaCount: 1
+  port: 8000
+  # The pods wait in an init container until the data Job's dbt step has finished at least once
+  # and the transcript store is non-empty, so a fresh install shows Init until the first seed is done.
+  waitForData: true
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  service:
+    type: ClusterIP
+    port: 8000
+    annotations: {}
+  # /healthz answers 503 while the transcript store is empty or unreadable.
+  startupProbe:
+    httpGet:
+      path: /healthz
+      port: http
+    periodSeconds: 5
+    failureThreshold: 36
+  readinessProbe:
+    httpGet:
+      path: /healthz
+      port: http
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  livenessProbe:
+    httpGet:
+      path: /healthz
+      port: http
+    periodSeconds: 30
+    timeoutSeconds: 5
+    failureThreshold: 4
+  resources:
+    requests:
+      cpu: 250m
+      memory: 1Gi
+    limits:
+      memory: 3Gi
+  extraVolumes: []
+  extraVolumeMounts: []
+
+# ── Exposure ──────────────────────────────────────────────────────────────────
+# Both are off: reach the server with `kubectl port-forward svc/<release>-ccai-mcp 8000`.
+# Terminate TLS at whichever you enable; the bearer token travels in a header.
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: mcp.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  # - secretName: ccai-mcp-tls
+  #   hosts: [mcp.example.com]
+  tls: []
+
+# Gateway API: an HTTPRoute to the mcp-server Service, and optionally the Gateway itself. The
+# cluster must have the Gateway API CRDs (the AKS application routing add-on installs them).
+gateway:
+  # Create a Gateway in the release namespace. false attaches the route to an existing one
+  # (httpRoute.parentRefs).
+  create: false
+  className: ""
+  annotations: {}
+  listeners:
+    - name: http
+      port: 80
+      protocol: HTTP
+      allowedRoutes:
+        namespaces:
+          from: Same
+  httpRoute:
+    enabled: false
+    hostnames: []
+    # Empty with gateway.create uses the chart's Gateway.
+    parentRefs: []
+    annotations: {}

@@ -1,0 +1,109 @@
+{{- if .Values.ollama.enabled }}
+{{- $o := .Values.ollama }}
+{{- $name := include "ccai.component" (dict "root" . "name" "ollama") }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "ccai.labels" . | nindent 4 }}
+    app.kubernetes.io/component: ollama
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: {{ $o.port }}
+      targetPort: http
+  selector:
+    {{- include "ccai.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: ollama
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "ccai.labels" . | nindent 4 }}
+    app.kubernetes.io/component: ollama
+spec:
+  accessModes: [ReadWriteOnce]
+  {{- with $o.persistence.storageClass }}
+  storageClassName: {{ . | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ $o.persistence.size }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "ccai.labels" . | nindent 4 }}
+    app.kubernetes.io/component: ollama
+spec:
+  replicas: 1
+  # The model volume is ReadWriteOnce, so the old pod lets go of it before the new one starts.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "ccai.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: ollama
+  template:
+    metadata:
+      labels:
+        {{- include "ccai.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: ollama
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: ollama
+          image: "{{ $o.image.repository }}:{{ $o.image.tag }}"
+          imagePullPolicy: {{ $o.image.pullPolicy }}
+          env:
+            - name: OLLAMA_HOST
+              value: "0.0.0.0:{{ $o.port }}"
+          ports:
+            - name: http
+              containerPort: {{ $o.port }}
+          readinessProbe:
+            httpGet:
+              path: /api/version
+              port: http
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /api/version
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 4
+          {{- with $o.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            - name: models
+              mountPath: /root/.ollama
+      volumes:
+        - name: models
+          persistentVolumeClaim:
+            claimName: {{ $name }}
+{{- end }}
