@@ -26,9 +26,15 @@ ENV UV_PYTHON_DOWNLOADS=never \
     PATH="/app/.venv/bin:${PATH}" \
     PYTHONUNBUFFERED=1
 
+# uv's package cache (/root/.cache/uv, ~0.8 GB after a sync) is mounted as a BuildKit cache
+# instead of being written into the layer, so it never lands in the image. The venv is copied
+# out of the cache, so it stays complete without the cache.
+#
 # Dependencies first so editing source does not re-resolve the environment.
 COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen --no-install-project --extra dev --group agent --group dbt --group notebooks --group lance
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-install-project --extra dev --group agent --group dbt --group notebooks --group lance
 
 COPY . .
-RUN uv sync --frozen --extra dev --group agent --group dbt --group notebooks --group lance
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --extra dev --group agent --group dbt --group notebooks --group lance
