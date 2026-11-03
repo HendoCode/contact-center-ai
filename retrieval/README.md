@@ -4,6 +4,39 @@ One `Retriever` interface (`base.py`) over two stores: `pgvector_backend.py` and
 `lancedb_backend.py`. `bench.py` is the R3 benchmark (`make bench`); its tables live in
 `results/retrieval/`. This README records the bench prerequisites and the DuckDB check.
 
+## Versioned LanceDB store
+
+Every write to the LanceDB table commits an immutable version. `retrieval/lance_versions.py` names
+the ones that matter, so a result can be tied to the exact data it read:
+
+```bash
+RETRIEVER_BACKEND=lancedb make ingest        # tags the table seed-<git sha> (seed-<sha>-2 on a repeat)
+make lance-versions                          # every version, its commit time, row count and tags
+make lance-rollback TAG=seed-abc1234         # that tag becomes the newest version again
+make lance-prune KEEP=5                      # retention, below
+```
+
+- **Time travel.** `LanceDBRetriever(as_of="seed-abc1234")` (or a version number) reads that snapshot,
+  read-only; `ingest`, `reset` and `rollback` on it raise.
+- **Rollback** is Lance's `restore`: it commits a copy of the old version on top, so the versions rolled
+  back from stay in the history until pruned. Indexes come back with the version.
+- **Provenance.** `results/evals/*.json` (`make evals-live`) and `results/retrieval/*.json`
+  (`make bench`) carry `params.store` = `{"backend": "lancedb", "lance_version": 12, "lance_tag":
+  "seed-abc1234", "rows": 1540}` when they read a Lance table. A bench store is a temporary directory,
+  so its record is marked `"ephemeral": true`: the version identifies the run's state, not a snapshot to
+  check out. To replay an eval, set `as_of` to the recorded tag or version. A version with no tag (an
+  ingest was not run through `make ingest`, or the table was rolled back) is recorded by number only.
+- **Retention.** One ingest commits several versions, so they accumulate. `make ingest` and `make
+  lance-prune` keep the newest 10 `seed-*` tags (`KEEP`) and delete the history older than the oldest
+  tag that remains. LanceDB 0.39 refuses `optimize(cleanup_older_than=...)` when a tagged version falls
+  inside the cleanup window, so the cutoff is set at that tag (with a one-second margin) and a tagged
+  version is never deleted. Tags not named `seed-*` are never expired and hold back the cutoff the same
+  way.
+- **Not built: embedding-model swaps.** Ingest still refuses a vector of a different dimension, so
+  trying another embedding model on the same table needs a second vector column (`add_columns`) or a
+  new table. Tagging before and after, running the bench and eval, then keeping the change or restoring
+  the tag would fit this mechanism; the column design is the open part.
+
 ## Running the bench
 
 `make bench` needs `make up` (Postgres for the pgvector backend; `ARGS="--backends lancedb"`

@@ -14,6 +14,13 @@ fields `category`, `outcome`, `date` and `home_branch`, and `metadata` (the full
 Ingest is `merge_insert` on `call_id` (update when matched, insert otherwise), so
 re-running it never duplicates rows.
 
+Versions
+--------
+Each write commits an immutable table version. `make ingest` tags the finished table
+`seed-<git sha>`; `LanceDBRetriever(as_of=<tag or version>)` reads that snapshot read-only,
+`snapshot()` names the version being read, and `rollback()` restores a tag. See
+`retrieval/lance_versions.py`.
+
 Indexes
 -------
 * `fts`: native Lance full-text (BM25) index on `text`. Built on first ingest and
@@ -98,7 +105,10 @@ class LanceDBRetriever:
         num_sub_vectors: int | None = None,
         index_type: str = "ivf_pq",
         num_bits: int | None = None,
+        as_of: int | str | None = None,
     ):
+        # A table version number or tag to read instead of the newest (time travel, read-only).
+        self.as_of = as_of
         self.uri = uri or os.getenv("LANCE_URI") or DEFAULT_LANCE_URI
         # Object-store settings for az:// / s3:// (e.g. azure_storage_account_name,
         # azure_use_azure_cli); None leaves Lance to read them from the environment.
@@ -131,10 +141,13 @@ class LanceDBRetriever:
         return self._db
 
     def _table(self):
-        """The table, or None before the first ingest."""
+        """The table (at `as_of`, when set), or None before the first ingest."""
         if self.table_name not in self.db.list_tables().tables:
             return None
-        return self.db.open_table(self.table_name)
+        table = self.db.open_table(self.table_name)
+        if self.as_of is not None:
+            table.checkout(self.as_of)
+        return table
 
     def _embed_documents(self, texts: list[str]) -> list[list[float]]:
         vectors: list[list[float]] = []
@@ -157,14 +170,56 @@ class LanceDBRetriever:
             ]
         )
 
+    def _refuse_write_as_of(self) -> None:
+        # merge_insert on a checked-out handle would still commit to the newest version.
+        if self.as_of is not None:
+            raise ValueError(f"This retriever reads a snapshot (as_of={self.as_of!r}) and is read-only")
+
     def reset(self) -> None:
         """Drop the table (a later ingest recreates it, with the current columns)."""
+        self._refuse_write_as_of()
         if self._table() is not None:
             self.db.drop_table(self.table_name)
+
+    # ── versions ──────────────────────────────────────────────────────────────
+
+    def snapshot(self) -> dict | None:
+        """Backend, Lance version, tag and row count this retriever reads (None before ingest)."""
+        from retrieval import lance_versions
+
+        table = self._table()
+        return None if table is None else lance_versions.snapshot(table)
+
+    def tag_seed(self, label: str | None = None, keep: int | None = None) -> str:
+        """Tag the table as ingested: `seed-<git sha>`, after applying the retention policy."""
+        from retrieval import lance_versions
+
+        self._refuse_write_as_of()
+        table = self._require_table()
+        return lance_versions.tag_seed(table, label, keep or lance_versions.KEEP_SEED_TAGS)
+
+    def versions(self) -> list[dict]:
+        from retrieval import lance_versions
+
+        return lance_versions.list_versions(self._require_table())
+
+    def rollback(self, ref: int | str) -> int:
+        """Restore a tag or version as the newest one; returns the new version number."""
+        from retrieval import lance_versions
+
+        self._refuse_write_as_of()
+        return lance_versions.rollback(self._require_table(), ref)
+
+    def _require_table(self):
+        table = self._table()
+        if table is None:
+            raise ValueError(f"No table {self.table_name!r} at {self.uri!r}; ingest first")
+        return table
 
     # ── ingest ────────────────────────────────────────────────────────────────
 
     def ingest(self, docs: list[dict]) -> int:
+        self._refuse_write_as_of()
         # Last occurrence of a call_id wins, as in the pgvector backend.
         by_id = {d["call_id"]: d for d in docs}
         if not by_id:

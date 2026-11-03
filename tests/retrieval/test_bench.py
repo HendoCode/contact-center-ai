@@ -112,6 +112,9 @@ def test_bench_cli_writes_valid_json_and_prints_table(docs, fake_embeddings, tmp
     assert validate(record) == []
     assert record["params"]["rows"] == 100 and record["params"]["scale"] == 2
     assert "SYNTHETIC SCALE-UP" in record["notes"]
+    store = record["params"]["store"]  # the LanceDB table version the run read
+    assert store["backend"] == "lancedb" and store["ephemeral"] and store["rows"] == 100
+    assert isinstance(store["lance_version"], int) and store["lance_version"] >= 1
     readme = (tmp_path / "results" / "retrieval" / "README.md").read_text()
     printed = capsys.readouterr().out
     assert "| lancedb/hybrid | ok |" in printed and "| lancedb/hybrid | ok |" in readme

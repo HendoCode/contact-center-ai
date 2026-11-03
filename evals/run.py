@@ -409,6 +409,7 @@ async def run_live(limit: int | None, max_concurrency: int, run_name: str | None
     from agent.tools import MCPToolbox
     from evals.evaluators import make_judge
     from rag.pipeline import get_llm
+    from retrieval.base import store_snapshot
     from retrieval.bench import detect_hardware, git_sha
     from tools.results import render, validate
 
@@ -447,6 +448,8 @@ async def run_live(limit: int | None, max_concurrency: int, run_name: str | None
         "retrieval_k": int(os.getenv("AGENT_RETRIEVAL_K") or 5),
         "embedding_provider": os.getenv("EMBEDDING_PROVIDER", provider),
     }
+    if store := store_snapshot():  # the Lance table version this run reads (replay: as_of)
+        params["store"] = store
     results = await aevaluate(
         target, data=data,
         evaluators=[*evaluators, make_judge(judge_llm)],

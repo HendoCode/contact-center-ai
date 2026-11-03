@@ -534,6 +534,8 @@ Azure backend, under its own state key. Cross-cloud traffic is the few MB of loa
   over 1,540 vectors is exact and fast; IVF-PQ needs training data and costs recall). `make bench
   ARGS="--scale 80"` is where the index path gets measured.
 - **Idempotent ingest:** `merge_insert` on `call_id`.
+- **Versioned:** each ingest is tagged `seed-<git sha>`; `make lance-versions`, `make lance-rollback
+  TAG=...`, `LanceDBRetriever(as_of=...)`, and `params.store` in results JSON (`retrieval/README.md`).
 - **R3 bench:** 40 labeled queries in four types (topical, filter, exact, paraphrase) with relevance
   derived from generator facts, not from search results. Honest limit: the corpus is templated
   (fewer than 30 distinct texts with names masked), so the numbers compare backends on this corpus
