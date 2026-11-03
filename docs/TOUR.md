@@ -292,9 +292,9 @@ for mode in ('vector', 'fts', 'hybrid'):
     print(mode, [(h.call_id, round(h.score, 3), h.metadata['category']) for h in hits])"
 ```
 
-Swap `RETRIEVER_BACKEND=pgvector` (the rollback and benchmark peer, after `RETRIEVER_BACKEND=pgvector make ingest`) and `mode='vector'` gives the
-same shape of answer; `mode='fts'` raises `NotImplementedError`, because the pgvector backend is
-vector-only. For this doc the LanceDB half was run on the real 1,250-call corpus with the
+LanceDB is the default transcript store. Set `RETRIEVER_BACKEND=pgvector` (the rollback and benchmark
+peer, filled by `make ingest`) and `mode='vector'` gives the same shape of answer; `mode='fts'` raises `NotImplementedError`, because the pgvector backend is
+vector-only. For this doc the LanceDB half was run on 2026-10-02 on the 1,250 baseline calls (the corpus now has 1,540) with the
 fixture's offline embedding in place of Ollama: ingest twice gave 1,250 rows both times, and all
 three modes returned escalated calls only. The scores from that run are not meaningful.
 
@@ -524,8 +524,8 @@ Azure backend, under its own state key. Cross-cloud traffic is the few MB of loa
 ### LanceDB
 
 - **Where:** `retrieval/lancedb_backend.py` behind the same `Retriever` protocol as pgvector;
-  `RETRIEVER_BACKEND=lancedb` swaps it everywhere (ingest, MCP tools, the agent's `ground` node).
-- **Embedded:** no server and no Compose service. `LANCE_URI` is a local directory or an
+  LanceDB is the default (`RETRIEVER_BACKEND=pgvector` swaps back) everywhere (ingest, MCP tools, the agent's `ground` node).
+- **Embedded:** no server. In Compose it lives on the `lance-data` volume and is the store the app services read. `LANCE_URI` is a local directory or an
   `az://`/`s3://` URI on the same code path (only local has been run).
 - **Three search modes** where pgvector has one: vector (cosine), native FTS (BM25), and hybrid
   fused with RRF (K=60), which needs no score calibration between cosine and BM25.
