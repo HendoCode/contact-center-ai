@@ -27,7 +27,8 @@ DEMO_LLM_PROVIDER ?= ollama
 
 # Brings the stack up (db, ollama, model pulls, seed, dbt build, the langgraph dev server)
 # and runs the five scripted questions from agent/demo.py. The first run pulls models and
-# embeds 1,540 transcripts on CPU, so expect several minutes; later runs reuse the volumes.
+# embeds 1,540 transcripts on CPU, so expect several minutes (about 45 on 2 cores); later runs
+# reuse the volumes, and `seed` embeds only transcripts the `lance-data` volume does not hold.
 # Works from `cp .env.example .env`; no cloud key is needed on the default path.
 demo:
 	export LLM_PROVIDER=$(DEMO_LLM_PROVIDER) EMBEDDING_PROVIDER=ollama; \
@@ -79,8 +80,9 @@ down:
 seed:
 	$(PYTHON) data/synthetic/generate_data.py
 
-# Embed and store the transcripts in the vector store. Vectors are cached per model in
-# .cache/embeddings/ (shared with make bench), so a rerun embeds only new text;
+# Embed and store the transcripts in the vector store. Vectors the Lance table already holds
+# for the same text and embedding model are reused, then those cached per model in
+# .cache/embeddings/ (shared with make bench), so a rerun embeds only new or changed text;
 # ARGS="--no-cache" embeds everything afresh.
 ingest:
 	uv run $(LANCE_GROUP) python -m rag.pipeline --ingest $(ARGS)

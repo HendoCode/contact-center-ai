@@ -17,7 +17,7 @@ from langchain_core.documents import Document
 
 from models.providers import get_llm, reasoning_effort, with_output_cap  # noqa: F401  (re-exported)
 from retrieval import Hit, get_retriever
-from retrieval.base import backend_name
+from retrieval.base import backend_name, content_hash, embedding_model_id
 
 
 # ── Ingest ────────────────────────────────────────────────────────────────────
@@ -136,14 +136,39 @@ def load_csat_surveys(docs: list[Document], connect=None) -> dict[str, tuple[int
     }
 
 
+def stored_vectors_for(docs: list[Document], model: str) -> dict[str, list[float]]:
+    """`{text: vector}` the Lance table already holds for these documents, made by `model`.
+
+    A vector is taken only when the row has the same call_id, the same content hash and the same
+    recorded embedding model, so changed text and a changed model both fall through to the embedder.
+    Needs no particular `RETRIEVER_BACKEND`: the pgvector rollback ingest reads the Lance table too.
+    Any problem reading it (lancedb not installed, store unreachable) means "nothing stored".
+    """
+    try:
+        from retrieval.lancedb_backend import LanceDBRetriever
+
+        stored = LanceDBRetriever().stored_vectors(model)
+    except Exception as e:  # noqa: BLE001 - reuse is an optimisation; embedding is always correct
+        print(f"ingest: no stored vectors reused ({type(e).__name__}: {str(e).splitlines()[0][:120]})")
+        return {}
+    reuse = {}
+    for d in docs:
+        hit = stored.get(d.metadata["call_id"])
+        if hit and hit[0] == content_hash(d.page_content):
+            reuse[d.page_content] = hit[1]
+    return reuse
+
+
 def ingest(source: str = "synthetic", use_cache: bool = True):
     """
     Ingest call transcripts into the vector store.
 
     Args:
         source: "synthetic" (local JSON) or "s3" (TODO: S3 integration)
-        use_cache: read and fill the on-disk embedding cache (.cache/embeddings/) that
-            `make bench` shares, so only transcripts never embedded before hit the model.
+        use_cache: reuse vectors already embedded: first those the Lance table holds for the
+            same call_id, text and embedding model (durable, on the `lance-data` volume), then
+            the on-disk file cache (.cache/embeddings/) that `make bench` shares. Only the rest
+            hit the model. False embeds everything afresh.
     """
     print(f"Loading transcripts from source: {source}")
 
@@ -166,6 +191,10 @@ def ingest(source: str = "synthetic", use_cache: bool = True):
     embeddings = get_embeddings()  # an Ollama model is pulled here if missing
     cached = CachedEmbeddings(embeddings, cache_file=cache_file_for(embeddings) if use_cache else None,
                               label="ingest")
+    if use_cache:
+        model = embedding_model_id(cached)
+        reused = cached.preload(stored_vectors_for(docs, model))
+        print(f"ingest: {reused} of {len(docs)} vectors reused from the Lance table (model {model}).")
     cached.warm_documents((d.page_content for d in docs), progress=embed_progress("ingest"))
 
     retriever = get_retriever(embeddings=cached)
@@ -293,7 +322,8 @@ if __name__ == "__main__":
     parser.add_argument("--query", type=str, help="Query to run against the vector store")
     parser.add_argument("--reset", action="store_true", help="Delete the vector store collection")
     parser.add_argument("--no-cache", action="store_true",
-                        help="ingest: do not read or write the embedding cache (.cache/embeddings/)")
+                        help="ingest: embed every transcript afresh; reuse neither the vectors in the Lance "
+                             "table nor the file cache (.cache/embeddings/)")
     args = parser.parse_args()
 
     from rag.ollama_models import OllamaUnavailable

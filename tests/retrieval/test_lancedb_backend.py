@@ -72,7 +72,8 @@ def test_ingest_in_new_process_sees_existing_rows(make_retriever, docs):
     assert again.count() == 50
 
 
-def test_ingest_rejects_embedding_dimension_change(make_retriever, docs, fake_embeddings):
+def test_ingest_rejects_a_partial_ingest_by_another_embedding_model(make_retriever, docs, fake_embeddings):
+    # A wider model replaces every vector or none; a full model change is in test_lancedb_embedding_reuse.py.
     r = make_retriever()
     r.ingest(docs)
 
@@ -81,7 +82,7 @@ def test_ingest_rejects_embedding_dimension_change(make_retriever, docs, fake_em
             return [v + [0.0] for v in fake_embeddings.embed_documents(texts)]
 
     r._embeddings = Wider()
-    with pytest.raises(ValueError, match="dimension"):
+    with pytest.raises(ValueError, match="mix two models"):
         r.ingest(docs[:2])
 
 

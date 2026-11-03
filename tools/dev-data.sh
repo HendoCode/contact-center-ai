@@ -7,8 +7,8 @@
 # 1 generate  synthetic JSON (data/synthetic/generate_data.py, seed 42)
 # 2 schema    OLTP tables in Postgres (olap/oltp/apply.sh)
 # 3 load      the JSON into those tables (olap/seed.py)
-# 4 ingest    transcripts into the LanceDB store (rag.pipeline --ingest; reuses the
-#             .cache/embeddings/ cache, so a rerun embeds only new text)
+# 4 ingest    transcripts into the LanceDB store (rag.pipeline --ingest; reuses the vectors
+#             the table holds for the same text and model, so a rerun embeds only new text)
 # 5 dbt       the marts and the semantic manifest for the dev target (dbt build --target dev)
 #
 # Every step is idempotent. One line per step; the first failure stops the run with the

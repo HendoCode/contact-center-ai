@@ -14,6 +14,22 @@ fields `category`, `outcome`, `date` and `home_branch`, and `metadata` (the full
 Ingest is `merge_insert` on `call_id` (update when matched, insert otherwise), so
 re-running it never duplicates rows.
 
+Stored vectors
+--------------
+Each row also records `content_hash` (sha256 of `text`) and `embedding_model` (`provider:model`),
+so the table states which model produced every vector. `stored_vectors(model)` returns the
+vectors recorded for a model; `rag.pipeline.ingest` hands those to the embedder first, so a
+re-ingest of unchanged text with the same model makes no embedding call, and the pgvector
+rollback ingest reuses the same vectors. A table written before these columns existed gets them
+through schema evolution (`add_columns`, NULL on old rows); NULL never matches a model, so the
+first ingest after the upgrade re-embeds once and fills them in.
+
+A different embedding model never shares a column with the old one. When any row records another
+model (or none), ingest must cover every such row, then replaces all of them: `merge_insert` for
+the same dimension, a table overwrite for a new one (an overwrite is one more version of the same
+dataset, so the tags and `rollback()` to the previous model's vectors still work). The version
+being replaced is tagged `pre-model-change-<n>` first when it carries no tag.
+
 Versions
 --------
 Each write commits an immutable table version. `make ingest` tags the finished table
@@ -68,7 +84,7 @@ from typing import Literal
 
 import pyarrow as pa
 
-from retrieval.base import INT_FIELDS, Hit, validate_where
+from retrieval.base import INT_FIELDS, Hit, content_hash, embedding_model_id, validate_where
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_LANCE_URI = str(REPO_ROOT / "data" / "lance")
@@ -82,6 +98,8 @@ _SQL_OPS = {"gte": ">=", "lte": "<=", "lt": "<"}
 
 
 CSAT_COLUMNS = ("csat_score", "surveyed_at")
+# Which text and which model produced a row's vector; ingest reuses a vector only when both match.
+PROVENANCE_COLUMNS = ("content_hash", "embedding_model")
 
 
 def _literal(value: object) -> str:
@@ -184,6 +202,43 @@ class LanceDBRetriever:
             vectors.extend(self.embeddings.embed_documents(texts[i : i + EMBED_BATCH]))
         return vectors
 
+    def stored_vectors(self, model: str) -> dict[str, tuple[str, list[float]]]:
+        """`{call_id: (content_hash, vector)}` for rows recorded as embedded by `model`.
+
+        Empty when there is no table, or it predates the provenance columns.
+        """
+        table = self._table()
+        if table is None or not set(PROVENANCE_COLUMNS) <= set(table.schema.names):
+            return {}
+        rows = (
+            table.search()
+            .where(f"embedding_model = {_literal(model)}")
+            .select(["call_id", *PROVENANCE_COLUMNS, "vector"])
+            .limit(table.count_rows())
+            .to_arrow()
+            .to_pylist()
+        )
+        return {r["call_id"]: (r["content_hash"], r["vector"]) for r in rows}
+
+    def _other_model_ids(self, table, model: str) -> set[str]:
+        """call_ids whose vector was not produced by `model` (no recorded model counts as another)."""
+        if table.count_rows() == 0:
+            return set()
+        if "embedding_model" not in table.schema.names:
+            return set(self._all_ids(table))
+        rows = (
+            table.search()
+            .where(f"embedding_model IS NULL OR embedding_model != {_literal(model)}")
+            .select(["call_id"])
+            .limit(table.count_rows())
+            .to_arrow()
+        )
+        return set(rows["call_id"].to_pylist())
+
+    @staticmethod
+    def _all_ids(table) -> list[str]:
+        return table.search().select(["call_id"]).limit(table.count_rows()).to_arrow()["call_id"].to_pylist()
+
     @staticmethod
     def _schema(dim: int) -> pa.Schema:
         return pa.schema(
@@ -195,6 +250,8 @@ class LanceDBRetriever:
                 pa.field("date", pa.string()),
                 pa.field("home_branch", pa.string()),
                 pa.field("metadata", pa.string()),
+                pa.field("content_hash", pa.string()),
+                pa.field("embedding_model", pa.string()),
                 pa.field("vector", pa.list_(pa.float32(), dim)),
             ]
         )
@@ -254,6 +311,18 @@ class LanceDBRetriever:
         if not by_id:
             return 0
         ids = list(by_id)
+        model = embedding_model_id(self.embeddings)
+
+        table = self._table()
+        replace_all = False
+        if table is not None:
+            if "home_branch" not in table.schema.names:
+                raise ValueError(
+                    f"Table {self.table_name!r} at {self.uri!r} predates the home_branch column. "
+                    "Rebuild it: python -m rag.pipeline --reset, then --ingest."
+                )
+            replace_all = self._plan_model_change(table, model, set(ids))
+
         vectors = self._embed_documents([by_id[i]["text"] for i in ids])
         dim = len(vectors[0])
 
@@ -270,35 +339,65 @@ class LanceDBRetriever:
                     "date": meta.get("date"),
                     "home_branch": meta.get("home_branch"),
                     "metadata": json.dumps(meta, default=str),
+                    "content_hash": content_hash(doc["text"]),
+                    "embedding_model": model,
                     "vector": vector,
                 }
             )
         data = pa.Table.from_pylist(rows, schema=self._schema(dim))
 
-        table = self._table()
         if table is None:
             table = self.db.create_table(self.table_name, data=data, schema=self._schema(dim))
         else:
-            if "home_branch" not in table.schema.names:
-                raise ValueError(
-                    f"Table {self.table_name!r} at {self.uri!r} predates the home_branch column. "
-                    "Rebuild it: python -m rag.pipeline --reset, then --ingest."
-                )
             existing = table.schema.field("vector").type.list_size
-            if existing != dim:
-                raise ValueError(
-                    f"Embedding dimension {dim} does not match the table's {existing}; the "
-                    f"embedding model changed. Delete {self.uri!r} table {self.table_name!r} "
-                    "and re-ingest."
+            if existing != dim and replace_all:
+                # A new dimension cannot be merged into the fixed-size column: write a new version
+                # of the dataset with the new schema. Tags and older versions stay reachable.
+                table = self.db.create_table(
+                    self.table_name, data=data, schema=self._schema(dim), mode="overwrite"
                 )
-            (
-                table.merge_insert("call_id")
-                .when_matched_update_all()
-                .when_not_matched_insert_all()
-                .execute(data)
-            )
+            elif existing != dim:
+                raise ValueError(
+                    f"Embedding dimension {dim} does not match the table's {existing}, but the "
+                    f"table records the same model ({model}). Rebuild it: python -m rag.pipeline "
+                    "--reset, then --ingest."
+                )
+            else:
+                (
+                    table.merge_insert("call_id")
+                    .when_matched_update_all()
+                    .when_not_matched_insert_all()
+                    .execute(data)
+                )
         self._ensure_indexes(table)
         return len(rows)
+
+    def _plan_model_change(self, table, model: str, incoming: set[str]) -> bool:
+        """Add missing provenance columns; True when rows hold another model's vectors.
+
+        Such rows are all replaced by this ingest, so one column never mixes two models: if
+        the batch does not cover them, refuse before anything is embedded or written.
+        """
+        stale = self._other_model_ids(table, model)
+        left_out = stale - incoming
+        if left_out:
+            raise ValueError(
+                f"{len(left_out)} rows in table {self.table_name!r} were embedded by another model "
+                f"(or by an unrecorded one) and are not in this ingest; embedding model {model!r} "
+                "would mix two models in one column. Ingest the full corpus, or run --reset first."
+            )
+        if stale:
+            self._tag_before_model_change(table)  # name the state about to be replaced
+        missing = [c for c in PROVENANCE_COLUMNS if c not in table.schema.names]
+        if missing:  # schema evolution: old rows get NULL, which never matches a model
+            table.add_columns(pa.schema([pa.field(c, pa.string()) for c in missing]))
+        return bool(stale)
+
+    @staticmethod
+    def _tag_before_model_change(table) -> None:
+        from retrieval import lance_versions
+
+        lance_versions.tag_before_model_change(table)
 
     def set_csat(self, surveys: dict[str, tuple[int, str | None]]) -> int:
         """Fill `csat_score` and `surveyed_at` from `surveys` ({call_id: (score, surveyed_at)}).

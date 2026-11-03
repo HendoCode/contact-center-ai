@@ -32,10 +32,37 @@ make lance-prune KEEP=5                      # retention, below
   inside the cleanup window, so the cutoff is set at that tag (with a one-second margin) and a tagged
   version is never deleted. Tags not named `seed-*` are never expired and hold back the cutoff the same
   way.
-- **Not built: embedding-model swaps.** Ingest still refuses a vector of a different dimension, so
-  trying another embedding model on the same table needs a second vector column (`add_columns`) or a
-  new table. Tagging before and after, running the bench and eval, then keeping the change or restoring
-  the tag would fit this mechanism; the column design is the open part.
+
+## Stored vectors and embedding-model changes
+
+Every row records `content_hash` (sha256 of its text) and `embedding_model` (`provider:model`), so the
+table itself states which model produced each vector. `rag.pipeline --ingest` looks the vectors up
+before it embeds anything: a transcript whose `call_id`, text hash and model all match a stored row
+keeps its vector. The pgvector ingest reads the same table, so the rollback store is filled from those
+vectors too (in Compose, `seed` ingests LanceDB first for that reason).
+
+| Re-seed with ... | Embedding calls |
+|---|---|
+| nothing changed (same transcripts, same model) | none; seconds (the 1,540 rows are upserted) |
+| a new or edited transcript | only that transcript |
+| a different embedding model | every transcript, once |
+| `--no-cache` | every transcript |
+
+The lookup reads the Lance table, which lives on the `lance-data` volume, so it survives a rebuilt or
+recreated container; the file cache under `.cache/embeddings/` is only consulted for what the table
+does not hold. A table written before the two columns existed gets them by schema evolution
+(`add_columns`, NULL on old rows). NULL never matches a model, so the first ingest after upgrading
+re-embeds once, because nothing says which model made those old vectors.
+
+**Changing the embedding model.** One vector column never holds two models. When any row records
+another model, ingest must cover all of those rows (otherwise it refuses, before embedding anything)
+and replaces them all: `merge_insert` if the dimension is unchanged, a table overwrite if it is not.
+An overwrite is one more version of the same Lance dataset, so earlier versions and tags stay
+reachable. The version being replaced is tagged `pre-model-change-<n>` first when it has no tag, and
+the previous ingest's `seed-<sha>` tag already names it in the usual case. To go back:
+`make lance-rollback TAG=seed-abc1234`, then set the embedding model back to the one the table records,
+since a query embedded by another model does not belong to those vectors. The CSAT columns are rebuilt
+by the same `--ingest` (the overwrite drops them; the CSAT step that follows every ingest refills them).
 
 ## Running the bench
 
@@ -48,7 +75,8 @@ on an 8-core laptop, about 45 minutes on 2 cores.
 
 Reruns reuse the document embeddings cached under `.cache/embeddings/` (gitignored, one file per
 embedding model, keyed by text hash), so only the first run pays for the embedding step; `--no-cache` skips the
-cache. Ingest goes in batches of `--ingest-batch` rows (default 12,500, the largest single insert proven at x10),
+cache. (`make ingest` and the Compose `seed` service also reuse the vectors the Lance table stores, see
+"Stored vectors" above.) Ingest goes in batches of `--ingest-batch` rows (default 12,500, the largest single insert proven at x10),
 so `--scale 80` never sends 100,000 rows in one call. A backend or mode that fails becomes a one-line
 `failed: <error>` row (at most 300 characters), the other backends still run, and the results file is
 written either way.
