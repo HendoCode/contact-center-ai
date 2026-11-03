@@ -15,8 +15,9 @@ import psycopg2
 
 from psycopg2 import errors as pg_errors
 
-from rag.embeddings import CONNECTION_STRING
-from rag.pipeline import rag_query, get_llm
+from retrieval.pgvector_backend import CONNECTION_STRING
+from models.providers import get_llm
+from rag.pipeline import rag_query
 from ccai_mcp.masking import mask_accounts
 from retrieval import get_retriever
 

@@ -47,7 +47,7 @@ from agent.tools import MCPToolbox
 from ccai_mcp import metrics
 from ccai_mcp.change import render_change, split_change
 from evals.offline import ScriptedClassifier
-from rag.embeddings import CONNECTION_STRING
+from retrieval.pgvector_backend import CONNECTION_STRING
 from retrieval import get_retriever
 
 REPO_ROOT = Path(__file__).resolve().parent.parent

@@ -2,10 +2,10 @@
 #
 #   (no profile)  db, ollama, open-webui, structurizr
 #                                    what `docker compose up -d` starts, as the published
-#                                    posts describe it. Unchanged by L3.
+#                                    posts describe it. Unchanged by the demo stack.
 #   app           ollama-pull, seed, dbt, langgraph-api, mcp-server, demo, jupyter, evals
-#                                    the L3 stack. `make demo` runs it end to end.
-#                                    mcp-server is the opt-in HTTP MCP endpoint (M1); it needs
+#                                    the Compose demo stack. `make demo` runs it end to end.
+#                                    mcp-server is the opt-in HTTP MCP endpoint; it needs
 #                                    MCP_AUTH_TOKEN in .env, and only `docker compose --profile app
 #                                    up -d mcp-server` (or the whole profile) starts it.
 #   tunnel        cloudflared        opt-in Cloudflare Tunnel to mcp-server (needs the `app`
@@ -154,7 +154,7 @@ services:
 
   # DEV SERVER, not production: `langgraph dev` (in-memory runtime, no checkpointer, no
   # auth) so Studio and the HTTP API are reachable on localhost:2024. The standalone Agent
-  # Server needs Redis and license keys, which would break the no-keys path; L4 serves
+  # Server needs Redis and license keys, which would break the no-keys path; the Azure deployment serves
   # Azure. `--allow-blocking` because the dev server's blocking-call guard (blockbuster)
   # raises on the one-time, cached read of agent/data/ambiguous_terms.yml inside a node.
   langgraph-api:
@@ -193,7 +193,7 @@ services:
       dbt:
         condition: service_completed_successfully
 
-  # The MCP server over streamable HTTP (M1): http://127.0.0.1:8000/mcp for Claude Desktop,
+  # The MCP server over streamable HTTP: http://127.0.0.1:8000/mcp for Claude Desktop,
   # Cursor, open-webui and the like (ccai_mcp/README.md has the registration snippets). It
   # serves database-backed tools, so it is safe by default: published on 127.0.0.1 only, and
   # the server refuses to start in a container (it must bind 0.0.0.0) until MCP_AUTH_TOKEN is
@@ -312,14 +312,14 @@ services:
       langgraph-api:
         condition: service_healthy
 
-  # One-shot: the L2 golden set offline (`make evals`): the real graph with a scripted
+  # One-shot: the agent golden set offline (`make evals`): the real graph with a scripted
   # classifier and stub tools, so it needs no other service. `make evals-live` is not run
   # here; it needs keys and spends money.
   evals:
     <<: *app
     command: ["python", "-m", "evals.run"]
 
-  # ── default tier: UIs (no profile, as before L3) ────────────────────────────
+  # ── default tier: UIs (no profile, as before the demo stack) ────────────────────────────
 
   # The open-webui image ships its own HEALTHCHECK. structurizr has none: nothing depends
   # on it and its image has no known probe tool, so none is invented here.

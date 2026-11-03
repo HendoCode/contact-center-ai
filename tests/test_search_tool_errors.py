@@ -12,7 +12,7 @@ from types import SimpleNamespace as NS
 
 import pytest
 
-import rag.embeddings as emb
+import retrieval.pgvector_backend as emb
 from evals import compare
 from evals.run import tool_error
 

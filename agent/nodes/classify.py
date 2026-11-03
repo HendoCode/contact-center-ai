@@ -13,7 +13,7 @@ from openai import LengthFinishReasonError, OpenAIError
 from pydantic import BaseModel, ValidationError
 
 from agent.state import AgentState, Route
-from rag.pipeline import with_output_cap
+from models.providers import with_output_cap
 
 log = logging.getLogger(__name__)
 

@@ -1,4 +1,4 @@
-# Fine-tune dataset (F1)
+# Fine-tune dataset
 
 Builds the `summary_v1` dataset for the fine-tune-or-retrieve experiment. Task, splits and
 fairness rules are in [`docs/design/finetune.md`](../../docs/design/finetune.md).

@@ -2,8 +2,8 @@
 #
 # `up` / `down` / `seed` / `ingest` mirror the quickstart and the published
 # "Anchoring AI" post commands. `test` / `lint` / `check-public` are the CI
-# gates. `bench` is the R3 retrieval benchmark. `demo` is the L3 Compose demo.
-# `evals` is the L2 agent golden set offline (a CI gate); `evals-live` is the same set
+# gates. `bench` is the retrieval benchmark. `demo` is the Compose demo stack.
+# `evals` is the agent golden set offline (a CI gate); `evals-live` is the same set
 # against real models, uploaded to LangSmith. Every target is declared in `.PHONY` below;
 # the comment above each one says what it does.
 
@@ -14,7 +14,7 @@ PYTHON := uv run python
 # store is read or written; RETRIEVER_BACKEND=pgvector (rollback, benchmark peer) does not.
 LANCE_GROUP = $(if $(filter pgvector,$(RETRIEVER_BACKEND)),,--group lance)
 
-# The L3 stack lives in the `app` Compose profile, so a bare `docker compose up -d`
+# The Compose demo stack lives in the `app` Compose profile, so a bare `docker compose up -d`
 # still starts only db and ollama.
 COMPOSE_APP := docker compose --profile app
 
@@ -23,7 +23,7 @@ COMPOSE_APP := docker compose --profile app
 # `make demo DEMO_LLM_PROVIDER=openai` (needs OPENAI_API_KEY in .env, e.g. an OpenRouter key).
 DEMO_LLM_PROVIDER ?= ollama
 
-# ── Compose demo (L3) ─────────────────────────────────────────────────────────
+# ── Compose demo stack ─────────────────────────────────────────────────────────
 
 # Brings the stack up (db, ollama, model pulls, seed, dbt build, the langgraph dev server)
 # and runs the five scripted questions from agent/demo.py. The first run pulls models and
@@ -98,7 +98,7 @@ check-public:
 
 # ── Benchmarks ───────────────────────────────────────────────────────────────
 
-# R3: every labeled query through both retrieval backends and every search mode.
+# Retrieval benchmark: every labeled query through both retrieval backends and every search mode.
 # Needs Postgres (`make up`), seeded data and an embedding provider; pass extra
 # flags with ARGS, e.g. `make bench ARGS="--backends lancedb"` or `ARGS="--scale 80"`.
 bench:
@@ -125,7 +125,7 @@ lance-rollback:
 lance-prune:
 	uv run --group lance python -m retrieval.lance_versions prune $(if $(KEEP),--keep $(KEEP))
 
-# ── Fine-tune dataset (F1) ────────────────────────────────────────────────────
+# ── Fine-tune dataset ────────────────────────────────────────────────────
 
 # Gold labels, the 800/150/300 split and test.jsonl under data/finetune/. Offline, no API.
 finetune-data:
@@ -136,7 +136,7 @@ finetune-data:
 finetune-label:
 	$(PYTHON) -m models.finetune.data_gen label $(ARGS)
 
-# ── Semantic-layer parity (S3) ───────────────────────────────────────────────
+# ── Semantic-layer parity ───────────────────────────────────────────────
 
 # Run five agreed metrics from the semantic layer on Postgres, Snowflake and
 # Databricks, diff the numbers to a tolerance, and write results to
@@ -145,7 +145,7 @@ finetune-label:
 parity:
 	$(PYTHON) -m tools.parity
 
-# ── Warehouse loaders (S2) ────────────────────────────────────────────────────
+# ── Warehouse loaders ────────────────────────────────────────────────────
 
 # Load the OLTP JSON into raw tables on Snowflake or Databricks. Each warehouse's adapter
 # group lives in its own uv env (the two groups conflict), hence one target each.
@@ -183,7 +183,7 @@ load-dry-run:
 	$(PYTHON) -m olap.dbt.loaders snowflake --dry-run
 	$(PYTHON) -m olap.dbt.loaders databricks --dry-run
 
-# ── Agent evals (L2) ──────────────────────────────────────────────────────────
+# ── Agent evals ──────────────────────────────────────────────────────────
 
 # The golden set (evals/datasets/agent_golden.jsonl) through the real graph with a scripted
 # classifier and stub tools: no keys, no DB, no network. Fails on any failure not listed in

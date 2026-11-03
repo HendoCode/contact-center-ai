@@ -1,4 +1,4 @@
-# Agent evals (L2)
+# Agent evals
 
 A golden set of 52 questions for the LangGraph agent (`agent/`), two change-analysis sets (six golden and four held-out "why did this number move?" questions), the evaluators that score them, and two runners: offline in CI and live in LangSmith.
 
