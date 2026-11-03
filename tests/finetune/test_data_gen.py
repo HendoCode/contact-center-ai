@@ -206,6 +206,6 @@ def test_dry_run_makes_no_api_call(out_dir, capsys, monkeypatch):
     def boom(*_a, **_k):
         raise AssertionError("get_llm must not be called on --dry-run")
 
-    monkeypatch.setattr("rag.pipeline.get_llm", boom)
+    monkeypatch.setattr("models.providers.get_llm", boom)
     assert data_gen.main(["--out", str(out_dir), "label", "--dry-run"]) == 0
     assert "950 calls pending of 950" in capsys.readouterr().out

@@ -1,6 +1,6 @@
 # contact-center-ai
 
-A RAG pipeline and MCP server that gives contact center supervisors natural language access to call recordings, transcripts, and CSAT survey data.
+`contact-center-ai` (`ccai` in package and module names) is a RAG pipeline and MCP server, built around Meridian Valley Credit Union, a fictional credit union, that gives contact center supervisors natural language access to call recordings, transcripts, and CSAT survey data.
 
 Built to be **provider-agnostic** (swap OpenAI for Anthropic or Gemini via LangChain) and **reusable** — the MCP server is designed as a shared enterprise tool, not tied to a single team or use case.
 

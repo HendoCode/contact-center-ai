@@ -1,9 +1,57 @@
 """pgvector backend: the existing LangChain PGVector store behind the Retriever interface."""
 
-import psycopg2
+import os
+import threading
 
-from rag.embeddings import COLLECTION_NAME, CONNECTION_STRING, get_vector_store
+import psycopg2
+from langchain_postgres.vectorstores import PGVector
+
+from rag.embeddings import get_embeddings
 from retrieval.base import Hit, refuse_lance_only, validate_where
+
+CONNECTION_STRING = os.getenv(
+    "DATABASE_URL",
+    "postgresql://postgres:postgres@localhost:5432/contactcenter"
+)
+
+COLLECTION_NAME = os.getenv("COLLECTION_NAME", "call_transcripts")
+
+
+# langchain_postgres defines its SQLAlchemy tables on the first PGVector it builds, behind
+# an unlocked module-level check. Two builds at once in one process (two concurrent tool
+# calls in the MCP server, which runs tools in threads) both define them, and every one
+# after the first fails with "Table 'langchain_pg_collection' is already defined for this
+# MetaData instance". So builds go through one lock, and the default store is built once
+# per process and collection, then reused.
+_STORE_LOCK = threading.Lock()
+_STORES: dict[tuple[str, str], PGVector] = {}
+
+
+def get_vector_store(embeddings=None) -> PGVector:
+    """
+    Return a configured PGVector store.
+
+    Creates the pgvector extension and collection table on first run. Without
+    `embeddings`, the store for the configured model is built once per process and reused;
+    with `embeddings` (e.g. ingest's cached model) a new store is built, under the same lock.
+    """
+    with _STORE_LOCK:
+        if embeddings is not None:
+            return _build_store(embeddings)
+        key = (CONNECTION_STRING, COLLECTION_NAME)
+        if key not in _STORES:
+            _STORES[key] = _build_store(get_embeddings())
+        return _STORES[key]
+
+
+def _build_store(embeddings) -> PGVector:
+    return PGVector(
+        embeddings=embeddings,
+        collection_name=COLLECTION_NAME,
+        connection=CONNECTION_STRING,
+        use_jsonb=True,
+    )
+
 
 _PG_OPS = {"eq": "$eq", "in": "$in", "gte": "$gte", "lte": "$lte", "lt": "$lt"}
 

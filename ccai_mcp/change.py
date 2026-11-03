@@ -41,7 +41,7 @@ from pydantic import BaseModel, Field
 
 from ccai_mcp.masking import mask_accounts
 from ccai_mcp.metrics import query_metric_raw
-from rag.pipeline import get_llm, with_output_cap
+from models.providers import get_llm, with_output_cap
 from retrieval import get_retriever
 
 SYNTHETIC_DIR = Path(__file__).resolve().parent.parent / "data" / "synthetic"
