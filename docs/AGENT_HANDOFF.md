@@ -1,5 +1,7 @@
 # contact-center-ai: agent hand-off (v1, Oct 1, 2026)
 
+> **Historical plan, 2026-10-01.** This file records the original hand-off and its ticket waves. Sections 3 and 4 are kept as written except for the MCP tool-contract rule in section 3, which still applies and now counts seven tools. The current state of the system is in [MAP.md](MAP.md), and the walk-through is in [TOUR.md](TOUR.md).
+
 **For:** coding agents working on `HendoCode/contact-center-ai`, and the orchestrators dispatching them (firstmate on OpenRouter models; second-mate on the Anthropic subscription).
 **Owner:** Stephen Henderson. He merges every PR, runs every command that costs money, and holds every credential.
 **This file is public-safe.** Copy it into the repo as `docs/AGENT_HANDOFF.md`. It contains no client names, no account identifiers, and no personal context. Keep it that way when you edit it.
@@ -41,8 +43,8 @@ _History: a dated 2026-10-01 snapshot, kept as written. For current state see th
 - `data/synthetic/generate_data.py`: seeded generator (`random.seed(42)`, `Faker.seed(42)`). Writes `transcripts.json`, `csat.json`, and the OLTP JSON files. `N_INTERACTIONS = 1250`.
 - `olap/`: OLTP schema plus `seed.py` (idempotent JSON → Postgres); a dbt project with staging, a star schema (`d_*` dims, `f_*` facts), `semantic/semantic_models.yml` and `metrics.yml`, assertion tests, and a `profiles.yml` with a single Postgres target. The `dbt` dependency group pins `dbt-core==1.12.5`, `dbt-postgres==1.11.0`, `dbt-metricflow==0.15.0`.
 - `rag/embeddings.py`: `get_embeddings()` (`EMBEDDING_PROVIDER` = openai | ollama) and `get_vector_store()` (LangChain `PGVector`). `rag/pipeline.py`: `get_llm()` (`LLM_PROVIDER` = openai-compatible, defaulting to OpenRouter, or ollama), `--ingest` and `--query`, `rag_query()`. **Ingest is not idempotent:** running it twice duplicates documents.
-- `ccai_mcp/`: stdio MCP server with five tools: `search_transcripts`, `get_call_summary`, `query_csat`, `query_metric`, `ask_the_analyst`. The metric tools shell out to the `mf` CLI. `get_call_summary` uses a **metadata filter on `call_id`**, never a semantic lookup. Keep it that way.
-- `tests/`: `test_config.py`, `test_metrics.py`, `test_server_handshake.py` (asserts the exact five tool names; needs no DB and no key).
+- `ccai_mcp/`: stdio MCP server with five tools at the time of this snapshot: `search_transcripts`, `get_call_summary`, `query_csat`, `query_metric`, `ask_the_analyst` (it now has seven; see section 3). The metric tools shell out to the `mf` CLI. `get_call_summary` uses a **metadata filter on `call_id`**, never a semantic lookup. Keep it that way.
+- `tests/`: `test_config.py`, `test_metrics.py`, `test_server_handshake.py` (asserted the exact five tool names then; it now asserts seven; needs no DB and no key).
 - `docker-compose.yml`: `db` (pgvector pg16), `structurizr`, `ollama`, `open-webui`. There's a `#TODO` about restart policies.
 - `blogs/`: the "Anchoring AI" series. **Posts 01–04 are published** (GitHub Pages). 05–12 are placeholders or drafts. `blogs/build.sh` needs pandoc ≥ 3.3.
 - No Makefile, no linter, no CI beyond the blog deploy workflow.
@@ -64,7 +66,7 @@ _History: a dated 2026-10-01 snapshot, kept as written. For current state see th
 **Don't break what's published**
 - Posts 01–04 are live. Every command they show must keep working: `docker compose up -d`, `uv sync --extra dev`, `python data/synthetic/generate_data.py`, `python -m rag.pipeline --ingest`, `python -m rag.pipeline --query "..."`, `python -m ccai_mcp.server`, `pytest`. T00 adds a smoke test for these. If a change would break one, keep a compatible path or stop and ask. **Never edit a published post's text** to match changed code.
 - MCP tool names and input schemas don't change. `test_server_handshake.py` guards the names.
-  - Exception (change analysis, `docs/design/change-analysis.md`): a tool may gain *optional* inputs, and a sixth tool is added. Every existing call behaves exactly as before. So far `query_metric` gained `time_window` and `where`, and `query_csat` gained `start_date` and `end_date`. Their descriptions were reworded to mention the new inputs; no existing input changed.
+  - Exception (change analysis, `docs/design/change-analysis.md`): a tool may gain *optional* inputs, and `explain_change` was added as a sixth tool, and `get_transcript` later made seven. Every existing call behaves exactly as before. So far `query_metric` gained `time_window` and `where`, and `query_csat` gained `start_date` and `end_date`. Their descriptions were reworded to mention the new inputs; no existing input changed.
 
 **Money and accounts**
 - Agents never run `terraform apply`, start a Fireworks fine-tuning job, rent a GPU, create a Databricks cluster, resume a Snowflake warehouse, or create any cloud account. You write the scripts and configs; Stephen runs anything that bills. Mark such steps in the PR as **"Stephen runs:"** with the exact command.

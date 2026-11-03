@@ -60,10 +60,10 @@ workspace "Contact Center AI" "A working sandbox exploring what AI can do for a 
                 generator = container "Synthetic data generator" "1,540 calls, CSAT, an OLTP ledger, four dated events and their answer key. make seed" "Python, seed 42" {
                     tags "Demo path"
                 }
-                postgres = container "PostgreSQL + pgvector" "OLTP tables, dbt marts, call vectors and agent checkpoints. Compose db locally." "PostgreSQL 16" {
+                postgres = container "PostgreSQL + pgvector" "OLTP tables, dbt marts, call vectors (the pgvector peer store, kept for rollback and benchmarks) and agent checkpoints. Compose db locally." "PostgreSQL 16" {
                     tags "Database" "Demo path"
                 }
-                lancedb = container "LanceDB" "Peer vector store, embedded: vector, full-text and hybrid search. RETRIEVER_BACKEND=lancedb" "Lance files" {
+                lancedb = container "LanceDB" "Default transcript store, embedded: vector, full-text and hybrid search, CSAT score columns, versioned tables. In Compose it lives on the lance-data volume and the app services read it. RETRIEVER_BACKEND=lancedb" "Lance files" {
                     tags "Database" "Built"
                 }
             }
@@ -78,16 +78,16 @@ workspace "Contact Center AI" "A working sandbox exploring what AI can do for a 
             }
 
             group "Access" {
-                retrieval = container "Retrieval and RAG" "Embeds and upserts calls by call_id; one Retriever interface over pgvector or LanceDB." "rag/, retrieval/" {
+                retrieval = container "Retrieval and RAG" "Embeds and upserts calls by call_id; one Retriever interface over LanceDB (default) or pgvector." "rag/, retrieval/" {
                     tags "Demo path"
                 }
-                mcpServer = container "MCP server" "Six tools: search_transcripts, get_call_summary, query_csat, query_metric, ask_the_analyst, explain_change." "ccai_mcp, stdio" {
+                mcpServer = container "MCP server" "Seven tools: search_transcripts, get_call_summary, get_transcript, query_csat, query_metric, ask_the_analyst, explain_change." "ccai_mcp, stdio" {
                     tags "Demo path"
 
                     router = component "Tool router" "Receives each MCP tool call, checks its arguments against the tool's schema and hands it to the tool that owns it." "ccai_mcp/server.py" {
                         tags "Demo path"
                     }
-                    searchTools = component "Search and call tools" "search_transcripts, get_call_summary, query_csat: cited search over the calls, one call's summary, CSAT counts from SQL." "ccai_mcp/tools.py" {
+                    searchTools = component "Search and call tools" "search_transcripts (with min_csat and max_csat filters on LanceDB), get_call_summary, get_transcript, query_csat: cited search over the calls, one call's summary and full text, CSAT counts from SQL." "ccai_mcp/tools.py" {
                         tags "Built"
                     }
                     metricTools = component "Metric tools" "query_metric and ask_the_analyst: one governed metric, or a question matched to metrics. Runs MetricFlow's mf and returns the value with its SQL." "ccai_mcp/metrics.py" {
@@ -100,7 +100,7 @@ workspace "Contact Center AI" "A working sandbox exploring what AI can do for a 
                         tags "Demo path"
                     }
                 }
-                mcpHttp = container "MCP HTTP endpoint" "The same six tools over streamable HTTP; bearer token locally (Compose mcp-server :8000), Easy Auth on Azure." "ccai_mcp --http" {
+                mcpHttp = container "MCP HTTP endpoint" "The same seven tools over streamable HTTP; bearer token locally (Compose mcp-server :8000), Easy Auth on Azure." "ccai_mcp --http" {
                     tags "Built"
                 }
             }
@@ -160,7 +160,7 @@ workspace "Contact Center AI" "A working sandbox exploring what AI can do for a 
             tags "Demo path"
         }
         supervisor -> mcpClients "Asks questions in"
-        mcpClients -> sandbox "Call the six tools" "MCP stdio or HTTP"
+        mcpClients -> sandbox "Call the seven tools" "MCP stdio or HTTP"
         analyst -> sandbox "Defines metrics, explores in notebooks"
         engineer -> sandbox "Runs the stack, evals and benchmarks"
         engineer -> azure "Plans and applies Terraform"
@@ -231,8 +231,8 @@ workspace "Contact Center AI" "A working sandbox exploring what AI can do for a 
         demoChange -> router "Asks step 6 as an MCP client would" "explain_change" {
             tags "Demo path"
         }
-        mcpClients -> router "Call the six tools" "MCP stdio"
-        router -> searchTools "Passes search_transcripts, get_call_summary, query_csat" "in process"
+        mcpClients -> router "Call the seven tools" "MCP stdio"
+        router -> searchTools "Passes search_transcripts, get_call_summary, get_transcript, query_csat" "in process"
         router -> metricTools "Passes query_metric, ask_the_analyst" "in process"
         router -> changeAnalysis "Passes explain_change; returns the cited answer and the change result" "in process" {
             tags "Demo path"

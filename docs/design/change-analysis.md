@@ -1,5 +1,7 @@
 # Change analysis
 
+> Design note as of 2026-10-23. `explain_change` is built as the sixth tool; `get_transcript` was added later, so the server now has seven tools. Where this note says six, read seven. The current state is in [MAP.md](../MAP.md).
+
 Supervisors ask why a number moved, not just what it is. Answering takes a governed metric over two windows plus cited evidence from the calls between them. This note, ticket E0, specifies synthetic events with known answers, the `explain_change` route, and seven build tickets (E1–E7, last section). Appendix A holds the schemas. Windows are half-open ISO dates. Weeks are ISO weeks starting Monday.
 
 ## Event model

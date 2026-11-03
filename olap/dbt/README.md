@@ -239,8 +239,8 @@ where:
 
 These numbers are a **convention, not a fact** — they are parameters to argue
 about, and because the formula lives in one committed YAML file, the argument
-happens in a code review instead of a slide deck. §8 of the plan (Q4) leaves
-this open; this is the explicitly-parameterized version the plan asked for.
+happens in a code review instead of a slide deck. The formula is left open to
+revision; this is the explicitly parameterized version.
 
 ### NPS mapping
 

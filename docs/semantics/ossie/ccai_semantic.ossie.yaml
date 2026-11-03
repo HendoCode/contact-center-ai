@@ -7,7 +7,7 @@ datasets:
   - product_id
   description: 'Product dimension carrying the LOB discriminator. The `lob` dimension
     on this model is referenced as `Dimension(''product__lob'')` from every fact that
-    joins to it, and it is what turns "average interest rate" into four different
+    joins to it, and it is what turns "average interest rate" into seven different
     auditable metrics.
 
     '
