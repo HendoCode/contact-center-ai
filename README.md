@@ -192,8 +192,7 @@ The pipeline is also designed so you can add other LangChain-supported providers
 
 See `infra/azure/` for the Azure infrastructure (Container Apps, PostgreSQL Flexible Server, ADLS)
 and its README for the bootstrap, plan and apply steps. Entra auth is configured as Easy Auth on
-the Container App — see `infra/azure/modules/apps/main.tf`. `infra/terraform/` is the deprecated
-single-file App Service version.
+the Container App — see `infra/azure/modules/apps/main.tf`.
 
 ## Notes
 

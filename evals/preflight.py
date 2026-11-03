@@ -33,6 +33,8 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
+from retrieval.base import DEFAULT_BACKEND
+
 OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models"
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 GOLDEN_PATH = Path(__file__).resolve().parent / "datasets" / "agent_golden.jsonl"
@@ -263,7 +265,7 @@ def check_marts(relations: list[tuple[str, str]], conninfo: str,
 
 def check_retrieval(env: os._Environ | dict = os.environ) -> str:
     """The search mode and k are valid, and the backend serves the mode."""
-    backend = env.get("RETRIEVER_BACKEND", "pgvector").lower()
+    backend = (env.get("RETRIEVER_BACKEND") or DEFAULT_BACKEND).lower()
     mode = (env.get("AGENT_RETRIEVAL_MODE") or "vector").strip().lower()
     k = (env.get("AGENT_RETRIEVAL_K") or "5").strip()
     if mode not in ("vector", "fts", "hybrid"):
@@ -286,7 +288,7 @@ def run_checks(env: os._Environ | dict = os.environ) -> Iterator[str]:
     target = DBT_DIR / "target"
     yield check_marts(mart_relations(target / "semantic_manifest.json"), dev_conninfo(env),
                       source_relations(target / "manifest.json"))
-    if env.get("RETRIEVER_BACKEND", "pgvector").lower() == "pgvector":
+    if (env.get("RETRIEVER_BACKEND") or DEFAULT_BACKEND).lower() == "pgvector":
         yield check_postgres(env.get("DATABASE_URL", DEFAULT_DATABASE_URL),
                              env.get("COLLECTION_NAME", "call_transcripts"))
     embed = env.get("EMBEDDING_PROVIDER", env.get("LLM_PROVIDER", "openai")).lower()

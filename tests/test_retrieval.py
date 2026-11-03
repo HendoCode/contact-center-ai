@@ -112,8 +112,15 @@ def test_where_rejects_outside_portable_subset(bad):
 
 # ── selection ─────────────────────────────────────────────────────────────────
 
-def test_get_retriever_defaults_to_pgvector(monkeypatch):
+def test_get_retriever_defaults_to_lancedb(monkeypatch):
+    pytest.importorskip("lancedb")
     monkeypatch.delenv("RETRIEVER_BACKEND", raising=False)
+    r = get_retriever()
+    assert r.name == "lancedb" and isinstance(r, Retriever)
+
+
+def test_get_retriever_pgvector_is_selectable(monkeypatch):
+    monkeypatch.setenv("RETRIEVER_BACKEND", "pgvector")
     r = get_retriever()
     assert r.name == "pgvector" and isinstance(r, Retriever)
 

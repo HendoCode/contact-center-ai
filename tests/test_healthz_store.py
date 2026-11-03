@@ -72,3 +72,10 @@ def test_empty_real_lance_store_is_a_problem(monkeypatch, tmp_path):
     monkeypatch.setenv("RETRIEVER_BACKEND", "lancedb")
     monkeypatch.setenv("LANCE_URI", str(tmp_path / "lance"))
     assert "empty" in store_check.store_problem()
+
+
+def test_store_problem_names_lancedb_by_default(monkeypatch):
+    monkeypatch.delenv("RETRIEVER_BACKEND", raising=False)
+    monkeypatch.delenv("MCP_STORE_CHECK", raising=False)
+    monkeypatch.setattr(store_check, "get_retriever", lambda: _Fake(0))
+    assert store_check.store_problem() == "lancedb store is empty"

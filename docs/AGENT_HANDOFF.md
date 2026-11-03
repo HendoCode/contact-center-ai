@@ -46,7 +46,6 @@ _History: a dated 2026-10-01 snapshot, kept as written. For current state see th
 - `ccai_mcp/`: stdio MCP server with five tools at the time of this snapshot: `search_transcripts`, `get_call_summary`, `query_csat`, `query_metric`, `ask_the_analyst` (it now has seven; see section 3). The metric tools shell out to the `mf` CLI. `get_call_summary` uses a **metadata filter on `call_id`**, never a semantic lookup. Keep it that way.
 - `tests/`: `test_config.py`, `test_metrics.py`, `test_server_handshake.py` (asserted the exact five tool names then; it now asserts seven; needs no DB and no key).
 - `docker-compose.yml`: `db` (pgvector pg16), `structurizr`, `ollama`, `open-webui`. There's a `#TODO` about restart policies.
-- `infra/terraform/main.tf`: azurerm `~> 3.0`, App Service plus Postgres Flexible Server, Entra variables.
 - `blogs/`: the "Anchoring AI" series. **Posts 01–04 are published** (GitHub Pages). 05–12 are placeholders or drafts. `blogs/build.sh` needs pandoc ≥ 3.3.
 - No Makefile, no linter, no CI beyond the blog deploy workflow.
 
@@ -105,7 +104,7 @@ class Retriever(Protocol):
     def get_by_id(self, call_id: str) -> Hit | None: ...   # metadata filter, never semantic
     def count(self) -> int: ...
 
-def get_retriever(backend: str | None = None) -> Retriever   # RETRIEVER_BACKEND env, default "pgvector"
+def get_retriever(backend: str | None = None) -> Retriever   # RETRIEVER_BACKEND env, default "lancedb"
 ```
 - `where` uses a small portable subset: equality, `in`, and date ranges (`gte`, `lte`, `lt`) on `category`, `outcome`, `date`, `call_id`, `home_branch`. A date-only bound means the whole day (stored `date` is a datetime); `validate_where` normalizes it once. Each backend translates it.
 - A backend that can't do `fts` or `hybrid` raises `NotImplementedError` with a clear message.
@@ -254,7 +253,7 @@ Follows `docs/design/infra.md`.
 
 **I1 · Terraform modules** · S, one PR per module · deps: D0.3
 - `core` (resource group, Key Vault, Log Analytics, **budget with alerts at 50% and 90%**), `data` (Postgres Flexible Server with the pgvector extension allow-listed; ADLS Gen2 for the Lance datasets and dbt artifacts), `apps` (ACR; Container Apps for `mcp-server` and `langgraph-api` with **Easy Auth via Entra ID**), `compute-gpu` (spot VM, nightly auto-shutdown, F4's cloud-init), `databricks` (workspace plus one small job cluster with auto-terminate).
-- `infra/azure/envs/dev` composes them. Once `apps` lands, mark `infra/terraform/` deprecated in its README; delete it only after Stephen confirms.
+- `infra/azure/envs/dev` composes them. The earlier single-file `infra/terraform/` was deleted.
 - **Verify:** `terraform fmt -check`, `terraform validate`, and `tflint` in CI; `terraform plan` with a dummy tfvars runs offline where the providers allow. **Stephen runs:** `apply` and `destroy`.
 
 ### Wave 4: writing (after each piece has results)

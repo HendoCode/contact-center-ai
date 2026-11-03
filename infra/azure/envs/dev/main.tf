@@ -44,7 +44,14 @@ module "apps" {
   enable_agent_api           = var.enable_agent_api
   database_url               = module.data.database_url
   key_vault_secrets          = var.key_vault_secrets
-  tags                       = local.tags
+  # Transcripts are read from LanceDB on the ADLS account (az://lance), the default store.
+  # The store starts empty: ingest into LANCE_URI once, or /healthz reports it unhealthy.
+  mcp_server_env = {
+    RETRIEVER_BACKEND          = "lancedb"
+    LANCE_URI                  = module.data.lance_uri
+    AZURE_STORAGE_ACCOUNT_NAME = module.data.adls_account_name
+  }
+  tags = local.tags
 }
 
 module "compute_gpu" {
