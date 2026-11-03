@@ -217,12 +217,12 @@ def load_teacher_labels(out_dir: Path, texts: dict[str, str], *, compact: bool =
 
 def teacher_llm(provider: str | None = None) -> Any:
     """The teacher for `provider` (default LLM_PROVIDER): `claude-code` runs `claude -p`,
-    anything else is `rag.pipeline.get_llm`."""
+    anything else is `models.providers.get_llm`."""
     if (provider or os.getenv("LLM_PROVIDER", "")).lower() == "claude-code":
         from models.finetune.claude_code import ClaudeCodeTeacher
 
         return ClaudeCodeTeacher()
-    from rag.pipeline import get_llm
+    from models.providers import get_llm
 
     return get_llm(provider)
 

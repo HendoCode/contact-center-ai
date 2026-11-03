@@ -1,6 +1,7 @@
 # contact-center-ai
 
-A governed semantic layer for a synthetic credit-union contact center, served to AI assistants
+`contact-center-ai` (`ccai` in package and module names) is a governed semantic layer for the
+contact center of Meridian Valley Credit Union, a fictional credit union, served to AI assistants
 through one MCP server. It runs on synthetic data only.
 
 ## What it does
@@ -248,7 +249,7 @@ EMBEDDING_BASE_URL=https://api.openai.com/v1  # embedding endpoint (default)
 ```
 
 `LLM_PROVIDER` also accepts `anthropic`, `fireworks` and `vllm`; `.env.example` lists their
-variables. A new chat provider goes in `get_llm()` in `rag/pipeline.py`, and a new embedding
+variables. A new chat provider goes in `get_llm()` in `models/providers.py`, and a new embedding
 provider in `rag/embeddings.py`.
 
 ## Azure deployment

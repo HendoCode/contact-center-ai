@@ -9,7 +9,7 @@ envs/snowflake/   persistent, same backend with its own state key: composes modu
 modules/core        resource group, Log Analytics (0.5 GB/day cap), app identity
 modules/data        Postgres Flexible 16 + pgvector, ADLS Gen2 (Lance, dbt artifacts)
 modules/apps        ACR, Container Apps (mcp-server, agent-api) + Easy Auth via azapi
-modules/compute-gpu A10 Spot VM, nightly shutdown, cloud-init variable (F4 TODO)
+modules/compute-gpu A10 Spot VM, nightly shutdown, cloud-init variable (TODO)
 modules/databricks  Premium workspace + single-node all-purpose cluster, 10 min auto-terminate
 modules/snowflake   XS warehouse (60 s auto-suspend), database, dbt role + key-pair service user, 5-credit monitor
 ```

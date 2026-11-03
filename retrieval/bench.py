@@ -436,7 +436,7 @@ def open_pgvector(embeddings, workdir: Path, cfg: IndexConfig | None = None) -> 
     import psycopg2
     from langchain_postgres import PGVector
 
-    from rag.embeddings import CONNECTION_STRING
+    from retrieval.pgvector_backend import CONNECTION_STRING
     from retrieval.pgvector_backend import PgVectorRetriever
 
     cfg = cfg or IndexConfig()
@@ -771,7 +771,7 @@ def detect_hardware() -> str:
 def postgres_versions() -> dict[str, str]:
     import psycopg2
 
-    from rag.embeddings import CONNECTION_STRING
+    from retrieval.pgvector_backend import CONNECTION_STRING
 
     with psycopg2.connect(CONNECTION_STRING) as conn, conn.cursor() as cur:
         cur.execute("SHOW server_version")

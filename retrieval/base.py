@@ -174,7 +174,7 @@ def get_retriever(backend: str | None = None, embeddings=None) -> Retriever:
         from retrieval.pgvector_backend import PgVectorRetriever
         if embeddings is None:
             return PgVectorRetriever()
-        from rag.embeddings import get_vector_store
+        from retrieval.pgvector_backend import get_vector_store
         return PgVectorRetriever(store=get_vector_store(embeddings))
     if backend == "lancedb":
         from retrieval.lancedb_backend import LanceDBRetriever

@@ -35,7 +35,7 @@ chat models: rag/pipeline.py get_llm()      (LLM_PROVIDER = openai | ollama | an
 infra: docker-compose.yml (local, no bill)  ·  infra/azure/ Terraform (Azure + a Snowflake root)
 ```
 
-The seven MCP tools: `search_transcripts`, `get_call_summary`, `get_transcript`, `query_csat` (data tools),
+The seven MCP tools: `search_transcripts`, `get_call_summary`, `get_transcript`, `query_csat` (evidence tools),
 `query_metric`, `ask_the_analyst` (semantic-layer tools that shell out to MetricFlow's `mf`) and
 `explain_change` (a metric before and after a change, plus the calls in between).
 

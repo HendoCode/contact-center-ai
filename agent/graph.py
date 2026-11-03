@@ -59,6 +59,6 @@ def _toolbox() -> MCPToolbox:
 
 def make_graph():
     """Graph for `langgraph dev` / Studio: no checkpointer (the dev server supplies one)."""
-    from rag.pipeline import get_llm
+    from models.providers import get_llm
 
     return build_graph(get_llm=get_llm, toolbox=_toolbox())

@@ -7,7 +7,18 @@ The MCP server: seven tools (`search_transcripts`, `get_call_summary`, `get_tran
 | stdio (default) | `python -m ccai_mcp.server` | a client on the same machine that spawns the server (Claude Desktop, the agent) |
 | streamable HTTP (opt in) | `python -m ccai_mcp.server --http` or `MCP_TRANSPORT=http` | clients on other machines: register a URL |
 
-Built on `mcp` 2.2.0 (`Server.streamable_http_app()`, served by uvicorn). Code: `server.py` (tools, transport choice), `change.py` (`explain_change`), `http_transport.py` (settings, bearer check, optional Cloudflare Access check, `/healthz`), `http_smoke.py` (a client for checking it).
+Built on `mcp` 2.2.0 (`Server.streamable_http_app()`, served by uvicorn). The seven tools fall into two groups. The evidence tools (`search_transcripts`, `get_call_summary`, `get_transcript`, `query_csat`) read calls and survey scores. The metric tools (`query_metric`, `ask_the_analyst`, `explain_change`) answer from the governed metrics in the semantic layer.
+
+| Module | What it holds |
+|---|---|
+| `server.py` | The seven tool schemas and dispatch; the transport (stdio or HTTP) is chosen at start |
+| `tools.py` | The evidence tools |
+| `metrics.py` | `query_metric` and `ask_the_analyst`, which call MetricFlow's `mf` over the `metrics.yml` catalog |
+| `change.py` | `explain_change` |
+| `masking.py` | Masking of account numbers in anything a supervisor reads |
+| `store_check.py` | The check behind `/healthz` that the transcript store is readable and not empty |
+| `http_transport.py` | HTTP settings, bearer check, optional Cloudflare Access check, `/healthz` |
+| `http_smoke.py` | A client for checking the HTTP endpoint |
 
 ## `explain_change`
 

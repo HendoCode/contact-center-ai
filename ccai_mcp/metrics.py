@@ -29,7 +29,7 @@ from pathlib import Path
 
 import yaml
 
-from rag.pipeline import get_llm
+from models.providers import get_llm
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DBT_DIR = REPO_ROOT / "olap" / "dbt"

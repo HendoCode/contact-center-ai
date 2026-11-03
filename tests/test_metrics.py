@@ -13,7 +13,7 @@ import pytest
 
 from ccai_mcp import metrics
 from ccai_mcp.tools import query_csat
-from rag.embeddings import CONNECTION_STRING
+from retrieval.pgvector_backend import CONNECTION_STRING
 
 
 def _mf_available() -> bool:

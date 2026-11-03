@@ -102,7 +102,7 @@ def pgvector(docs_factory):
     conn = sqlite3.connect(":memory:")
     conn.execute("CREATE TABLE langchain_pg_collection (uuid TEXT, name TEXT)")
     conn.execute("CREATE TABLE langchain_pg_embedding (document TEXT, cmetadata TEXT, collection_id TEXT)")
-    from rag.embeddings import COLLECTION_NAME
+    from retrieval.pgvector_backend import COLLECTION_NAME
 
     conn.execute("INSERT INTO langchain_pg_collection VALUES ('c1', ?)", (COLLECTION_NAME,))
     conn.executemany("INSERT INTO langchain_pg_embedding VALUES (?, ?, 'c1')",
