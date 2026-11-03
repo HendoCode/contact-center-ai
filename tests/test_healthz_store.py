@@ -61,6 +61,12 @@ def test_store_problem(monkeypatch, fake, expect):
     assert (problem is None) if expect is None else (expect in problem)
 
 
+def test_check_can_be_turned_off(monkeypatch):
+    monkeypatch.setattr(store_check, "get_retriever", lambda: _Fake(0))
+    monkeypatch.setenv("MCP_STORE_CHECK", "off")
+    assert store_check.store_problem() is None
+
+
 def test_empty_real_lance_store_is_a_problem(monkeypatch, tmp_path):
     pytest.importorskip("lancedb")
     monkeypatch.setenv("RETRIEVER_BACKEND", "lancedb")

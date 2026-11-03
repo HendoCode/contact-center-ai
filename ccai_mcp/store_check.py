@@ -16,6 +16,8 @@ logger = logging.getLogger("ccai_mcp.store")
 
 def store_problem() -> str | None:
     """None when the configured store holds at least one transcript, else a short reason."""
+    if (os.getenv("MCP_STORE_CHECK") or "").strip().lower() in ("off", "0", "false", "no"):
+        return None
     backend = (os.getenv("RETRIEVER_BACKEND") or "pgvector").lower()
     try:
         rows = get_retriever().count()
