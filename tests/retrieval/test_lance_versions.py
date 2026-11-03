@@ -229,10 +229,13 @@ def test_pipeline_ingest_tags_the_store(retriever, monkeypatch, fake_embeddings,
     monkeypatch.setattr(rag.embeddings, "get_embeddings", lambda: fake_embeddings)
     monkeypatch.setattr(pipeline, "get_retriever", lambda embeddings=None: retriever)
     monkeypatch.setattr(lv, "git_label", lambda: "abc1234")
+    # ingest ends with the CSAT step, which reads Postgres csat_survey; stand in for it
+    monkeypatch.setattr(pipeline, "load_csat_surveys", lambda docs: {"CALL-0": (2, "2026-01-02")})
 
     pipeline.ingest(use_cache=False)
     pipeline.ingest(use_cache=False)  # same commit again: a second tag, the first stays
 
     assert "Tagged the store seed-abc1234" in capsys.readouterr().out
+    assert retriever.count({"csat_score": {"lte": 2}}) == 1  # scored before the tag was taken
     assert {"seed-abc1234", "seed-abc1234-2"} <= set(retriever._table().tags.list())
     assert retriever.snapshot()["lance_tag"] == "seed-abc1234-2"

@@ -21,11 +21,23 @@ Each write commits an immutable table version. `make ingest` tags the finished t
 `snapshot()` names the version being read, and `rollback()` restores a tag. See
 `retrieval/lance_versions.py`.
 
+CSAT columns
+------------
+`set_csat()` adds the typed columns `csat_score` (int32, 1-5) and `surveyed_at` (ISO date) with
+Lance schema evolution (`add_columns`) and fills them with a partial-column `merge_insert`: the
+vector, text and metadata columns are not rewritten and nothing is re-embedded. A call with no
+survey keeps NULL. Every row is written on each run (a survey removed upstream goes back to NULL),
+and `rag.pipeline.ingest` runs it after every ingest, so a rebuilt table or newly inserted rows
+get their scores in the same command. An ingest never writes these columns itself, and a re-ingest
+leaves the ones already filled in place. `where={"csat_score": ...}` needs the columns; before
+`set_csat()` has run, the search refuses with a message saying so.
+
 Indexes
 -------
 * `fts`: native Lance full-text (BM25) index on `text`. Built on first ingest and
   refreshed with `optimize()` after later ones so new rows are indexed, not scanned.
 * `call_id`: BTree scalar index, which keeps the merge and `get_by_id` lookups fast.
+* `csat_score`: Bitmap scalar index (five distinct values), created by `set_csat()`.
 * `vector`: **none below `VECTOR_INDEX_MIN_ROWS` (100,000 rows)**. The synthetic corpus is
   ~1,540 documents. A brute-force (flat) scan over that many vectors is exact and takes
   milliseconds, while IVF-PQ has to train k-means centroids and a PQ codebook from the
@@ -56,7 +68,7 @@ from typing import Literal
 
 import pyarrow as pa
 
-from retrieval.base import Hit, validate_where
+from retrieval.base import INT_FIELDS, Hit, validate_where
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_LANCE_URI = str(REPO_ROOT / "data" / "lance")
@@ -69,9 +81,17 @@ EMBED_BATCH = 64
 _SQL_OPS = {"gte": ">=", "lte": "<=", "lt": "<"}
 
 
+CSAT_COLUMNS = ("csat_score", "surveyed_at")
+
+
 def _literal(value: object) -> str:
-    """SQL string literal (single quotes doubled). All filterable columns are strings."""
+    """SQL string literal (single quotes doubled). Filterable columns are strings except
+    `INT_FIELDS`, which `translate_where` writes as bare integers."""
     return "'" + str(value).replace("'", "''") + "'"
+
+
+def _value(fld: str, value: object) -> str:
+    return str(int(value)) if fld in INT_FIELDS else _literal(value)
 
 
 def translate_where(where: dict | None) -> str | None:
@@ -79,14 +99,23 @@ def translate_where(where: dict | None) -> str | None:
     clauses = []
     for fld, op, value in validate_where(where):
         if op == "eq":
-            clauses.append(f"{fld} IS NULL" if value is None else f"{fld} = {_literal(value)}")
+            clauses.append(f"{fld} IS NULL" if value is None else f"{fld} = {_value(fld, value)}")
         elif op == "in":
             clauses.append(
-                f"{fld} IN ({', '.join(_literal(v) for v in value)})" if value else "1 = 0"
+                f"{fld} IN ({', '.join(_value(fld, v) for v in value)})" if value else "1 = 0"
             )
         else:
-            clauses.append(f"{fld} {_SQL_OPS[op]} {_literal(value)}")
+            clauses.append(f"{fld} {_SQL_OPS[op]} {_value(fld, value)}")
     return " AND ".join(clauses) or None
+
+
+def _hit_metadata(row: dict) -> dict:
+    """The stored metadata dict, plus the survey columns when the call has a survey."""
+    meta = json.loads(row["metadata"])
+    for col in CSAT_COLUMNS:
+        if row.get(col) is not None:
+            meta[col] = row[col]
+    return meta
 
 
 class LanceDBRetriever:
@@ -271,14 +300,54 @@ class LanceDBRetriever:
         self._ensure_indexes(table)
         return len(rows)
 
+    def set_csat(self, surveys: dict[str, tuple[int, str | None]]) -> int:
+        """Fill `csat_score` and `surveyed_at` from `surveys` ({call_id: (score, surveyed_at)}).
+
+        Adds the columns if the table lacks them, then writes only those two columns for every
+        row (NULL where `surveys` has no entry) with a partial-column `merge_insert`, so the
+        vector and text columns are untouched. Safe to repeat. Returns the rows now holding a
+        score (0 if there is no table yet).
+        """
+        self._refuse_write_as_of()
+        table = self._table()
+        if table is None:
+            return 0
+        for call_id, (score, _day) in surveys.items():
+            if isinstance(score, bool) or not isinstance(score, int) or not 1 <= score <= 5:
+                raise ValueError(f"CSAT score for {call_id} must be an integer from 1 to 5, got {score!r}")
+        if "csat_score" not in table.schema.names:
+            table.add_columns(
+                pa.schema([pa.field("csat_score", pa.int32()), pa.field("surveyed_at", pa.string())])
+            )
+        ids = table.search().select(["call_id"]).limit(table.count_rows()).to_arrow()["call_id"].to_pylist()
+        src = pa.table(
+            {
+                "call_id": pa.array(ids, pa.string()),
+                "csat_score": pa.array([surveys[i][0] if i in surveys else None for i in ids], pa.int32()),
+                "surveyed_at": pa.array([surveys[i][1] if i in surveys else None for i in ids], pa.string()),
+            }
+        )
+        table.merge_insert("call_id").when_matched_update_all().execute(src)
+        self._ensure_indexes(table)
+        return table.count_rows("csat_score IS NOT NULL")
+
+    def _require_csat(self, table, flt: str | None) -> None:
+        if flt and "csat_score" in flt and "csat_score" not in table.schema.names:
+            raise ValueError(
+                "No CSAT scores are stored in this table yet; run the ingest "
+                "(python -m rag.pipeline --ingest), which adds them from csat_survey"
+            )
+
     def _ensure_indexes(self, table) -> None:
-        from lancedb.index import FTS, BTree
+        from lancedb.index import FTS, BTree, Bitmap
 
         existing = {idx.columns[0] for idx in table.list_indices()}
         if "call_id" not in existing:
             table.create_index("call_id", config=BTree())
         if "text" not in existing:
             table.create_index("text", config=FTS())
+        if "csat_score" in table.schema.names and "csat_score" not in existing:
+            table.create_index("csat_score", config=Bitmap())
         n = table.count_rows()
         if "vector" not in existing and n >= self.vector_index_min_rows:
             table.create_index("vector", config=self._vector_index_config(n))
@@ -312,6 +381,7 @@ class LanceDBRetriever:
         table = self._table()
         if table is None:
             return []
+        self._require_csat(table, flt)
         rows = self._query(table, query, k, flt, mode).to_list()
         return self._to_hits(rows, mode)
 
@@ -352,7 +422,7 @@ class LanceDBRetriever:
             best = 2.0 / (RRF_K + 1)
             scores = [r["_relevance_score"] / best for r in rows]
         return [
-            Hit(call_id=r["call_id"], text=r["text"], score=float(s), metadata=json.loads(r["metadata"]))
+            Hit(call_id=r["call_id"], text=r["text"], score=float(s), metadata=_hit_metadata(r))
             for r, s in zip(rows, scores)
         ]
 
@@ -376,4 +446,8 @@ class LanceDBRetriever:
 
     def count(self, where: dict | None = None) -> int:
         table = self._table()
-        return 0 if table is None else table.count_rows(translate_where(where))
+        if table is None:
+            return 0
+        flt = translate_where(where)
+        self._require_csat(table, flt)
+        return table.count_rows(flt)

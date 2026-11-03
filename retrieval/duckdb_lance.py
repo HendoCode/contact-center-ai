@@ -42,7 +42,7 @@ import json
 import os
 from typing import Literal
 
-from retrieval.base import Hit, validate_where
+from retrieval.base import LANCE_ONLY_FIELDS, Hit, validate_where
 from retrieval.lancedb_backend import DEFAULT_LANCE_URI
 
 _SQL_OPS = {"gte": ">=", "lte": "<=", "lt": "<"}
@@ -55,6 +55,8 @@ def where_to_sql(where: dict | None) -> tuple[str, list]:
     clauses: list[str] = []
     params: list = []
     for fld, op, value in validate_where(where):
+        if fld in LANCE_ONLY_FIELDS:
+            raise ValueError(f"The DuckDB reader does not filter on {fld!r}; use the LanceDB backend")
         if op == "eq":
             if value is None:
                 clauses.append(f"{fld} IS NULL")

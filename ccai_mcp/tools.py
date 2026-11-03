@@ -33,18 +33,35 @@ def retrieval_mode() -> str:
     return mode
 
 
-def search_transcripts(query: str, k: int = 5) -> str:
+def csat_where(min_csat: int | None = None, max_csat: int | None = None) -> dict | None:
+    """The retrieval filter for a CSAT score range (inclusive, 1-5), or None for no filter."""
+    bounds = {"gte": min_csat, "lte": max_csat}
+    for name, value in (("min_csat", min_csat), ("max_csat", max_csat)):
+        if value is not None and (isinstance(value, bool) or not isinstance(value, int) or not 1 <= value <= 5):
+            raise ValueError(f"{name} must be an integer from 1 to 5, got {value!r}")
+    if min_csat is not None and max_csat is not None and min_csat > max_csat:
+        raise ValueError(f"min_csat ({min_csat}) is above max_csat ({max_csat})")
+    cond = {op: v for op, v in bounds.items() if v is not None}
+    return {"csat_score": cond} if cond else None
+
+
+def search_transcripts(
+    query: str, k: int = 5, min_csat: int | None = None, max_csat: int | None = None
+) -> str:
     """
-    Semantic search over call transcripts.
+    Semantic search over call transcripts, optionally only calls whose survey score is in a range.
 
     Args:
         query: Natural language question or search phrase
         k: Number of transcripts to retrieve (default 5)
+        min_csat: Only calls whose CSAT survey score is at least this (1-5). Needs
+            RETRIEVER_BACKEND=lancedb; calls with no survey are left out
+        max_csat: Only calls whose CSAT survey score is at most this (1-5); same conditions
 
     Returns:
         AI-generated answer grounded in retrieved transcripts
     """
-    return rag_query(query, k=k, mode=retrieval_mode())
+    return rag_query(query, k=k, mode=retrieval_mode(), where=csat_where(min_csat, max_csat))
 
 
 def get_call_summary(call_id: str) -> str:

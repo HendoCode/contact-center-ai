@@ -51,7 +51,10 @@ TOOLS = [
             "Search call transcripts using natural language. "
             "Use this to find calls about specific topics, issues, or patterns. "
             "Examples: 'calls where members complained about fees', "
-            "'fraud disputes where the member was frustrated', 'calls that were escalated'."
+            "'fraud disputes where the member was frustrated', 'calls that were escalated'. "
+            "min_csat and max_csat restrict the search to calls whose survey score is in that "
+            "range (e.g. max_csat=2: what do members who scored us 1-2 say about fees?); they "
+            "need the LanceDB retriever and leave out calls with no survey."
         ),
         inputSchema={
             "type": "object",
@@ -64,6 +67,18 @@ TOOLS = [
                     "type": "integer",
                     "description": "Number of transcripts to retrieve (default: 5)",
                     "default": 5
+                },
+                "min_csat": {
+                    "type": "integer",
+                    "description": "Only search calls whose CSAT survey score is at least this (1-5). Needs the LanceDB retriever; calls with no survey are left out",
+                    "minimum": 1,
+                    "maximum": 5
+                },
+                "max_csat": {
+                    "type": "integer",
+                    "description": "Only search calls whose CSAT survey score is at most this (1-5), e.g. 2 for unhappy members. Needs the LanceDB retriever",
+                    "minimum": 1,
+                    "maximum": 5
                 }
             },
             "required": ["query"]
@@ -353,6 +368,8 @@ async def _run_tool(name: str, arguments: dict) -> str | list[str]:
             search_transcripts,
             query=arguments["query"],
             k=arguments.get("k", 5),
+            min_csat=arguments.get("min_csat"),
+            max_csat=arguments.get("max_csat"),
         )
     elif name == "get_call_summary":
         result = await asyncio.to_thread(get_call_summary, call_id=arguments["call_id"])

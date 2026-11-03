@@ -61,8 +61,10 @@ behind one Retriever interface; the diagrams make no performance claim about eit
 `explain_change` reads the metric for both windows through MetricFlow and counts calls through
 the Retriever; the model only labels drivers and supplies quotes that code checks verbatim.
 
-**CSAT is SQL, not vectors.** `query_csat` reads the `f_csat` fact in Postgres; CSAT is not
-embedded, so it cannot be combined with semantic search.
+**CSAT is SQL, with a score column on the LanceDB table.** `query_csat` reads the `f_csat` fact
+in Postgres. CSAT is not embedded, but on the LanceDB retriever ingest copies each call's survey
+score onto the table as a typed column, so `search_transcripts` can prefilter by score. The pgvector
+retriever has no such column and refuses the filter.
 
 **Auth is infrastructure-only.** On Azure, Entra Easy Auth sits in front of the Container App;
 the Python code has no auth logic. Locally, the HTTP transport binds to loopback unless a bearer

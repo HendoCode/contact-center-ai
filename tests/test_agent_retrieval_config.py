@@ -21,9 +21,9 @@ def test_k_and_mode_reach_the_search(monkeypatch):
     monkeypatch.setenv("AGENT_RETRIEVAL_MODE", "Hybrid")
     assert search_arguments("why fees?") == {"query": "why fees?", "k": 10}
     seen = {}
-    monkeypatch.setattr(tools, "rag_query", lambda query, k, mode: seen.update(q=query, k=k, mode=mode) or "ok")
+    monkeypatch.setattr(tools, "rag_query", lambda query, k, mode, where: seen.update(q=query, k=k, mode=mode, where=where) or "ok")
     assert tools.search_transcripts("why fees?", k=10) == "ok"
-    assert seen == {"q": "why fees?", "k": 10, "mode": "hybrid"}
+    assert seen == {"q": "why fees?", "k": 10, "mode": "hybrid", "where": None}
 
 
 def test_unknown_mode_is_refused(monkeypatch):

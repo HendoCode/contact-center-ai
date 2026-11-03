@@ -3,7 +3,7 @@
 import psycopg2
 
 from rag.embeddings import COLLECTION_NAME, CONNECTION_STRING, get_vector_store
-from retrieval.base import Hit, validate_where
+from retrieval.base import Hit, refuse_lance_only, validate_where
 
 _PG_OPS = {"eq": "$eq", "in": "$in", "gte": "$gte", "lte": "$lte", "lt": "$lt"}
 
@@ -15,8 +15,10 @@ _ROW_SQL = (
 
 
 def translate_where(where: dict | None) -> dict | None:
-    """Portable `where` -> LangChain PGVector filter syntax."""
-    clauses = [{f: {_PG_OPS[op]: v}} for f, op, v in validate_where(where)]
+    """Portable `where` -> LangChain PGVector filter syntax (`csat_score` is refused)."""
+    triples = validate_where(where)
+    refuse_lance_only(triples, "pgvector")
+    clauses = [{f: {_PG_OPS[op]: v}} for f, op, v in triples]
     if not clauses:
         return None
     return clauses[0] if len(clauses) == 1 else {"$and": clauses}
@@ -32,7 +34,9 @@ def _count_sql(where: dict | None) -> tuple[str, list]:
     own `$gte` and `$lt` compare them as text too, so this agrees with `search`.
     """
     sql, params = _ROW_SQL.replace("e.document, e.cmetadata", "count(*)"), [COLLECTION_NAME]
-    for fld, op, value in validate_where(where):
+    triples = validate_where(where)
+    refuse_lance_only(triples, "pgvector")
+    for fld, op, value in triples:
         if op == "eq" and value is None:
             sql += " AND e.cmetadata->>%s IS NULL"
             params.append(fld)
