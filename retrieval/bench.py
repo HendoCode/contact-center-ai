@@ -684,8 +684,11 @@ def run_bench(docs: list[dict], queries: list[dict], embeddings, *,
               backends: Iterable[str] = BACKENDS, modes: Iterable[str] = MODES,
               repeats: int = 3, openers: dict[str, Callable] | None = None,
               workdir: Path | None = None, ingest_batch: int = INGEST_BATCH,
-              cache_file: Path | None = None, jitter_eps: float = 0.0) -> dict:
+              cache_file: Path | None = None, jitter_eps: float = 0.0,
+              provenance: dict | None = None) -> dict:
     """Run the benchmark; returns the `metrics` block of the results record.
+
+    `provenance`, when given, is filled with `store`: the LanceDB table version the run read.
 
     A backend that fails (open, ingest or anything else) gets a short `failed: ...` row per
     mode, and the other backends still run, so a partial run still yields a results file.
@@ -711,6 +714,11 @@ def run_bench(docs: list[dict], queries: list[dict], embeddings, *,
                 emb = JitteredEmbeddings(cached, jitter_eps) if jitter_eps else cached
                 store = openers[name](emb, Path(tmp))
                 metrics.update(bench_backend(store, docs, queries, modes, repeats, ingest_batch, reference))
+                snapshot = getattr(store.retriever, "snapshot", None)
+                if provenance is not None and snapshot and (snap := snapshot()):
+                    # The bench store is deleted below, so the version identifies the run's state
+                    # (ingest batches applied) rather than a snapshot to check out.
+                    provenance["store"] = {**snap, "ephemeral": True}
             except Exception as e:  # noqa: BLE001 - recorded, not raised: keep the other backends
                 print(f"bench: {name} FAILED: {short_error(e)}", flush=True)
                 for mode in modes:
@@ -887,9 +895,10 @@ def _main(args: argparse.Namespace, backends: list[str], modes: list[str]) -> in
     cfg = args.index_config
     openers = {k: (functools.partial(v, cfg=cfg) if v in (open_pgvector, open_lancedb) else v)
                for k, v in OPENERS.items()}
+    provenance: dict = {}
     metrics = run_bench(docs, queries, embeddings, backends=backends, modes=modes,
                         repeats=args.repeats, ingest_batch=args.ingest_batch, cache_file=cache_file,
-                        openers=openers, jitter_eps=jitter_eps)
+                        openers=openers, jitter_eps=jitter_eps, provenance=provenance)
 
     versions = {"python": platform.python_version(), "model": embedding_model(embeddings)}
     for pkg in ("lancedb", "pyarrow", "pylance", "langchain-postgres", "psycopg2-binary"):
@@ -904,6 +913,7 @@ def _main(args: argparse.Namespace, backends: list[str], modes: list[str]) -> in
         "scale": args.scale, "rows": len(docs), "queries": len(queries), "ingest_batch": args.ingest_batch,
         "jitter_eps": jitter_eps, "index": cfg.as_params(),
         "labels_sha256": hashlib.sha256(labels_text.encode()).hexdigest()[:16],
+        **provenance,
     }
     notes = ("recall@k is capped recall, |rel ∩ top-k| / min(k, |rel|). Embeddings are "
              "precomputed and cached, so ingest_s and latency exclude the embedding model. "

@@ -6,7 +6,7 @@
 # `evals` is the L2 agent golden set offline (a CI gate); `evals-live` is the same set
 # against real models, uploaded to LangSmith.
 
-.PHONY: up down seed ingest test lint check-public demo demo-change demo-change-replay notebooks strip-notebooks bench evals evals-live evals-compare evals-export evals-retrieval-experiment finetune-data finetune-label load-snowflake load-databricks load-dry-run dbt-build dbt-build-dev dev-data lance-azure-check parity
+.PHONY: up down seed ingest test lint check-public demo demo-change demo-change-replay notebooks strip-notebooks bench evals evals-live evals-compare evals-export evals-retrieval-experiment finetune-data finetune-label load-snowflake load-databricks load-dry-run dbt-build dbt-build-dev dev-data lance-azure-check lance-versions lance-rollback lance-prune parity
 
 PYTHON := uv run python
 # RETRIEVER_BACKEND=lancedb needs the lance dependency group wherever the store is read or written.
@@ -106,6 +106,22 @@ bench:
 # side. Needs `az login` (Entra; no account keys). ARGS="--dry-run" prints the plan only.
 lance-azure-check:
 	uv run --group lance python -m retrieval.lance_azure_check $(ARGS)
+
+# The LanceDB store's table versions and tags (`make ingest` tags each ingest `seed-<git sha>`).
+# Reads LANCE_URI / COLLECTION_NAME like the retriever does.
+lance-versions:
+	uv run --group lance python -m retrieval.lance_versions list
+
+# Make a tagged version the newest again: `make lance-rollback TAG=seed-abc1234`. The versions
+# rolled back from stay in the history until `make lance-prune` cleans them.
+lance-rollback:
+	$(if $(TAG),,$(error TAG is required, e.g. make lance-rollback TAG=seed-abc1234; see make lance-versions))
+	uv run --group lance python -m retrieval.lance_versions rollback "$(TAG)"
+
+# Retention: keep the newest KEEP seed tags (default 10) and clean the history before them.
+# Tagged versions are never deleted. `make ingest` applies the same policy.
+lance-prune:
+	uv run --group lance python -m retrieval.lance_versions prune $(if $(KEEP),--keep $(KEEP))
 
 # ── Fine-tune dataset (F1) ────────────────────────────────────────────────────
 

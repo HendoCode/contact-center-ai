@@ -246,6 +246,8 @@ def ingest(source: str = "synthetic", use_cache: bool = True):
     )
 
     print(f"Ingestion complete. {written} documents upserted ({retriever.count()} total, {retriever.name}).")
+    if hasattr(retriever, "tag_seed"):  # versioned stores (LanceDB) name this snapshot
+        print(f"Tagged the store {retriever.tag_seed()} (roll back with `make lance-rollback TAG=...`).")
 
 
 # ── Retrieve ──────────────────────────────────────────────────────────────────

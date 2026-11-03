@@ -110,6 +110,17 @@ def validate_where(where: dict | None) -> list[tuple[str, str, object]]:
     return triples
 
 
+def store_snapshot() -> dict | None:
+    """Provenance of the store the default retriever reads, for results JSON `params.store`.
+
+    A versioned store (LanceDB) names the table version and tag the run read, so the run can be
+    replayed with `LanceDBRetriever(as_of=...)`. Other backends have no version: None.
+    """
+    if os.getenv("RETRIEVER_BACKEND", "pgvector").lower() != "lancedb":
+        return None
+    return get_retriever().snapshot()
+
+
 def get_retriever(backend: str | None = None, embeddings=None) -> Retriever:
     """Return the backend named by `backend` or RETRIEVER_BACKEND (default "pgvector").
 

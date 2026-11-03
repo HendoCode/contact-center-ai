@@ -121,6 +121,7 @@ New variables: `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`, `FIREWORKS_API_KEY`, `FIR
  "versions": {"python": "...", "lancedb": "...", "model": "..."},
  "params": {...}, "metrics": {...}, "notes": "..."}
 ```
+Optional `params.store` records the store snapshot a run read; for a LanceDB table it is `{"backend": "lancedb", "lance_version": 12, "lance_tag": "seed-abc1234" | null, "rows": 1540}` (`retrieval/README.md`).
 `python -m tools.results render <area>` writes `results/<area>/README.md` tables from the JSON. Docs and posts quote the rendered tables, never retyped numbers.
 
 ### 4.4 Layout

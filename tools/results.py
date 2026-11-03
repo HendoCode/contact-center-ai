@@ -10,6 +10,10 @@ A run record is one JSON object:
      "hardware": "...", "versions": {"python": "...", ...},
      "params": {...}, "metrics": {...}, "notes": "..."}
 
+`params.store` is optional: for a run that read a versioned LanceDB table it is
+`{"backend": "lancedb", "lance_version": 12, "lance_tag": "seed-abc1234" | null, "rows": 1540}`,
+so the result is tied to the exact table version (retrieval/lance_versions.py).
+
 Rendering convention for `metrics`: an entry whose value is a dict is a table row
 (row label = key). Scalar values in those rows become columns of the run's main
 table; dict values (e.g. a per-query-type breakdown) become one extra table per
@@ -56,7 +60,20 @@ def validate(record: object) -> list[str]:
         errors.append("versions must include 'python'")
     if not record["metrics"]:
         errors.append("metrics is empty")
+    errors += _validate_store(record["params"].get("store"))
     return errors
+
+
+def _validate_store(store: object) -> list[str]:
+    """Optional `params.store`: the store snapshot a run read. A LanceDB one names its version."""
+    if store is None:
+        return []
+    if not isinstance(store, dict) or not store.get("backend"):
+        return ["params.store must be an object with a 'backend'"]
+    version = store.get("lance_version")
+    if store["backend"] == "lancedb" and (not isinstance(version, int) or isinstance(version, bool)):
+        return ["params.store.lance_version must be an integer for a lancedb store"]
+    return []
 
 
 def load(path: Path) -> dict:
