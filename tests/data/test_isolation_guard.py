@@ -11,6 +11,7 @@ data tables, period grammar and subgraph.
 """
 
 import re
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -29,7 +30,6 @@ GUARDED = [
     "agent/demo_change.py",
     "agent/citation_view.py",
     "ccai_mcp/masking.py",
-    "results/demo/*.json",
     "tools/demo_chat.py",
     "evals/datasets/*.jsonl",
     "evals/datasets/*.py",
@@ -40,6 +40,10 @@ GUARDED = [
     "ccai_mcp/change.py",
     "notebooks/**/*",
 ]
+# results/demo/*.json is not guarded: it is the recorded output of the held-out step in
+# `make demo-change` (the point of that step is that the agent finds the held-out change), so it
+# names the held-out drivers by design. It never feeds a prompt or an eval. It is checked for
+# local paths, hostnames and keys in test_the_recorded_demo_run_is_replayable_and_clean.
 # File types the guard reads (images and caches are skipped).
 SUFFIXES = {".md", ".yml", ".yaml", ".json", ".jsonl", ".py", ".txt", ".toml", ".ipynb"}
 
@@ -65,9 +69,21 @@ def forbidden(events_config) -> dict[str, re.Pattern]:
     return found
 
 
+def tracked_files() -> set[Path] | None:
+    """Files git tracks, so an untracked local artifact (a results file) is never scanned."""
+    try:
+        out = subprocess.run(["git", "ls-files", "-z"], cwd=REPO_ROOT, capture_output=True,
+                             check=True).stdout.decode()
+    except (OSError, subprocess.CalledProcessError):
+        return None
+    return {REPO_ROOT / name for name in out.split("\0") if name}
+
+
 def guarded_files() -> list[Path]:
+    tracked = tracked_files()
     files = {p for pattern in GUARDED for p in REPO_ROOT.glob(pattern)
-             if p.is_file() and p.suffix in SUFFIXES and "__pycache__" not in p.parts}
+             if p.is_file() and p.suffix in SUFFIXES and "__pycache__" not in p.parts
+             and (tracked is None or p in tracked)}
     return sorted(files)
 
 
@@ -156,3 +172,16 @@ def test_the_scanner_catches_a_planted_keyword_or_id(events_config, planted):
 
 def test_the_scanner_ignores_words_that_only_contain_a_keyword(events_config):
     assert not hits("bitcoin, coinbase, coins and notaries", forbidden(events_config))
+
+
+def test_the_recorded_demo_run_is_replayable_and_clean():
+    """The committed record is what `make demo-change-replay` prints on a fresh clone."""
+    import json
+    path = REPO_ROOT / "results" / "demo" / "change-demo-last-verified-run.json"
+    record = json.loads(path.read_text())
+    assert {"version", "recorded_at", "git_sha", "chat_provider", "steps", "transcript"} <= set(record)
+    assert record["transcript"].strip()
+    text = path.read_text()
+    for pattern in (r"/home/", r"/Users/", r"\.lan\b", r"\bsk-[A-Za-z0-9]", r"op://",
+                    r"\blocalhost\b", r"\b\d{1,3}(?:\.\d{1,3}){3}\b", r"\b\d{9,}\b"):
+        assert not re.search(pattern, text), pattern
