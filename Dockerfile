@@ -17,7 +17,7 @@
 #   in the Debian sources. Build-arg values are part of the layer cache key, so an arg would
 #   stop hosts with and without a mirror from sharing the registry build cache
 #   (docker-compose.cache.yml); secret contents are not.
-# There's no PyPI mirror on purpose: `uv sync --frozen` downloads the exact URLs recorded in
+# There's no PyPI mirror on purpose: a frozen uv install (`--frozen`) downloads the exact URLs recorded in
 # uv.lock, whatever index is configured, so the uv cache mount below is what saves re-downloads.
 ARG GHCR_MIRROR=
 FROM ${GHCR_MIRROR:-ghcr.io}/astral-sh/uv:0.12.22 AS uv
