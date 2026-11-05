@@ -21,7 +21,10 @@ COMPOSE_APP := docker compose --profile app
 # Opt-in registry build cache. With BUILD_CACHE_REF unset (the default) builds are unchanged.
 # Set it to a registry repository (e.g. registry.example.com/team/ccai-cache) to pull layers
 # from <ref>:<branch> and <ref>:main, and, on the default branch only, push them back.
-BUILD_CACHE_REF ?=
+# BUILD_CACHE_PREFIX (a project-neutral registry path, e.g. registry.example.com/cache) is the
+# shared form: this project's ref is derived from it unless BUILD_CACHE_REF is set explicitly.
+BUILD_CACHE_PREFIX ?=
+BUILD_CACHE_REF ?= $(if $(strip $(BUILD_CACHE_PREFIX)),$(BUILD_CACHE_PREFIX)/contact-center-ai/app)
 ifneq ($(strip $(BUILD_CACHE_REF)),)
 CACHE_BRANCH := $(shell git rev-parse --abbrev-ref HEAD 2>/dev/null | tr -c 'A-Za-z0-9_.\n-' '-')
 export CACHE_REF := $(BUILD_CACHE_REF)
@@ -29,6 +32,14 @@ export CACHE_BRANCH
 COMPOSE_CACHE_FILES := -f docker-compose.yml -f docker-compose.cache.yml$(if $(filter main,$(CACHE_BRANCH)), -f docker-compose.cache-push.yml)
 COMPOSE_APP := docker compose $(COMPOSE_CACHE_FILES) --profile app
 endif
+
+# The app image is built with `docker buildx bake`, which reads the same Compose files (args,
+# secrets, image name, the cache overrides above) but can set the export compression: zstd
+# level 1 instead of the default gzip. Compressing the ~1.3 GB venv layer with gzip took about
+# 50s of a ~89s dependency-change rebuild; zstd brought that rebuild to ~50s. Override with
+# BUILD_IMAGE_OUTPUT=type=docker for the plain default.
+BUILD_IMAGE_OUTPUT ?= type=docker,compression=zstd,compression-level=1,force-compression=true
+BUILD_IMAGE := docker buildx bake $(or $(COMPOSE_CACHE_FILES),-f docker-compose.yml) --set 'seed.output=$(BUILD_IMAGE_OUTPUT)' seed
 
 # `make demo` defaults to the local, keyless path: chat on Ollama (llama3.2) and embeddings
 # on Ollama (nomic-embed-text). Override the chat provider with DEMO_LLM_PROVIDER, e.g.
@@ -39,7 +50,7 @@ DEMO_LLM_PROVIDER ?= ollama
 
 # Builds the shared app image (every app service uses it). Honours BUILD_CACHE_REF above.
 build-image:
-	$(COMPOSE_APP) build seed
+	$(BUILD_IMAGE)
 
 # Brings the stack up (db, ollama, model pulls, seed, dbt build, the langgraph dev server)
 # and runs the five scripted questions from agent/demo.py. The first run pulls models and
@@ -48,7 +59,7 @@ build-image:
 # Works from `cp .env.example .env`; no cloud key is needed on the default path.
 demo:
 	export LLM_PROVIDER=$(DEMO_LLM_PROVIDER) EMBEDDING_PROVIDER=ollama; \
-	$(COMPOSE_APP) build seed && $(COMPOSE_APP) run --rm demo
+	$(BUILD_IMAGE) && $(COMPOSE_APP) run --rm demo
 	@echo
 	@echo "Stack is still up. LangGraph dev server: http://localhost:2024 (API docs at /docs)."
 	@echo "Stop it with: make down"
@@ -73,7 +84,7 @@ demo-change-replay:
 # the token (JUPYTER_TOKEN in .env, `ccai-demo` when unset). Stop it with `make down`.
 notebooks:
 	export LLM_PROVIDER=$(DEMO_LLM_PROVIDER) EMBEDDING_PROVIDER=ollama; \
-	$(COMPOSE_APP) up -d --build jupyter
+	$(BUILD_IMAGE) && $(COMPOSE_APP) up -d jupyter
 	@echo
 	@echo "JupyterLab: http://127.0.0.1:8888/lab/tree/change-analysis.ipynb?token=$${JUPYTER_TOKEN:-ccai-demo}"
 	@echo "Stop it with: make down"

@@ -150,8 +150,10 @@ declares a vLLM server.
 
 ### Shared build cache (optional)
 
-Every app service runs from one image, and `make build-image` builds it. By default the
-build uses only the local layer cache. Setting `BUILD_CACHE_REF` to a registry repository
+Every app service runs from one image, and `make build-image` builds it (with
+`docker buildx bake` over the same Compose files, exporting layers as zstd level 1, which is
+much faster than gzip for the ~1.3 GB dependency layer; `make demo` and `make notebooks` build
+the same way). By default the build uses only the local layer cache. Setting `BUILD_CACHE_REF` to a registry repository
 lets machines share layers through BuildKit's registry cache:
 
 ```bash

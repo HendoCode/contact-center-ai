@@ -32,9 +32,10 @@ x-app: &app
     context: .
     dockerfile: Dockerfile
     # Optional build-time mirrors (see the Dockerfile header); empty = public sources.
+    # APT_MIRROR goes in as a secret so it never splits the layer cache.
     args:
       GHCR_MIRROR: ${GHCR_MIRROR:-}
-      APT_MIRROR: ${APT_MIRROR:-}
+    secrets: [apt_mirror]
   image: ccai-app:local
   # `.env` is optional; the environment block below wins over it, rewiring hosts for
   # the Compose network (inside a container `localhost` is the container itself).
@@ -400,3 +401,9 @@ volumes:
   dbt-target: {}
   lance-data: {}
   hf-cache: {}
+
+# Build-time secret (see the app build above): the APT_MIRROR value from the environment/.env.
+# Unset or empty is fine and means the public Debian mirrors.
+secrets:
+  apt_mirror:
+    environment: APT_MIRROR

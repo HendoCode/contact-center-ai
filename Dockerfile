@@ -8,12 +8,17 @@
 # agent, dbt, notebooks (JupyterLab) and lance (LanceDB, the Compose transcript store) groups.
 # The finetune group stays out.
 #
-# Optional build-time mirrors (compose `build.args`, values from a git-ignored .env; empty by
-# default, which means the public sources): GHCR_MIRROR is a registry host that mirrors ghcr.io
-# (an ARG can't go directly in `COPY --from`, hence the named stage), and APT_MIRROR is a base URL
-# that replaces `http://deb.debian.org` in the Debian sources. There's no PyPI mirror arg on
-# purpose: `uv sync --frozen` downloads the exact URLs recorded in uv.lock, whatever index is
-# configured, so the uv cache mount below is what saves the re-downloads.
+# Optional build-time mirrors (values from a git-ignored .env; empty by default, which means the
+# public sources):
+# - GHCR_MIRROR (build arg): a registry host that mirrors ghcr.io. An ARG can't go directly in
+#   `COPY --from`, hence the named stage. It's cache-neutral: the same image digest yields the
+#   same cache key either way.
+# - APT_MIRROR (BuildKit *secret*, not a build arg): a base URL replacing `http://deb.debian.org`
+#   in the Debian sources. Build-arg values are part of the layer cache key, so an arg would
+#   stop hosts with and without a mirror from sharing the registry build cache
+#   (docker-compose.cache.yml); secret contents are not.
+# There's no PyPI mirror on purpose: `uv sync --frozen` downloads the exact URLs recorded in
+# uv.lock, whatever index is configured, so the uv cache mount below is what saves re-downloads.
 ARG GHCR_MIRROR=
 FROM ${GHCR_MIRROR:-ghcr.io}/astral-sh/uv:0.12.22 AS uv
 
@@ -26,9 +31,9 @@ FROM python:3.12-slim
 # .debs it already downloaded. The image's docker-clean hook (which deletes them) and, when a
 # mirror is set, the original Debian sources are set aside and restored in the same step, so the
 # shipped image is apt-wise identical to a plain build. `--no-cache` bypasses the mounts too.
-ARG APT_MIRROR=
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+    --mount=type=secret,id=apt_mirror,env=APT_MIRROR,required=false \
     mv /etc/apt/apt.conf.d/docker-clean /tmp/docker-clean.orig \
     && echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/zz-build-keep-debs \
     && if [ -n "$APT_MIRROR" ]; then \
