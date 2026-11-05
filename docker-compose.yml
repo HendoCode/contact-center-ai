@@ -31,6 +31,10 @@ x-app: &app
   build:
     context: .
     dockerfile: Dockerfile
+    # Optional build-time mirrors (see the Dockerfile header); empty = public sources.
+    args:
+      GHCR_MIRROR: ${GHCR_MIRROR:-}
+      APT_MIRROR: ${APT_MIRROR:-}
   image: ccai-app:local
   # `.env` is optional; the environment block below wins over it, rewiring hosts for
   # the Compose network (inside a container `localhost` is the container itself).

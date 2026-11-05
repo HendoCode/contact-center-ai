@@ -7,15 +7,43 @@
 # Dependencies come from uv.lock: the base install, the dev extra (pytest) and the
 # agent, dbt, notebooks (JupyterLab) and lance (LanceDB, the Compose transcript store) groups.
 # The finetune group stays out.
+#
+# Optional build-time mirrors (compose `build.args`, values from a git-ignored .env; empty by
+# default, which means the public sources): GHCR_MIRROR is a registry host that mirrors ghcr.io
+# (an ARG can't go directly in `COPY --from`, hence the named stage), and APT_MIRROR is a base URL
+# that replaces `http://deb.debian.org` in the Debian sources. There's no PyPI mirror arg on
+# purpose: `uv sync --frozen` downloads the exact URLs recorded in uv.lock, whatever index is
+# configured, so the uv cache mount below is what saves the re-downloads.
+ARG GHCR_MIRROR=
+FROM ${GHCR_MIRROR:-ghcr.io}/astral-sh/uv:0.12.22 AS uv
+
 FROM python:3.12-slim
 
 # psql is for olap/oltp/apply.sh, which falls back to `psql $DATABASE_URL` when there is
 # no docker CLI (always the case inside a container).
-RUN apt-get update \
+#
+# apt's archives and lists sit on BuildKit cache mounts, so a rebuild of this layer reuses the
+# .debs it already downloaded. The image's docker-clean hook (which deletes them) and, when a
+# mirror is set, the original Debian sources are set aside and restored in the same step, so the
+# shipped image is apt-wise identical to a plain build. `--no-cache` bypasses the mounts too.
+ARG APT_MIRROR=
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+    mv /etc/apt/apt.conf.d/docker-clean /tmp/docker-clean.orig \
+    && echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/zz-build-keep-debs \
+    && if [ -n "$APT_MIRROR" ]; then \
+      cp /etc/apt/sources.list.d/debian.sources /tmp/debian.sources.orig \
+      && sed -i "s|http://deb.debian.org|${APT_MIRROR%/}|g" /etc/apt/sources.list.d/debian.sources; \
+    fi \
+    && apt-get update \
     && apt-get install -y --no-install-recommends postgresql-client \
-    && rm -rf /var/lib/apt/lists/*
+    && rm /etc/apt/apt.conf.d/zz-build-keep-debs \
+    && mv /tmp/docker-clean.orig /etc/apt/apt.conf.d/docker-clean \
+    && if [ -f /tmp/debian.sources.orig ]; then \
+      mv /tmp/debian.sources.orig /etc/apt/sources.list.d/debian.sources; \
+    fi
 
-COPY --from=ghcr.io/astral-sh/uv:0.12.22 /uv /uvx /bin/
+COPY --from=uv /uv /uvx /bin/
 
 WORKDIR /app
 # ccai_mcp/metrics.py looks for /app/.venv/bin/mf; keeping the venv at /app/.venv

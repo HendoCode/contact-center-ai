@@ -86,6 +86,8 @@ ccai_mcp/server.py (stdio; HTTP opt-in) → 7 tools exposed to MCP clients
 - **Embeddings are decoupled via `EMBEDDING_PROVIDER`** (falling back to `LLM_PROVIDER`, so an unset value keeps the old single-provider behavior). OpenRouter currently serves **no embedding models**, so an OpenRouter chat setup must pair with `EMBEDDING_PROVIDER=ollama` (local, free `nomic-embed-text`) or an OpenAI-compatible `EMBEDDING_BASE_URL`/`EMBEDDING_MODEL`. A new embedding provider goes in `rag/embeddings.py`, and a new chat provider in `get_llm()` in `models/providers.py`.
 - **MCP server is stdio by default**; streamable HTTP is opt-in (`MCP_TRANSPORT=http` or `--http`, `ccai_mcp/http_transport.py`) for clients on other machines, bound to loopback unless `MCP_AUTH_TOKEN` is set. Claude Desktop and other local clients can still connect via process I/O. The HTTP mode is designed to run on Azure Container Apps behind Easy Auth (Entra); the Terraform is validated in CI and has not been deployed.
 
+- **The app image build is cached; don't reach for `--no-cache`.** uv and apt use BuildKit cache mounts, and `--no-cache` bypasses them, so it re-downloads everything. Optional `GHCR_MIRROR` / `APT_MIRROR` build args (from `.env`, blank = public; see the Dockerfile header) route the uv image and apt through local mirrors. There's deliberately no PyPI-mirror arg: `uv sync --frozen` downloads the exact URLs in `uv.lock` whatever index is set.
+
 ## Environment variables
 
 ```
