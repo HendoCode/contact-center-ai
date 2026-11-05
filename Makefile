@@ -7,7 +7,7 @@
 # against real models, uploaded to LangSmith. Every target is declared in `.PHONY` below;
 # the comment above each one says what it does.
 
-.PHONY: up down seed ingest test lint check-public demo demo-change demo-change-replay notebooks strip-notebooks bench evals evals-live evals-compare evals-export evals-retrieval-experiment finetune-data finetune-label load-snowflake load-databricks load-dry-run dbt-build dbt-build-dev dev-data lance-azure-check lance-versions lance-rollback lance-prune parity k8s-check
+.PHONY: build-image up down seed ingest test lint check-public demo demo-change demo-change-replay notebooks strip-notebooks bench evals evals-live evals-compare evals-export evals-retrieval-experiment finetune-data finetune-label load-snowflake load-databricks load-dry-run dbt-build dbt-build-dev dev-data lance-azure-check lance-versions lance-rollback lance-prune parity k8s-check
 
 PYTHON := uv run python
 # LanceDB is the default transcript store and needs the lance dependency group wherever the
@@ -18,12 +18,28 @@ LANCE_GROUP = $(if $(filter pgvector,$(RETRIEVER_BACKEND)),,--group lance)
 # starts only db, ollama, open-webui and structurizr.
 COMPOSE_APP := docker compose --profile app
 
+# Opt-in registry build cache. With BUILD_CACHE_REF unset (the default) builds are unchanged.
+# Set it to a registry repository (e.g. registry.example.com/team/ccai-cache) to pull layers
+# from <ref>:<branch> and <ref>:main, and, on the default branch only, push them back.
+BUILD_CACHE_REF ?=
+ifneq ($(strip $(BUILD_CACHE_REF)),)
+CACHE_BRANCH := $(shell git rev-parse --abbrev-ref HEAD 2>/dev/null | tr -c 'A-Za-z0-9_.\n-' '-')
+export CACHE_REF := $(BUILD_CACHE_REF)
+export CACHE_BRANCH
+COMPOSE_CACHE_FILES := -f docker-compose.yml -f docker-compose.cache.yml$(if $(filter main,$(CACHE_BRANCH)), -f docker-compose.cache-push.yml)
+COMPOSE_APP := docker compose $(COMPOSE_CACHE_FILES) --profile app
+endif
+
 # `make demo` defaults to the local, keyless path: chat on Ollama (llama3.2) and embeddings
 # on Ollama (nomic-embed-text). Override the chat provider with DEMO_LLM_PROVIDER, e.g.
 # `make demo DEMO_LLM_PROVIDER=openai` (needs OPENAI_API_KEY in .env, e.g. an OpenRouter key).
 DEMO_LLM_PROVIDER ?= ollama
 
 # ── Compose demo stack ─────────────────────────────────────────────────────────
+
+# Builds the shared app image (every app service uses it). Honours BUILD_CACHE_REF above.
+build-image:
+	$(COMPOSE_APP) build seed
 
 # Brings the stack up (db, ollama, model pulls, seed, dbt build, the langgraph dev server)
 # and runs the five scripted questions from agent/demo.py. The first run pulls models and

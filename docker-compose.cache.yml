@@ -1,0 +1,17 @@
+# Opt-in registry build cache for the app image (see README, "Shared build cache").
+# The Makefile adds this file only when BUILD_CACHE_REF is set; it reads
+# CACHE_REF (<registry>/<repository>) and CACHE_BRANCH from the environment.
+x-cache: &cache
+  build:
+    cache_from:
+      - type=registry,ref=${CACHE_REF:?}:${CACHE_BRANCH:-main}
+      - type=registry,ref=${CACHE_REF:?}:main
+
+services:
+  dbt: *cache
+  demo: *cache
+  evals: *cache
+  jupyter: *cache
+  langgraph-api: *cache
+  mcp-server: *cache
+  seed: *cache

@@ -148,6 +148,24 @@ declares a vLLM server.
 (`notebooks/change-analysis.ipynb`) on the same stack; the login token is `JUPYTER_TOKEN`
 (`ccai-demo` when unset). Notebooks are committed with their outputs cleared.
 
+### Shared build cache (optional)
+
+Every app service runs from one image, and `make build-image` builds it. By default the
+build uses only the local layer cache. Setting `BUILD_CACHE_REF` to a registry repository
+lets machines share layers through BuildKit's registry cache:
+
+```bash
+make build-image BUILD_CACHE_REF=registry.example.com/team/ccai-cache
+```
+
+The build pulls cache from `<ref>:<branch>` and `<ref>:main`. On the `main` branch it also
+pushes the cache back (`mode=max`, `ignore-error=true`, so a registry failure never fails
+the build); other branches only read. It works with any OCI registry that supports cache
+manifests, needs a BuildKit builder that can export registry cache (for example
+`docker buildx create --driver docker-container --use`), and `make demo` and `make notebooks`
+honour the same variable. Leaving it unset keeps the build exactly as before. The
+Compose overrides are `docker-compose.cache.yml` and `docker-compose.cache-push.yml`.
+
 ## Connecting a client
 
 Claude Desktop starts the server itself over stdio. Add this to `claude_desktop_config.json`,
