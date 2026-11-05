@@ -1,0 +1,15 @@
+# Adds the cache export to docker-compose.cache.yml. The Makefile includes it only on the
+# default branch, so feature branches read the cache but never write it.
+x-cache-push: &cache-push
+  build:
+    cache_to:
+      - type=registry,ref=${CACHE_REF:?}:${CACHE_BRANCH:-main},mode=max,ignore-error=true
+
+services:
+  dbt: *cache-push
+  demo: *cache-push
+  evals: *cache-push
+  jupyter: *cache-push
+  langgraph-api: *cache-push
+  mcp-server: *cache-push
+  seed: *cache-push
