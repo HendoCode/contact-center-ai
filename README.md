@@ -278,16 +278,19 @@ provider in `rag/embeddings.py`.
 `infra/azure/` holds the Terraform for Azure (Container Apps, PostgreSQL Flexible Server, ADLS)
 and its README has the bootstrap, plan and apply steps. Entra auth is configured as Easy Auth on
 the Container App (`infra/azure/modules/apps/main.tf`). CI validates the Terraform; it has not
-been applied, and no workflow builds the server image yet.
+been applied. The `publish-image` workflow pushes the server image to GHCR.
 
 ## Kubernetes deployment
 
 `infra/k8s/ccai` is a Helm chart for the MCP server stack: Postgres (or an external server),
 optional Ollama, one Job for the seed and dbt steps, and the streamable-HTTP `mcp-server` with
-probes on `/healthz`. `infra/k8s/values-aks.yaml` is the AKS example, and
-`infra/azure/envs/aks` is its Terraform (validated in CI, not applied). The deploy guide is
-[infra/k8s/README.md](infra/k8s/README.md), covering install, upgrade, rollback and where the
-data lives. `make k8s-check` runs the chart's lint and schema checks.
+probes on `/healthz`. `infra/k8s/values-aks.yaml` is the AKS example, `infra/k8s/values-local.yaml` the laptop one
+(kind or OrbStack, arm64 or amd64), and `infra/azure/envs/aks` is the AKS Terraform (validated in
+CI, not applied). The chart also has an optional cloudflared connector and a stopped mode
+(`enabled: false`). Workflows publish the multi-arch image and the chart (as an OCI artifact) to
+GHCR. The deploy guide is [infra/k8s/README.md](infra/k8s/README.md), covering install, laptop
+use, upgrade, rollback, releases and where the data lives. `make k8s-check` runs the chart's lint
+and schema checks.
 
 ## Notes
 

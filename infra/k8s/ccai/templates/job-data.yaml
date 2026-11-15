@@ -1,4 +1,4 @@
-{{- if or .Values.seed.enabled .Values.dbt.enabled }}
+{{- if and .Values.enabled (or .Values.seed.enabled .Values.dbt.enabled) }}
 {{- $j := .Values.dataJob }}
 {{- $s := .Values.seed }}
 {{- $d := .Values.dbt }}

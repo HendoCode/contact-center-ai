@@ -1,13 +1,22 @@
-# Default values: a single-namespace install on any cluster, with Postgres and Ollama in the
-# chart and the Lance dataset on a PersistentVolumeClaim. The AKS example overrides these in
-# ../values-aks.yaml. infra/k8s/README.md is the deploy guide.
+# Default values: a single-namespace install on any cluster, with Postgres in the chart, chat and
+# embeddings on one OpenAI-compatible endpoint, and the Lance dataset on a PersistentVolumeClaim.
+# Requests and limits are sized for small nodes (2 GiB). The AKS and laptop examples override
+# these in ../values-aks.yaml and ../values-local.yaml. infra/k8s/README.md is the deploy guide.
 
-# The one app image (the repo's Dockerfile). Every app container runs it with a different
-# command, as the Compose app services do. No workflow publishes it yet: build it and push it to
-# your registry, or load it into a local cluster (`kind load docker-image ccai-app:local`).
+# Running switch. false is "stopped" mode: every Deployment and the Postgres StatefulSet go to 0
+# replicas, the data Job is not rendered, and the helm test pod is skipped. Nothing is deleted:
+# the Services, the Secret reference and every PersistentVolumeClaim stay, so the release can sit
+# idle without being uninstalled. `--set enabled=true` starts it again; that revision's data Job
+# re-runs the idempotent seed and dbt steps.
+enabled: true
+
+# The one app image (the repo's Dockerfile), published for linux/amd64 and linux/arm64 by the
+# publish-image workflow. Every app container runs it with a different command, as the Compose
+# app services do. An empty tag means the chart's appVersion. To run a local build instead:
+# `--set image.repository=ccai-app --set image.tag=local` (`kind load docker-image ccai-app:local`).
 image:
-  repository: ccai-app
-  tag: local
+  repository: ghcr.io/hendocode/ccai-app
+  tag: ""
   pullPolicy: IfNotPresent
 
 imagePullSecrets: []
@@ -23,6 +32,7 @@ fullnameOverride: ""
 #                      DATABASE_URL is built from it, so use URL-safe characters (hex is safe).
 # Optional, read by the app when present: OPENAI_API_KEY, ANTHROPIC_API_KEY, FIREWORKS_API_KEY,
 # LANGSMITH_API_KEY, AZURE_STORAGE_ACCOUNT_KEY (az:// Lance without workload identity).
+# The cloudflared token is a separate Secret (cloudflared.tokenSecret), not this one.
 secrets:
   name: ccai-secrets
 
@@ -30,11 +40,18 @@ secrets:
 # that is not a secret belongs here. RETRIEVER_BACKEND (retrieverBackend), LANCE_URI, DATABASE_URL, DBT_* and
 # OLLAMA_BASE_URL are set by the chart from the sections below; a value here for one of those
 # is overridden.
+#
+# The defaults use one OpenAI-compatible endpoint for chat and embeddings, so a single
+# OPENAI_API_KEY in the Secret is enough and no model server runs in the cluster. For OpenRouter
+# chat, set LLM_BASE_URL and LLM_MODEL; OpenRouter serves no embedding models, so pair it with
+# ollama.enabled (below) or an embeddings endpoint that takes the same key.
 config:
-  LLM_PROVIDER: ollama
-  EMBEDDING_PROVIDER: ollama
-  OLLAMA_MODEL: llama3.2
-  OLLAMA_EMBEDDING_MODEL: nomic-embed-text
+  LLM_PROVIDER: openai
+  LLM_BASE_URL: https://api.openai.com/v1
+  LLM_MODEL: gpt-4o-mini
+  EMBEDDING_PROVIDER: openai
+  EMBEDDING_BASE_URL: https://api.openai.com/v1
+  EMBEDDING_MODEL: text-embedding-3-small
 
 serviceAccount:
   create: true
@@ -81,13 +98,13 @@ postgresql:
     # Empty uses the cluster's default StorageClass.
     storageClass: ""
   # /dev/shm for parallel index builds (the Compose service sets shm_size: 1gb for the same reason).
-  shmSize: 1Gi
+  shmSize: 256Mi
   resources:
     requests:
-      cpu: 250m
-      memory: 512Mi
+      cpu: 100m
+      memory: 256Mi
     limits:
-      memory: 2Gi
+      memory: 1Gi
 
 # Used when postgresql.enabled is false. The password is POSTGRES_PASSWORD in the Secret above.
 # The server must allow the pgvector extension (`CREATE EXTENSION vector`).
@@ -100,12 +117,15 @@ externalDatabase:
   sslmode: require
 
 # ── Ollama ────────────────────────────────────────────────────────────────────
-# Local embeddings (nomic-embed-text) and, with LLM_PROVIDER=ollama, local chat. Disable it when
-# config points both providers at an OpenAI-compatible endpoint; set OLLAMA_BASE_URL in config to
-# use an Ollama server outside the chart.
+# Local embeddings (nomic-embed-text) and, with LLM_PROVIDER=ollama, local chat. Off by default:
+# the pod wants about 2 GiB and a 3.4 GB image, more than a small node has. To use it set
+# `enabled: true` and point the providers at it in config:
+#   config: {LLM_PROVIDER: ollama, OLLAMA_MODEL: llama3.2, EMBEDDING_PROVIDER: ollama,
+#            OLLAMA_EMBEDDING_MODEL: nomic-embed-text}
+# Set OLLAMA_BASE_URL in config instead to use an Ollama server outside the chart.
 
 ollama:
-  enabled: true
+  enabled: false
   image:
     repository: ollama/ollama
     tag: 0.40.5
@@ -173,10 +193,10 @@ seed:
   pgvector: true
   resources:
     requests:
-      cpu: 500m
-      memory: 1Gi
+      cpu: 250m
+      memory: 512Mi
     limits:
-      memory: 4Gi
+      memory: 2Gi
 
 dbt:
   # `dbt build`: the star schema and its data tests. false leaves the marts as they are and the
@@ -184,10 +204,10 @@ dbt:
   enabled: true
   resources:
     requests:
-      cpu: 250m
-      memory: 512Mi
+      cpu: 100m
+      memory: 256Mi
     limits:
-      memory: 2Gi
+      memory: 1Gi
 
 # ── MCP server ────────────────────────────────────────────────────────────────
 
@@ -229,15 +249,15 @@ mcpServer:
     failureThreshold: 4
   resources:
     requests:
-      cpu: 250m
-      memory: 1Gi
+      cpu: 100m
+      memory: 384Mi
     limits:
-      memory: 3Gi
+      memory: 1Gi
   extraVolumes: []
   extraVolumeMounts: []
 
 # ── Exposure ──────────────────────────────────────────────────────────────────
-# Both are off: reach the server with `kubectl port-forward svc/<release>-ccai-mcp 8000`.
+# All three are off: reach the server with `kubectl port-forward svc/<release>-ccai-mcp 8000`.
 # Terminate TLS at whichever you enable; the bearer token travels in a header.
 
 ingress:
@@ -274,3 +294,27 @@ gateway:
     # Empty with gateway.create uses the chart's Gateway.
     parentRefs: []
     annotations: {}
+
+# A Cloudflare Tunnel connector (cloudflared) in the release, as an alternative to an Ingress or
+# Gateway when the cluster has no inbound path. The tunnel is remotely managed: create it in
+# Cloudflare, add a public hostname that forwards to the origin NOTES.txt prints
+# (http://<release>-ccai-mcp.<namespace>.svc.cluster.local:8000), and put its connector token in
+# a Secret you create (the chart never holds the token):
+#   kubectl -n <ns> create secret generic ccai-cloudflared --from-literal=TUNNEL_TOKEN=<token>
+cloudflared:
+  enabled: false
+  image:
+    repository: cloudflare/cloudflared
+    tag: "2025.11.1"
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  tokenSecret:
+    name: ccai-cloudflared
+    key: TUNNEL_TOKEN
+  metricsPort: 2000
+  resources:
+    requests:
+      cpu: 25m
+      memory: 48Mi
+    limits:
+      memory: 128Mi

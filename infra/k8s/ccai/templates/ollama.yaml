@@ -42,7 +42,7 @@ metadata:
     {{- include "ccai.labels" . | nindent 4 }}
     app.kubernetes.io/component: ollama
 spec:
-  replicas: 1
+  replicas: {{ include "ccai.replicas" (dict "root" . "count" 1) }}
   # The model volume is ReadWriteOnce, so the old pod lets go of it before the new one starts.
   strategy:
     type: Recreate

@@ -1,3 +1,4 @@
+{{- if .Values.enabled }}
 # `helm test <release>`: /healthz through the Service from inside the cluster.
 apiVersion: v1
 kind: Pod
@@ -26,3 +27,4 @@ spec:
         allowPrivilegeEscalation: false
         capabilities:
           drop: [ALL]
+{{- end }}

@@ -1,0 +1,68 @@
+name: Release chart
+
+# Packages infra/k8s/ccai and pushes it to GHCR as an OCI chart:
+#   oci://ghcr.io/<owner>/charts/ccai:<version>
+#
+# It runs on every push to main and on a `chart-v<version>` tag, and publishes only when
+# `version:` in Chart.yaml is not in the registry yet, so bumping the version is what cuts a
+# release and every other push is a no-op. A published version is never overwritten.
+# GHCR creates the package private on first push: set it to public once in the package settings
+# if clusters pull without credentials. infra/k8s/README.md ("Releases") has the procedure.
+
+on:
+  push:
+    branches: [main]
+    tags: ["chart-v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-chart
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: package and push
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+        with:
+          version: v4.3.1
+      - name: Read the chart version
+        id: chart
+        run: |
+          version="$(awk '/^version:/ {gsub(/"/, "", $2); print $2}' infra/k8s/ccai/Chart.yaml)"
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]] || { echo "::error::Chart.yaml version '$version' is not semver"; exit 1; }
+          if [[ "$GITHUB_REF_TYPE" == tag && "$GITHUB_REF_NAME" != "chart-v$version" ]]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match Chart.yaml version $version (expected chart-v$version)"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "REGISTRY=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/charts" >> "$GITHUB_ENV"
+      - name: Log in to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io --username "${{ github.actor }}" --password-stdin
+      - name: Is this version already published?
+        id: exists
+        run: |
+          if helm show chart "oci://${REGISTRY}/ccai" --version "${{ steps.chart.outputs.version }}" >/dev/null 2>&1; then
+            echo "published=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::ccai ${{ steps.chart.outputs.version }} is already in ${REGISTRY}; nothing to do. Bump version in Chart.yaml to release."
+          else
+            echo "published=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Lint and package
+        if: steps.exists.outputs.published == 'false'
+        run: |
+          helm lint --strict infra/k8s/ccai
+          helm package infra/k8s/ccai --destination "$RUNNER_TEMP/chart"
+      - name: Push
+        if: steps.exists.outputs.published == 'false'
+        run: |
+          helm push "$RUNNER_TEMP/chart/ccai-${{ steps.chart.outputs.version }}.tgz" "oci://${REGISTRY}"
+          echo "Published oci://${REGISTRY}/ccai:${{ steps.chart.outputs.version }}" >> "$GITHUB_STEP_SUMMARY"

@@ -29,7 +29,7 @@ metadata:
     app.kubernetes.io/component: postgresql
 spec:
   serviceName: {{ $name }}
-  replicas: 1
+  replicas: {{ include "ccai.replicas" (dict "root" . "count" 1) }}
   selector:
     matchLabels:
       {{- include "ccai.selectorLabels" . | nindent 6 }}

@@ -1,0 +1,99 @@
+{{- if .Values.cloudflared.enabled }}
+{{- $c := .Values.cloudflared }}
+{{- $name := include "ccai.component" (dict "root" . "name" "cloudflared") }}
+# An in-cluster Cloudflare Tunnel connector (off by default). The tunnel is remotely managed: its
+# public hostname and the origin it forwards to are set in Cloudflare, so there is no config file
+# here, only the connector token, read from a Secret you create. Point the tunnel's public
+# hostname at the mcp-server Service (the URL is in NOTES.txt). Outbound-only: no Service, Ingress
+# or open port is needed. Run two replicas for connector redundancy; both use the same token.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "ccai.labels" . | nindent 4 }}
+    app.kubernetes.io/component: cloudflared
+spec:
+  replicas: {{ include "ccai.replicas" (dict "root" . "count" $c.replicaCount) }}
+  selector:
+    matchLabels:
+      {{- include "ccai.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: cloudflared
+  template:
+    metadata:
+      labels:
+        {{- include "ccai.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: cloudflared
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      serviceAccountName: {{ include "ccai.serviceAccountName" . }}
+      automountServiceAccountToken: false
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: cloudflared
+          image: {{ $c.image.repository }}:{{ $c.image.tag }}
+          imagePullPolicy: {{ $c.image.pullPolicy }}
+          command: ["cloudflared"]
+          # `tunnel run` takes the token from TUNNEL_TOKEN; --no-autoupdate because the image is
+          # replaced by changing the tag, not by the process updating itself.
+          args:
+            - tunnel
+            - --no-autoupdate
+            - --metrics
+            - 0.0.0.0:{{ $c.metricsPort }}
+            - run
+          env:
+            - name: TUNNEL_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $c.tokenSecret.name }}
+                  key: {{ $c.tokenSecret.key }}
+          ports:
+            - name: metrics
+              containerPort: {{ $c.metricsPort }}
+          # /ready answers 200 only while the connector holds at least one edge connection.
+          livenessProbe:
+            httpGet:
+              path: /ready
+              port: metrics
+            initialDelaySeconds: 10
+            periodSeconds: 20
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: metrics
+            periodSeconds: 10
+          {{- with $c.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+{{- end }}
