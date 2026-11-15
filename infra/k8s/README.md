@@ -6,9 +6,16 @@ Apps path in `infra/azure`. The AKS Terraform (`infra/azure/envs/aks`) is planne
 only; nothing has been applied to Azure.
 
 ```
-ccai/              the chart
-values-aks.yaml    AKS values: external Postgres, az:// Lance, workload identity, Gateway API
+ccai/                     the chart
+values-local.yaml         laptop values (kind or OrbStack), hosted models
+values-local-ollama.yaml  laptop add-on: Ollama in the cluster, no API key
+values-aks.yaml           AKS values: external Postgres, az:// Lance, workload identity, Gateway API
 ```
+
+The chart is published to GHCR on each release, so a cluster installs it without this checkout
+(see [Releases](#releases)). Its defaults are portable and small-node friendly; cluster-specific
+settings (storage classes, hostnames, replica switches) belong in the values file of whoever
+runs it.
 
 ## Why Helm
 
@@ -24,11 +31,12 @@ Kustomize has no release history, and a new Job name per rollout would be a manu
 | Component | Kind | Notes |
 |---|---|---|
 | Postgres (`pgvector/pgvector:pg16`) | StatefulSet, Service, PVC | `postgresql.enabled=false` uses `externalDatabase` instead |
-| Ollama | Deployment, Service, PVC | `ollama.enabled=false` when both providers point elsewhere |
+| Ollama | Deployment, Service, PVC | off by default; `ollama.enabled=true` for in-cluster models |
 | Data Job (`<release>-ccai-data-r<revision>`) | Job | the Compose `seed` and `dbt` services, in order |
 | mcp-server | Deployment, Service | `python -m ccai_mcp.server --http`, probes on `/healthz` |
 | Lance dataset | PVC | none when `lance.uri` is an `az://` URI |
 | Ingress or Gateway API route | Ingress, or Gateway and HTTPRoute | both off by default |
+| cloudflared | Deployment | off by default; a Cloudflare Tunnel connector ([below](#cloudflare-tunnel)) |
 | `helm test` pod | Pod (test hook) | calls `/healthz` through the Service |
 
 ### Ordering
@@ -68,7 +76,7 @@ app containers.
 |---|---|---|
 | `MCP_AUTH_TOKEN` | yes | the server's bearer token (`openssl rand -hex 32`) |
 | `POSTGRES_PASSWORD` | yes | the in-chart Postgres, or the external server's password |
-| `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `FIREWORKS_API_KEY` | per `LLM_PROVIDER` | chat provider keys |
+| `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `FIREWORKS_API_KEY` | per `LLM_PROVIDER` | chat provider keys (`OPENAI_API_KEY` also serves embeddings on the default config) |
 | `AZURE_STORAGE_ACCOUNT_KEY` | only for `az://` without workload identity | ADLS access for Lance |
 
 `DATABASE_URL` is assembled from `POSTGRES_PASSWORD`, so use URL-safe characters (hex is safe).
@@ -82,16 +90,17 @@ kubectl -n ccai create secret generic ccai-secrets \
 
 ## Install on any cluster
 
-The chart expects the repo's image. No workflow publishes it yet, so build it and either push it
-to a registry the cluster can pull from or load it into a local cluster.
+The chart's default image is `ghcr.io/hendocode/ccai-app`, published for `linux/amd64` and
+`linux/arm64` with the tag equal to the chart's `appVersion` (see [Releases](#releases)). To run
+an image you built instead, push it to a registry the cluster can pull from, or load it into a
+local cluster, and set `image.repository` and `image.tag`.
 
 ```bash
-docker build -t ccai-app:local .
-kind create cluster --name ccai
-kind load docker-image ccai-app:local --name ccai     # about 2.6 GB
-
-# the Secret from "Secrets" above, then:
+# the Secret from "Secrets" above, then, from a checkout:
 helm upgrade --install ccai infra/k8s/ccai -n ccai
+# or from the registry, with no checkout:
+helm upgrade --install ccai oci://ghcr.io/hendocode/charts/ccai --version <chart version> -n ccai
+
 kubectl -n ccai logs -f job/ccai-data-r1 -c seed
 kubectl -n ccai rollout status deploy/ccai-mcp --timeout=3h
 
@@ -101,11 +110,86 @@ MCP_SERVER_URL=http://127.0.0.1:8000/mcp MCP_AUTH_TOKEN=<token> \
 helm test ccai -n ccai
 ```
 
-The defaults mirror `make demo`: chat and embeddings on the in-chart Ollama, which pulls
-`nomic-embed-text` and `llama3.2` into its volume. The Ollama image is about 3.4 GB compressed.
-To use an OpenAI-compatible chat endpoint instead, put the key in the Secret and set
-`config.LLM_PROVIDER=openai` (plus `LLM_BASE_URL` and `LLM_MODEL` if they differ from the
-defaults). Any non-secret variable from `.env.example` goes under `config`.
+The defaults send chat and embeddings to one OpenAI-compatible endpoint (`api.openai.com`), so
+`OPENAI_API_KEY` in the Secret is all the models need and nothing model-shaped runs in the
+cluster. Any non-secret variable from `.env.example` goes under `config`. Two variations:
+
+- **OpenRouter chat.** Set `config.LLM_BASE_URL=https://openrouter.ai/api/v1` and `LLM_MODEL`.
+  OpenRouter serves no embedding models, and the key in the Secret is the OpenRouter one, so
+  embeddings need either Ollama (next) or an `EMBEDDING_BASE_URL` that accepts that key.
+- **Ollama in the cluster.** `--set ollama.enabled=true` plus
+  `config.LLM_PROVIDER=ollama` and `config.EMBEDDING_PROVIDER=ollama` (`values-local-ollama.yaml`
+  has the whole set). This mirrors `make demo` and pulls `nomic-embed-text` and `llama3.2` into
+  the Ollama volume. The image is about 3.4 GB compressed, the pod asks for 2 GiB by default,
+  and the first ingest takes about 45 minutes on 2 CPU cores.
+
+## Run it on a laptop (kind or OrbStack)
+
+`values-local.yaml` is the laptop target: small volumes on the cluster's default StorageClass,
+one replica, no ingress. It works on kind and on OrbStack's Kubernetes (both arm64 and amd64;
+the published image is multi-arch, so Apple silicon pulls the native build).
+
+```bash
+kind create cluster --name ccai          # OrbStack: enable Kubernetes in its settings instead
+kubectl create namespace ccai
+kubectl -n ccai create secret generic ccai-secrets \
+  --from-literal=MCP_AUTH_TOKEN="$(openssl rand -hex 32)" \
+  --from-literal=POSTGRES_PASSWORD="$(openssl rand -hex 24)" \
+  --from-literal=OPENAI_API_KEY="$OPENAI_API_KEY"
+
+helm upgrade --install ccai infra/k8s/ccai -n ccai -f infra/k8s/values-local.yaml
+kubectl -n ccai wait --for=condition=complete job/ccai-data-r1 --timeout=1h
+kubectl -n ccai port-forward svc/ccai-mcp 8000:8000
+```
+
+The Secret lives only in your cluster, made from your shell; nothing in the chart or the values
+holds it. Then use the server as in the previous section (`MCP_SERVER_URL=http://127.0.0.1:8000/mcp`).
+
+- **No API key:** add `-f infra/k8s/values-local-ollama.yaml` (Ollama chat and embeddings in the
+  cluster). Give the Docker or OrbStack VM 6 GiB of memory or more first; the `OPENAI_API_KEY`
+  entry can be any placeholder.
+- **A local build** (before a release exists, or to test a change):
+  `docker build -t ccai-app:local .`, `kind load docker-image ccai-app:local --name ccai`
+  (OrbStack needs no load), and add `--set image.repository=ccai-app --set image.tag=local`.
+  The image is about 2.6 GB.
+
+## Stopped mode
+
+`enabled: false` stops the release without uninstalling it. Every Deployment (mcp-server,
+cloudflared and Ollama if on) and the Postgres StatefulSet go to 0 replicas, the data Job is not
+rendered, and the helm test pod is skipped. The Services, the Secrets you created and every
+PersistentVolumeClaim stay, so the database and the Lance dataset survive the stop and a
+rebuilt-from-values release finds them again.
+
+```bash
+helm upgrade ccai infra/k8s/ccai -n ccai -f <your values> --set enabled=false    # stop
+helm upgrade ccai infra/k8s/ccai -n ccai -f <your values> --set enabled=true     # start
+```
+
+In a GitOps repo, set `enabled: false` in the release's values instead; that is the whole
+switch. Starting again creates the next revision's data Job (`ccai-data-r<revision>`), which
+re-runs the seed and dbt steps. They are idempotent and reuse the stored vectors, so the restart
+takes about a minute on a seeded volume; the mcp-server pods wait in Init for it as on a first
+install. Set `seed.enabled=false` for that revision to skip the seed.
+
+## Cloudflare Tunnel
+
+`cloudflared.enabled=true` adds a Deployment that runs `cloudflared tunnel run` with a
+remotely-managed tunnel's connector token. The tunnel's public hostname and the origin it
+forwards to are configured in Cloudflare, so the chart has no config file and opens no inbound
+port; use it where the cluster has no ingress path, or in place of an Ingress.
+
+```bash
+kubectl -n ccai create secret generic ccai-cloudflared --from-literal=TUNNEL_TOKEN=<connector token>
+helm upgrade --install ccai infra/k8s/ccai -n ccai --set cloudflared.enabled=true
+```
+
+Point the tunnel's public hostname at the mcp-server Service. `helm status` prints the URL; it is
+`http://<release>-ccai-mcp.<namespace>.svc.cluster.local:8000`. The Secret name and key are
+`cloudflared.tokenSecret.name` and `.key`. The server still requires its bearer token, so a
+tunnel is not a substitute for `MCP_AUTH_TOKEN`; put an access policy on the hostname in
+Cloudflare as well if the clients can use one. Stopped mode scales this Deployment to 0 with the
+rest.
 
 ## Upgrade
 
@@ -231,13 +315,43 @@ cd infra/azure && terraform fmt -check -recursive
 (cd infra/azure/envs/aks && terraform init -backend=false && terraform validate)
 ```
 
-`make k8s-check` needs `helm` and `kubeconform` on PATH. kubeconform downloads the Kubernetes
+`make k8s-check` renders the default values, `values-aks.yaml`, `values-local.yaml`, the laptop
+Ollama add-on, Ingress with an external database, cloudflared and stopped mode. It needs `helm`
+and `kubeconform` on PATH. kubeconform downloads the Kubernetes
 schemas, and the Gateway API schemas from the CRD catalog, so it needs network access.
 `tests/test_helm_chart.py` (part of `make test`) checks that the chart's seed and server
 commands match the Compose services.
 
 ## Not in the chart
 
-The Compose `langgraph-api` (a dev server), `jupyter`, `demo`, `evals` and `cloudflared`
-services are not in the chart. Each would need its own auth or exposure decisions. They are
+The Compose `langgraph-api` (a dev server), `jupyter`, `demo` and `evals` services are not in
+the chart (Compose's `cloudflared` is the optional Deployment above). Each would need its own auth or exposure decisions. They are
 listed in [docs/ROADMAP.md](../../docs/ROADMAP.md).
+
+## Releases
+
+Two workflows publish to GHCR with the repository's `GITHUB_TOKEN` (`packages: write`); nothing
+else is needed. GHCR creates each package private on its first push: in the package settings,
+set `ccai-app` and `charts/ccai` to public once if clusters pull without credentials (otherwise
+give the cluster an `imagePullSecret`).
+
+| Artifact | Workflow | Published when |
+|---|---|---|
+| Image `ghcr.io/hendocode/ccai-app`, `linux/amd64` and `linux/arm64` | `publish-image.yml` | every push to main (`main`, `sha-<short>`), and a `v<version>` tag (`<version>`, `<major>.<minor>`) |
+| Chart `oci://ghcr.io/hendocode/charts/ccai` | `release-chart.yml` | a push to main or a `chart-v<version>` tag, when `version` in `Chart.yaml` is not in the registry yet |
+
+The chart's default image tag is its `appVersion`, so a chart release needs the matching image
+tag to exist. To cut a release:
+
+1. Edit `infra/k8s/ccai/Chart.yaml`: bump `version` (semver: a patch for template fixes, a minor
+   for new values, a major for a breaking change to values or behaviour) and, when the app
+   changed, `appVersion`.
+2. Merge to main. `release-chart.yml` sees an unpublished `version` and pushes the chart.
+   Published versions are never overwritten, so any other push to main is a no-op.
+3. When `appVersion` is new, push the tag `v<appVersion>` (`git tag v0.2.0 && git push origin
+   v0.2.0`) to publish the image under that tag. Pushing `chart-v<version>` instead of merging
+   also works for the chart, and the workflow checks the tag against `Chart.yaml`.
+4. Consumers pin the chart `version`, for example in a Flux `HelmRelease`
+   (`HelmRepository` with `type: oci`, URL `oci://ghcr.io/hendocode/charts`, chart `ccai`).
+
+Both workflows can be started by hand from the Actions tab.

@@ -3,6 +3,7 @@
 The templates are Go templates, not YAML, so these read them as text. Rendering and schema
 validation are `make k8s-check` (helm and kubeconform), which CI runs in its own job.
 """
+import re
 from pathlib import Path
 
 import yaml
@@ -52,3 +53,64 @@ def test_values_reference_a_secret_and_never_hold_secret_values():
         assert set(values["secrets"]) == {"name"}, path
         config = values.get("config") or {}
         assert not [k for k in config if k.endswith(("_KEY", "_TOKEN", "_PASSWORD"))], path
+
+
+def _values(path: Path = CHART / "values.yaml") -> dict:
+    return yaml.safe_load(path.read_text())
+
+
+def test_stopped_mode_zeroes_every_workload_and_skips_the_data_job():
+    assert _values()["enabled"] is True
+    for name in ("mcp-server.yaml", "ollama.yaml", "postgresql.yaml", "cloudflared.yaml"):
+        assert 'include "ccai.replicas"' in _template(name), name
+    assert "{{- if and .Values.enabled" in _template("job-data.yaml")
+    assert "{{- if .Values.enabled }}" in _template("tests/healthz.yaml")
+
+
+def test_default_resources_fit_small_nodes_and_ollama_is_off():
+    values = _values()
+    assert values["ollama"]["enabled"] is False
+    assert values["config"]["EMBEDDING_PROVIDER"] == "openai"
+    assert values["config"]["LLM_PROVIDER"] == "openai"
+    for section in (values["postgresql"], values["seed"], values["dbt"], values["mcpServer"], values["cloudflared"]):
+        assert section["resources"]["requests"]["memory"].endswith(("Mi",)), section
+    assert values["mcpServer"]["resources"]["limits"]["memory"] == "1Gi"
+
+
+def test_cloudflared_runs_a_remotely_managed_tunnel_from_a_secret():
+    values = _values()["cloudflared"]
+    assert values["enabled"] is False
+    assert set(values["tokenSecret"]) == {"name", "key"}
+    template = _template("cloudflared.yaml")
+    assert "{{- if .Values.cloudflared.enabled }}" in template
+    assert "- run" in template and "- tunnel" in template
+    # The token comes from a Secret; a remotely managed tunnel has no config file or origin flag.
+    assert "secretKeyRef" in template and "TUNNEL_TOKEN" in template
+    assert "--config" not in template and "--url" not in template
+
+
+def test_default_image_is_published_and_tagged_with_the_app_version():
+    values = _values()
+    assert values["image"]["repository"].startswith("ghcr.io/") and values["image"]["tag"] == ""
+    assert "default .Chart.AppVersion .Values.image.tag" in _template("_helpers.tpl")
+    chart = yaml.safe_load((CHART / "Chart.yaml").read_text())
+    assert re.fullmatch(r"\d+\.\d+\.\d+", chart["version"])
+    assert re.fullmatch(r"\d+\.\d+\.\d+", chart["appVersion"])
+
+
+def test_release_workflows_publish_the_chart_and_a_multi_arch_image():
+    workflows = ROOT / ".github" / "workflows"
+    chart_release = (workflows / "release-chart.yml").read_text()
+    assert "packages: write" in chart_release and "helm push" in chart_release
+    assert "/charts" in chart_release
+    image = (workflows / "publish-image.yml").read_text()
+    assert "packages: write" in image
+    assert "linux/amd64" in image and "linux/arm64" in image
+
+
+def test_laptop_values_layer_on_the_defaults_without_secrets():
+    for name in ("values-local.yaml", "values-local-ollama.yaml"):
+        values = _values(ROOT / "infra" / "k8s" / name)
+        assert "secrets" not in values, name
+        config = values.get("config") or {}
+        assert not [k for k in config if k.endswith(("_KEY", "_TOKEN", "_PASSWORD"))], name

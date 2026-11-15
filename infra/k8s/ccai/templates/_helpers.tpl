@@ -46,8 +46,17 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 {{- end }}
 
+{{/* The image tag defaults to the chart's appVersion, which the app image workflow publishes. */}}
 {{- define "ccai.image" -}}
-{{- printf "%s:%s" .Values.image.repository .Values.image.tag }}
+{{- printf "%s:%s" .Values.image.repository (default .Chart.AppVersion .Values.image.tag) }}
+{{- end }}
+
+{{/*
+Replica count for a workload: the given count while the release is running, 0 while it is
+stopped (`enabled: false`). Usage: include "ccai.replicas" (dict "root" . "count" 1)
+*/}}
+{{- define "ccai.replicas" -}}
+{{- ternary (int .count) 0 (.root.Values.enabled | default false) }}
 {{- end }}
 
 {{/* Where things are */}}

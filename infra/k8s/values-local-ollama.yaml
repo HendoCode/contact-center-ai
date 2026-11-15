@@ -1,0 +1,30 @@
+# Keyless local models for a laptop: Ollama in the cluster serves chat and embeddings, so no API
+# key is needed (the OPENAI_API_KEY entry in the Secret can be any placeholder). Layer it after
+# values-local.yaml:
+#
+#   helm upgrade --install ccai infra/k8s/ccai -n ccai --create-namespace \
+#     -f infra/k8s/values-local.yaml -f infra/k8s/values-local-ollama.yaml
+#
+# The Ollama image is about 3.4 GB and the first ingest embeds 1,540 transcripts on the CPU (about
+# 45 minutes on 2 cores; Docker Desktop and OrbStack default to fewer than a full laptop, so give
+# the VM 6 GiB of memory or more). The models are pulled into the Ollama volume once.
+
+config:
+  LLM_PROVIDER: ollama
+  OLLAMA_MODEL: llama3.2
+  EMBEDDING_PROVIDER: ollama
+  OLLAMA_EMBEDDING_MODEL: nomic-embed-text
+
+ollama:
+  enabled: true
+  persistence:
+    size: 6Gi
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      memory: 4Gi
+
+dataJob:
+  activeDeadlineSeconds: 9000

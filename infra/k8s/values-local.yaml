@@ -1,0 +1,32 @@
+# Laptop example for kind or OrbStack (Kubernetes in Docker on an arm64 or amd64 machine),
+# layered on the chart defaults:
+#
+#   helm upgrade --install ccai infra/k8s/ccai -n ccai --create-namespace -f infra/k8s/values-local.yaml
+#
+# Create the Secret first (infra/k8s/README.md, "Run it on a laptop"): MCP_AUTH_TOKEN,
+# POSTGRES_PASSWORD and OPENAI_API_KEY. Nothing else is needed: the app image is the published
+# multi-arch one (linux/amd64 and linux/arm64), so Apple silicon pulls the native build.
+#
+# To run an image you built yourself, load it into the cluster and point the chart at it:
+#   docker build -t ccai-app:local .
+#   kind load docker-image ccai-app:local --name ccai          # kind; OrbStack needs no load
+#   ... --set image.repository=ccai-app --set image.tag=local
+#
+# For keyless local models instead of a hosted API, add -f infra/k8s/values-local-ollama.yaml.
+
+# Both clusters ship a default StorageClass (kind: standard, OrbStack: local-path), so no class
+# is named here. The volumes are small: the synthetic dataset is a few hundred MB.
+postgresql:
+  persistence:
+    size: 4Gi
+lance:
+  persistence:
+    size: 2Gi
+
+# One replica, no ingress: reach it with `kubectl -n ccai port-forward svc/ccai-ccai-mcp 8000:8000`.
+mcpServer:
+  replicaCount: 1
+
+# A hosted embeddings API finishes the first ingest in minutes.
+dataJob:
+  activeDeadlineSeconds: 3600

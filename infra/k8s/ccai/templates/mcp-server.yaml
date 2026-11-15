@@ -31,7 +31,7 @@ metadata:
     {{- include "ccai.labels" . | nindent 4 }}
     app.kubernetes.io/component: mcp-server
 spec:
-  replicas: {{ $m.replicaCount }}
+  replicas: {{ include "ccai.replicas" (dict "root" . "count" $m.replicaCount) }}
   {{- with $m.strategy }}
   strategy:
     {{- toYaml . | nindent 4 }}
